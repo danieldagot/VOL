@@ -1,0 +1,23 @@
+# Build outputs
+/vol
+/vol.exe
+*.test
+*.out
+
+# Test, coverage, and profiling artifacts
+coverage.*
+*.prof
+*.pprof
+
+# Local Go caches and workspaces
+/.gocache/
+go.work
+go.work.sum
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db

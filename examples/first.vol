@@ -1,0 +1,11 @@
+numbers := [4, 7, 2, 9]
+total := 0
+
+numbers.each number {
+    if number > 5 {
+        total = total + number
+    }
+}
+
+print total
+
