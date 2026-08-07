@@ -66,7 +66,7 @@ implemented and tested, but spelling or meaning may change.
 - Remove boilerplate without removing structural clarity.
 - Optimize syntax for humans, language models, formatters, and static analysis.
 
-`.each` (imperative iteration) and `.where` / `.sum` (filter / reduce) are
+`.each` (imperative iteration) and `.where` / `.sum()` (filter / reduce) are
 different intents. Both are valid.
 
 ### Quick vocabulary
@@ -101,10 +101,10 @@ do not claim identical implementation.
 | `items.each item { ... }` | Per-element block, in order | `for item in items` | Supported |
 | `value.len` | Array length or string Unicode scalars | `len(value)` | Supported |
 | `string.byte_len` | UTF-8 byte count of a string | `len(s)` in Go | Supported |
-| `array.copy` | Shallow copy of an array | `clone` / `[...arr]` | Supported |
-| `array.deep_copy` | Recursive deep clone of an array | deep clone | Supported |
+| `array.copy()` | Shallow copy of an array | `clone` / `[...arr]` | Supported |
+| `array.deep_copy()` | Recursive deep clone of an array | deep clone | Supported |
 | `items.where(condition)` | Eager filter; `_` is current item | eager `filter` | Supported |
-| `items.sum` | Left-fold `+` from integer `0` | `sum` / `reduce` | Supported |
+| `items.sum()` | Left-fold `+` from integer `0` | `sum` / `reduce` | Supported |
 | `input()` / `input(prompt)` | Read one line | stdin / `readLine` | Supported |
 | `assert(cond)` / `assert(cond, msg)` | Fail when false | assertion | Supported |
 | `string(value)` | Display string | `toString` | Supported |
@@ -283,14 +283,14 @@ There is no static type checker yet. Type mistakes are usually runtime errors
   binding; other names that still reference the previous array are unchanged.
 - `.where` always returns a **new** array. Mutating the result does not mutate
   the source.
-- **`.copy`** returns a shallow copy of the array: a new top-level `[]any` with
+- **`.copy()`** returns a shallow copy of the array: a new top-level `[]any` with
   the same elements. Mutations to the copy's indices do not affect the original,
   but nested arrays within the copy still share identity with the originals.
-- **`.deep_copy`** returns a recursive clone: all nested arrays are also cloned.
+- **`.deep_copy()`** returns a recursive clone: all nested arrays are also cloned.
   Non-array values (integers, booleans, strings, functions) are copied by value
   semantics and are not affected by either clone operation.
-- Both properties require an array receiver; non-array → `R031` (`.copy`) or
-  `R032` (`.deep_copy`).
+- Both calls require an array receiver; non-array → `R031` (`.copy()`) or
+  `R032` (`.deep_copy()`).
 - Move semantics and ownership are out of scope until designed separately.
 
 Example of shared mutation:
@@ -320,12 +320,13 @@ print b // [9]
 expression  = conditional
 conditional = or ("?" conditional ":" conditional)?
 or          = and ("or" and)*
-and         = equality ("and" equality)*
+and         = not ("and" not)*
+not         = "not" not | equality
 equality    = comparison (("==" | "!=") comparison)*
 comparison  = term (("<" | "<=" | ">" | ">=") term)*
 term        = factor (("+" | "-") factor)*
 factor      = unary (("*" | "/") unary)*
-unary       = ("not" | "-") unary | postfix
+unary       = "-" unary | postfix
 postfix     = primary (call | index | property)*
 call        = "(" args? ")"
 index       = "[" expression "]"
@@ -343,12 +344,13 @@ Lowest to highest:
 1. `? :` (right-associative)
 2. `or`
 3. `and`
-4. `==` `!=`
-5. `<` `<=` `>` `>=`
-6. `+` `-`
-7. `*` `/`
-8. unary `not` `-`
-9. call, index, `.property`
+4. `not`
+5. `==` `!=`
+6. `<` `<=` `>` `>=`
+7. `+` `-`
+8. `*` `/`
+9. unary `-`
+10. call, index, `.property`
 
 Binary operators at the same level associate left-to-right.
 Unary operators associate right-to-left.
@@ -359,7 +361,7 @@ Examples:
 | Source | Meaning |
 | --- | --- |
 | `a + b * c` | `a + (b * c)` |
-| `not a == b` | `(not a) == b` |
+| `not a == b` | `not (a == b)` |
 | `true or false and x` | `true or (false and x)` |
 | `a ? b : c ? d : e` | `a ? b : (c ? d : e)` |
 
@@ -370,6 +372,8 @@ Examples:
   - `false and x` does not evaluate `x`
   - `true or x` does not evaluate `x`
 - `not` requires a Boolean operand.
+- `not` binds after comparisons and before `and` / `or`; use parentheses to
+  negate a wider expression, such as `not (ready and allowed)`.
 
 ### 4.2.1 Conditional operator `? :`
 
@@ -406,9 +410,9 @@ Known properties:
 | `array.len` | element count as integer |
 | `string.len` | Unicode scalar count as integer (not bytes) |
 | `string.byte_len` | UTF-8 byte count as integer (`R033` on non-string) |
-| `array.copy` | shallow copy of the array (`R031` on non-array) |
-| `array.deep_copy` | recursive deep clone of the array (`R032` on non-array) |
-| `array.sum` | left fold of `+` starting from integer `0` |
+| `array.copy()` | shallow copy of the array (`R031` on non-array) |
+| `array.deep_copy()` | recursive deep clone of the array (`R032` on non-array) |
+| `array.sum()` | left fold of `+` starting from integer `0` |
 | `array.where(condition)` | eager filter; see below |
 
 Unknown properties are `R007`. Using `.length` instead of `.len` is `R007` with
@@ -445,10 +449,10 @@ right, so impure helpers may appear to “work.” Such programs are
 `.where` pipelines, or reject impure predicates. Do not depend on side effects
 inside `.where`.
 
-#### `.sum`
+#### `.sum()`
 
 ```vol
-items.sum
+items.sum()
 ```
 
 Semantics:
@@ -459,7 +463,7 @@ Semantics:
 4. Empty array yields `0`.
 5. Non-numeric items fail with `R013`.
 
-`.where` / `.sum` are not parallel and not lazy in this prototype. Future
+`.where` / `.sum()` are not parallel and not lazy in this prototype. Future
 fusion or parallelization of `.where` depends on the purity rule above.
 
 ---
@@ -594,7 +598,7 @@ items.each item {
 - Intended for imperative per-item work, including mutation and `print`.
 
 `.each` and `.where` express different intents. Both are valid: use `.where` for
-pure filters (and `.sum` for reduction); use `.each` when the body has side
+pure filters (and `.sum()` for reduction); use `.each` when the body has side
 effects. See §4.4.
 
 ### 5.7 `print`
@@ -796,7 +800,7 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `R016` | array index out of bounds |
 | `R017` | call of non-function |
 | `R018` | wrong function argument count |
-| `R019` | `.sum` on non-array |
+| `R019` | `.sum()` on non-array |
 | `R020` | `.where` wrong arity |
 | `R021` | `.where` on non-array |
 | `R022` | `.where` condition not Boolean |
@@ -808,8 +812,8 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `R028` | integer overflow |
 | `R029` | expected a value, got `nothing` |
 | `R030` | assignment to a `const` binding |
-| `R031` | `.copy` on non-array |
-| `R032` | `.deep_copy` on non-array |
+| `R031` | `.copy()` on non-array |
+| `R032` | `.deep_copy()` on non-array |
 | `R033` | `.byte_len` on non-string |
 | `R999` | internal unsupported expression |
 
@@ -824,7 +828,7 @@ These programs must keep working. They are also covered by `examples/` and tests
 ```vol
 print 1 + 2 * 3 // 7
 print true or false and false // true
-print not false == true // true
+print not 1 == 1 // false
 ```
 
 ### 9.2 Scope
@@ -844,7 +848,7 @@ print value // 1
 numbers := [4, 7, 2, 9, 12]
 large := numbers.where(_ > 5)
 print large // [7, 9, 12]
-print large.sum // 28
+print large.sum() // 28
 ```
 
 ### 9.4 Functions
@@ -888,7 +892,7 @@ and Planned work in [`IDEAS.md`](IDEAS.md).
   immutability uses `const name := expression` with shallow semantics
   (implemented; `S030`/`R030` on reassignment).
 - **Array assignment (§3.3):** assignment and argument passing **share** the
-  array reference. Use `.copy` for a shallow clone or `.deep_copy` for a
+  array reference. Use `.copy()` for a shallow clone or `.deep_copy()` for a
   recursive clone. Move/ownership are not implied.
 - **Integer overflow (§4.3):** overflow **traps** (`R028` with a `fix`
   suggestion). Wrapping ops / build modes are Planned.

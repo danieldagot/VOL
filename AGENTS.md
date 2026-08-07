@@ -40,7 +40,7 @@ every document.
 Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 
 - bindings are **mutable by default**; opt-in `const name := expression` is Supported (shallow; `S030`/`R030` on reassignment)
-- array assignment **shares** references; use `.copy` (shallow) or `.deep_copy` (recursive) for isolation
+- array assignment **shares** references; use `.copy()` (shallow) or `.deep_copy()` (recursive) for isolation
 - integer overflow **traps** (`R028`) with a `fix` suggestion; wrapping modes are Planned
 - `.where` predicates are **pure**; side effects belong in `.each`
 - missing `return` yields `nothing`; discarding in a call statement is OK;
@@ -232,7 +232,7 @@ users.each user {
 Instead of iterator boilerplate.
 
 Prefer familiar, trainable surface syntax (`:=`, braces, `fn`, `if`, arrays)
-plus semantic compression (`.where(...).sum`) over inventing unfamiliar glyphs.
+plus semantic compression (`.where(...).sum()`) over inventing unfamiliar glyphs.
 
 Keep about one canonical representation for each distinct intent. Imperative
 iteration and pure filtering or aggregation are different intents; both may exist.

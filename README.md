@@ -50,10 +50,10 @@ This README separates **what works today** from **long-term design targets**. Tr
 - `repeat` loops
 - `while` loops
 - arrays and array indexing
-- indexed array assignment (assignment and arguments share array identity; use `.copy` for a shallow clone or `.deep_copy` for a recursive clone)
+- indexed array assignment (assignment and arguments share array identity; use `.copy()` for a shallow clone or `.deep_copy()` for a recursive clone)
 - array `.len` and string `.len` (Unicode scalar values) and string `.byte_len` (UTF-8 byte count)
 - array iteration with `.each` (imperative / side effects)
-- collection filtering with `.where(...)` (eager new array; pure predicates) and numeric aggregation with `.sum`
+- collection filtering with `.where(...)` (eager new array; pure predicates) and numeric aggregation with `.sum()`
 - `print`
 - interactive text input with `input()` or `input(prompt)`
 - runtime checks with `assert(condition)` or `assert(condition, message)`
@@ -73,7 +73,7 @@ This README separates **what works today** from **long-term design targets**. Tr
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter
 - a published compatibility policy and versioned conformance corpus
-- LLM generation and repair benchmark *runs* (protocol defined in [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md); source token density is measured in `bench/`; generate/repair results are not yet collected)
+- broader LLM workflow results across more models and realistic backend tasks
 - initial language-server support
 
 ### What Is Still an Open Experiment
@@ -171,7 +171,7 @@ print total
 Filtering and summing are a different intent from imperative iteration:
 
 ```vol
-total := numbers.where(_ > 5).sum
+total := numbers.where(_ > 5).sum()
 print total
 ```
 
@@ -227,6 +227,25 @@ How to run / regenerate: [`bench/README.md`](bench/README.md).
 cd bench && uv sync && uv run python harness/count_tokens.py
 ```
 
+## LLM Workflow Benchmark
+
+One protocol-v1 core run is available for `gemini-3.5-flash-lite`, temperature
+0, three replicates, and at most two repair rounds. The suite has five tasks
+covering generation, seeded repair, and modification:
+
+| Language | First-try success | Success @ K | Mean total tokens |
+| --- | ---: | ---: | ---: |
+| Go | 100% | 100% | 789.3 |
+| VOL | 100% | 100% | 805.5 |
+
+VOL used about 2.1% more workflow tokens overall in this run. It used fewer
+tokens on the modification task, but more on generation and seeded repair.
+This small synthetic suite does not establish real-world superiority for either
+language and does not measure runtime performance.
+
+Full result: [`bench/llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md`](bench/llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md).
+Protocol and limitations: [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md).
+
 ## Requirements
 
 - Go 1.24 or newer
@@ -253,7 +272,7 @@ The `examples` folder contains small programs that can be run independently:
 | `conditions.vol` | Comparisons and Boolean conditions |
 | `loops.vol` | `while`, `repeat`, and assignment |
 | `arrays.vol` | Arrays, indexing, length, and `.each` |
-| `collections.vol` | `.where`, `.sum`, and `assert` |
+| `collections.vol` | `.where`, `.sum()`, and `assert` |
 | `functions.vol` | Function declarations, calls, parameters, and returns |
 | `scope.vol` | Lexical scopes and shadowing |
 | `interaction.vol` | Interactive input and assertions |

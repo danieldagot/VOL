@@ -29,9 +29,10 @@ print 1 != 1.0
 print [1, [2, 3]] == [1, [2, 3]]
 print "a" + "b"
 print not false
+print not 1 == 1
 print true and true
 print false or true`
-	want := "7\n9\n3\n3.5\n3.5\n3.5\n5\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\nfalse\ntrue\nab\ntrue\ntrue\ntrue\n"
+	want := "7\n9\n3\n3.5\n3.5\n3.5\n5\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\nfalse\ntrue\nab\ntrue\nfalse\ntrue\ntrue\n"
 	output, diagnostic := run(t, source)
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
@@ -100,7 +101,7 @@ func TestCollectionsCoverEmptyNestedUnicodeAndMutation(t *testing.T) {
 	source := `empty := []
 print empty
 print empty.len
-print empty.sum
+print empty.sum()
 print empty.where(_ > 0)
 items := [[1], [2, 3]]
 items[0][0] = 9
@@ -109,7 +110,7 @@ alias := items[1]
 alias[0] = 8
 print items
 print "🙂é".len
-total := [1, 2.5, 3].sum
+total := [1, 2.5, 3].sum()
 print total
 items.each item { print item.len }`
 	want := "[]\n0\n0\n[]\n[[9], [2, 3]]\n[[9], [8, 3]]\n2\n6.5\n1\n2\n"
@@ -279,6 +280,9 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "float repeat", source: "repeat 1.0 {}", code: "R005", message: "non-negative integer"},
 		{name: "each non-array", source: `"x".each item {}`, code: "R006", message: "requires an array"},
 		{name: "unknown property", source: "print [1].missing", code: "R007", message: "Unknown property"},
+		{name: "sum requires call", source: "print [1].sum", code: "R007", message: "Unknown property `sum`"},
+		{name: "copy requires call", source: "print [1].copy", code: "R007", message: "Unknown property `copy`"},
+		{name: "deep copy requires call", source: "print [1].deep_copy", code: "R007", message: "Unknown property `deep_copy`"},
 		{name: "len wrong type", source: "print 1.len", code: "R007", message: "Unknown property"},
 		{name: "length renamed", source: "print [1].length", code: "R007", message: "Unknown property `length`"},
 		{name: "not wrong type", source: "print not 1", code: "R008", message: "Boolean"},
@@ -288,7 +292,7 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "and right wrong type", source: "print true and 1", code: "R012", message: "Boolean"},
 		{name: "or right wrong type", source: "print false or 1", code: "R012", message: "Boolean"},
 		{name: "operator types", source: `print "x" + 1`, code: "R013", message: "string and integer"},
-		{name: "sum item type", source: `print [1, "x"].sum`, code: "R013", message: "integer and string"},
+		{name: "sum item type", source: `print [1, "x"].sum()`, code: "R013", message: "integer and string"},
 		{name: "integer division zero", source: "print 1 / 0", code: "R014", message: "Division by zero"},
 		{name: "float division zero", source: "print 1.0 / 0.0", code: "R014", message: "Division by zero"},
 		{name: "integer add overflow", source: "print 9223372036854775807 + 1", code: "R028", message: "Integer overflow"},
@@ -305,7 +309,7 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "index at length", source: "print [1][1]", code: "R016", message: "outside length 1"},
 		{name: "call non-function", source: "value := 1\nvalue()", code: "R017", message: "Only functions"},
 		{name: "indirect arity", source: "fn one(value) { return value }\ncall := one\ncall()", code: "R018", message: "expects 1 arguments, got 0"},
-		{name: "sum non-array", source: `print "x".sum`, code: "R019", message: "requires an array"},
+		{name: "sum non-array", source: `print "x".sum()`, code: "R019", message: "requires an array"},
 		{name: "where non-array", source: `print "x".where(_ == "x")`, code: "R021", message: "requires an array"},
 		{name: "where condition", source: "print [1].where(_ + 1)", code: "R022", message: "must be Boolean"},
 		{name: "input prompt", source: "input(1)", code: "R023", message: "prompt must be a string"},
@@ -314,8 +318,8 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "assert default", source: "assert(false)", code: "R027", message: "Assertion failed"},
 		{name: "assert custom", source: `assert(false, "custom")`, code: "R027", message: "custom"},
 		{name: "const rebind", source: "const limit := 10\nlimit = 11", code: "S030", message: "Cannot assign to const"},
-		{name: "copy non-array", source: `print "x".copy`, code: "R031", message: "requires an array"},
-		{name: "deep_copy non-array", source: `print "x".deep_copy`, code: "R032", message: "requires an array"},
+		{name: "copy non-array", source: `print "x".copy()`, code: "R031", message: "requires an array"},
+		{name: "deep_copy non-array", source: `print "x".deep_copy()`, code: "R032", message: "requires an array"},
 		{name: "byte_len non-string", source: "print [1].byte_len", code: "R033", message: "requires a string"},
 	}
 	for _, test := range tests {
@@ -458,42 +462,42 @@ func TestStringByteLenProperty(t *testing.T) {
 
 func TestArrayCopyAndDeepCopy(t *testing.T) {
 	// .copy isolates the top-level array from the original
-	source := "a := [1, 2, 3]\nb := a.copy\nb[0] = 9\nprint a\nprint b"
+	source := "a := [1, 2, 3]\nb := a.copy()\nb[0] = 9\nprint a\nprint b"
 	output, diagnostic := run(t, source)
 	if diagnostic != nil || output != "[1, 2, 3]\n[9, 2, 3]\n" {
 		t.Fatalf(".copy isolation: output = %q, diagnostic = %#v", output, diagnostic)
 	}
 
 	// .copy is shallow: nested arrays still share identity
-	source = "inner := [1, 2]\nouter := [inner]\ncopy := outer.copy\ncopy[0][0] = 9\nprint inner"
+	source = "inner := [1, 2]\nouter := [inner]\ncopy := outer.copy()\ncopy[0][0] = 9\nprint inner"
 	output, diagnostic = run(t, source)
 	if diagnostic != nil || output != "[9, 2]\n" {
 		t.Fatalf(".copy shallow (nested shares): output = %q, diagnostic = %#v", output, diagnostic)
 	}
 
 	// .deep_copy isolates nested arrays too
-	source = "inner := [1, 2]\nouter := [inner]\ndc := outer.deep_copy\ndc[0][0] = 9\nprint inner"
+	source = "inner := [1, 2]\nouter := [inner]\ndc := outer.deep_copy()\ndc[0][0] = 9\nprint inner"
 	output, diagnostic = run(t, source)
 	if diagnostic != nil || output != "[1, 2]\n" {
 		t.Fatalf(".deep_copy nested isolation: output = %q, diagnostic = %#v", output, diagnostic)
 	}
 
 	// .deep_copy on a flat array behaves like .copy
-	source = "a := [10, 20]\nb := a.deep_copy\nb[1] = 99\nprint a\nprint b"
+	source = "a := [10, 20]\nb := a.deep_copy()\nb[1] = 99\nprint a\nprint b"
 	output, diagnostic = run(t, source)
 	if diagnostic != nil || output != "[10, 20]\n[10, 99]\n" {
 		t.Fatalf(".deep_copy flat: output = %q, diagnostic = %#v", output, diagnostic)
 	}
 
 	// original rebind does not affect copy
-	source = "a := [1, 2]\nb := a.copy\na = [9]\nprint b"
+	source = "a := [1, 2]\nb := a.copy()\na = [9]\nprint b"
 	output, diagnostic = run(t, source)
 	if diagnostic != nil || output != "[1, 2]\n" {
 		t.Fatalf(".copy rebind independence: output = %q, diagnostic = %#v", output, diagnostic)
 	}
 
 	// .copy on empty array
-	output, diagnostic = run(t, "a := []\nb := a.copy\nprint b.len")
+	output, diagnostic = run(t, "a := []\nb := a.copy()\nprint b.len")
 	if diagnostic != nil || output != "0\n" {
 		t.Fatalf(".copy empty: output = %q, diagnostic = %#v", output, diagnostic)
 	}

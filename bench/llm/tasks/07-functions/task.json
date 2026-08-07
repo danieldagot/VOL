@@ -1,0 +1,7 @@
+{
+  "kind": "generation",
+  "source_checks": {
+    "vol": ["\\bfn\\s+greet\\b", "\\bfn\\s+square\\b"],
+    "go": ["\\bfunc\\s+greet\\b", "\\bfunc\\s+square\\b"]
+  }
+}

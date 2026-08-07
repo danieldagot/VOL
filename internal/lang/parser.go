@@ -321,7 +321,18 @@ func (p *parser) ternary() (Expression, *Diagnostic) {
 }
 
 func (p *parser) or() (Expression, *Diagnostic)  { return p.binary(p.and, TokenOr) }
-func (p *parser) and() (Expression, *Diagnostic) { return p.binary(p.equality, TokenAnd) }
+func (p *parser) and() (Expression, *Diagnostic) { return p.binary(p.not, TokenAnd) }
+func (p *parser) not() (Expression, *Diagnostic) {
+	if p.match(TokenNot) {
+		operator := p.previous()
+		right, d := p.not()
+		if d != nil {
+			return nil, d
+		}
+		return &Unary{Operator: operator, Right: right}, nil
+	}
+	return p.equality()
+}
 func (p *parser) equality() (Expression, *Diagnostic) {
 	return p.binary(p.comparison, TokenEqualEqual, TokenBangEqual)
 }
@@ -348,7 +359,7 @@ func (p *parser) binary(next func() (Expression, *Diagnostic), kinds ...TokenKin
 }
 
 func (p *parser) unary() (Expression, *Diagnostic) {
-	if p.match(TokenNot, TokenMinus) {
+	if p.match(TokenMinus) {
 		operator := p.previous()
 		right, d := p.unary()
 		if d != nil {

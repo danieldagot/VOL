@@ -1,7 +1,7 @@
 numbers := [4, 7, 2, 9, 12]
 
 large := numbers.where(_ > 5)
-total := large.sum
+total := large.sum()
 
 print large
 print "Sum: " + string(total)

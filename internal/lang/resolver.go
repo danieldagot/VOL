@@ -191,6 +191,18 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 			r.end()
 			return d
 		}
+		if property, ok := node.Callee.(*Property); ok {
+			switch property.Name.Lexeme {
+			case "sum", "copy", "deep_copy":
+				if d := r.expression(property.Object); d != nil {
+					return d
+				}
+				if len(node.Arguments) != 0 {
+					return r.arity(property.Name, "."+property.Name.Lexeme, 0, len(node.Arguments))
+				}
+				return nil
+			}
+		}
 		if d := r.expression(node.Callee); d != nil {
 			return d
 		}

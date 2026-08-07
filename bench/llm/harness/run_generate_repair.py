@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
 """
-run_generate_repair.py — VOL LLM generate/repair harness (protocol v0).
+run_generate_repair.py — VOL LLM workflow benchmark harness (protocol v1).
 
 See ../../LLM_BENCHMARK.md (repo root: LLM_BENCHMARK.md).
 
 Modes:
   --provider ollama   Local Ollama OpenAI-compatible API (default for local work)
   --provider openai   OpenAI or any OpenAI-compatible cloud endpoint
+  --provider gemini   Google Gemini via its OpenAI-compatible endpoint
   --dry-run           Skip the model; run frozen reference solutions from bench/tasks.
                       Use this to validate runners/summary wiring. NOT a benchmark result.
 
 Environment:
+  .env                            loaded from bench/.env or the repository root
   OLLAMA_HOST / OLLAMA_BASE_URL   default http://localhost:11434/v1
   OPENAI_API_KEY                  required for --provider openai
   OPENAI_BASE_URL                 optional cloud base URL
   OPENAI_MODEL / OLLAMA_MODEL     default model name override
+  GEMINI_API_KEY                  required for --provider gemini
+  GEMINI_BASE_URL / GEMINI_MODEL  optional Gemini overrides
 
 Examples:
   uv run python llm/harness/run_generate_repair.py --dry-run
   uv run python llm/harness/run_generate_repair.py --provider ollama --model qwen3:4b-instruct
   uv run python llm/harness/run_generate_repair.py --provider openai --model gpt-4.1-mini
+  uv run python llm/harness/run_generate_repair.py --provider gemini --model gemini-3.6-flash
 """
 
 from __future__ import annotations
@@ -47,12 +52,13 @@ CARDS_DIR = LLM_ROOT / "cards"
 PROMPTS_DIR = LLM_ROOT / "tasks"
 RESULTS_DIR = LLM_ROOT / "results"
 
-SMOKE_TASKS = [
-    "01-hello",
-    "02-arithmetic",
-    "03-conditions",
-    "06-where-sum",
-    "07-functions",
+SMOKE_TASKS = ["01-hello", "07-functions"]
+CORE_TASKS = [
+    "05-arrays-each",
+    "08-strings-assert",
+    "10-fibonacci",
+    "11-leaderboard",
+    "13-temperatures",
 ]
 
 LANG_META = {
@@ -77,12 +83,45 @@ DEFAULT_OLLAMA_BASE = "http://localhost:11434/v1"
 DEFAULT_OLLAMA_MODEL = "qwen3:4b-instruct"
 DEFAULT_OPENAI_BASE = "https://api.openai.com/v1"
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
+DEFAULT_GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
+DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
+RETRYABLE_HTTP_CODES = {429, 500, 502, 503, 504}
+MAX_API_RETRIES = 5
+
+
+def load_dotenv(path: Path) -> None:
+    """Load simple KEY=VALUE entries without overriding the process environment."""
+    if not path.is_file():
+        return
+    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            die(f"invalid .env entry at {path}:{line_number}: expected KEY=VALUE")
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            die(f"invalid .env key at {path}:{line_number}: {key!r}")
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
+
+
+def load_environment() -> None:
+    # A bench-local file is more specific; existing shell variables win over both.
+    load_dotenv(BENCH_ROOT / ".env")
+    load_dotenv(VOL_REPO / ".env")
 
 
 @dataclass
 class AttemptRecord:
     suite: str
     task: str
+    task_kind: str
     language: str
     model: str
     temperature: float
@@ -102,6 +141,7 @@ class AttemptRecord:
 @dataclass
 class TaskResult:
     task: str
+    task_kind: str
     language: str
     replicate: int
     success: bool
@@ -207,7 +247,26 @@ def load_task_prompt(task: str, language: str) -> str:
     if not path.exists():
         die(f"missing task prompt: {path}")
     lang_name = LANG_META[language]["prompt_lang"]
-    return path.read_text(encoding="utf-8").replace("{{LANG}}", lang_name)
+    prompt = path.read_text(encoding="utf-8").replace("{{LANG}}", lang_name)
+    starter_path = path.parent / f"starter{LANG_META[language]['ext']}"
+    if "{{STARTER}}" in prompt:
+        if not starter_path.exists():
+            die(f"missing starter source: {starter_path}")
+        prompt = prompt.replace("{{STARTER}}", starter_path.read_text(encoding="utf-8").rstrip())
+    return prompt
+
+
+def load_task_config(task: str) -> dict:
+    path = PROMPTS_DIR / task / "task.json"
+    if not path.exists():
+        die(f"missing task metadata: {path}")
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        die(f"invalid task metadata {path}: {exc}")
+    if config.get("kind") not in {"generation", "repair", "modification"}:
+        die(f"invalid task kind in {path}")
+    return config
 
 
 def load_expected(task: str) -> str:
@@ -225,14 +284,24 @@ def load_reference(task: str, language: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def judge(stdout: str, stderr: str, rc: int | None, timed_out: bool, expected: str) -> str:
+def judge(
+    stdout: str,
+    rc: int | None,
+    timed_out: bool,
+    expected: str,
+    source: str,
+    source_checks: list[str],
+) -> tuple[str, str | None]:
     if timed_out or rc is None:
-        return "timeout"
+        return "timeout", None
     if rc != 0:
-        return "diag_error"
+        return "diag_error", None
     if stdout != expected:
-        return "wrong_output"
-    return "success"
+        return "wrong_output", None
+    for pattern in source_checks:
+        if not re.search(pattern, source, re.MULTILINE):
+            return "source_check_failed", f"Required source pattern was not found: {pattern}"
+    return "success", None
 
 
 SYSTEM_PROMPT = (
@@ -278,6 +347,21 @@ def normalize_openai_base(url: str) -> str:
     return url
 
 
+def retry_delay_seconds(exc: urllib.error.HTTPError, detail: str, retry: int) -> float:
+    retry_after = exc.headers.get("Retry-After") if exc.headers else None
+    if retry_after:
+        try:
+            return min(60.0, max(1.0, float(retry_after)))
+        except ValueError:
+            pass
+    match = re.search(r'"retryDelay"\s*:\s*"([0-9.]+)s"', detail)
+    if not match:
+        match = re.search(r"retry in ([0-9.]+)s", detail, re.IGNORECASE)
+    if match:
+        return min(60.0, max(1.0, float(match.group(1)) + 1.0))
+    return min(30.0, float(2**retry))
+
+
 def chat_completion(
     *,
     base_url: str,
@@ -302,19 +386,34 @@ def chat_completion(
         # Ollama ignores the key but accepts the header; cloud requires it.
         "Authorization": f"Bearer {api_key or 'ollama'}",
     }
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=request_timeout) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        die(f"API HTTP {exc.code}: {detail}")
-    except urllib.error.URLError as exc:
-        die(
-            f"API request failed: {exc}\n"
-            f"  URL: {url}\n"
-            "  If using Ollama, is `ollama serve` running?"
-        )
+    body = None
+    for retry in range(MAX_API_RETRIES + 1):
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=request_timeout) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            if exc.code not in RETRYABLE_HTTP_CODES or retry >= MAX_API_RETRIES:
+                die(f"API HTTP {exc.code}: {detail}")
+            delay = retry_delay_seconds(exc, detail, retry)
+            print(
+                f"API HTTP {exc.code}; retrying in {delay:.1f}s "
+                f"({retry + 1}/{MAX_API_RETRIES})",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
+        except urllib.error.URLError as exc:
+            die(
+                f"API request failed: {exc}\n"
+                f"  URL: {url}\n"
+                "  If using Ollama, is `ollama serve` running?"
+            )
+
+    if body is None:
+        die("API request ended without a response")
 
     try:
         message = body["choices"][0]["message"]
@@ -357,7 +456,17 @@ def run_task_replicate(
     vol_cwd: str | None,
 ) -> TaskResult:
     expected = load_expected(task)
-    result = TaskResult(task=task, language=language, replicate=replicate, success=False, first_try=False)
+    task_config = load_task_config(task)
+    task_kind = task_config["kind"]
+    source_checks = task_config.get("source_checks", {}).get(language, [])
+    result = TaskResult(
+        task=task,
+        task_kind=task_kind,
+        language=language,
+        replicate=replicate,
+        success=False,
+        first_try=False,
+    )
     messages = build_initial_messages(language, task)
 
     for attempt in range(0, max_repairs + 1):
@@ -382,6 +491,7 @@ def run_task_replicate(
             rec = AttemptRecord(
                 suite=suite,
                 task=task,
+                task_kind=task_kind,
                 language=language,
                 model=model,
                 temperature=temperature,
@@ -412,10 +522,13 @@ def run_task_replicate(
             continue
 
         stdout, stderr, rc, timed_out, diag = run_source(language, source, vol_prefix, vol_cwd)
-        outcome = judge(stdout, stderr, rc, timed_out, expected)
+        outcome, validation_error = judge(stdout, rc, timed_out, expected, source, source_checks)
+        if validation_error:
+            stderr = validation_error
         rec = AttemptRecord(
             suite=suite,
             task=task,
+            task_kind=task_kind,
             language=language,
             model=model,
             temperature=temperature,
@@ -472,7 +585,7 @@ def summarize(results: list[TaskResult], *, suite: str, model: str, temperature:
         "",
         "## Summary",
         "",
-        "| Language | First-try % | Success @ K % | Median tokens (success) | Mean tokens (all) | N task-replicates |",
+        "| Language | First-try % | Success @ K % | Median tokens (success) | Mean ± SD tokens (all) | N task-replicates |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
 
@@ -485,20 +598,37 @@ def summarize(results: list[TaskResult], *, suite: str, model: str, temperature:
         all_tokens = [r.total_tokens for r in subset]
         med = statistics.median(success_tokens) if success_tokens else float("nan")
         mean = statistics.mean(all_tokens) if all_tokens else float("nan")
+        spread = statistics.pstdev(all_tokens) if len(all_tokens) > 1 else 0.0
         med_s = f"{med:.0f}" if success_tokens else "—"
         mean_s = f"{mean:.1f}" if all_tokens else "—"
         label = LANG_META[language]["label"]
         lines.append(
-            f"| {label} | {first:.1f} | {ok:.1f} | {med_s} | {mean_s} | {n} |"
+            f"| {label} | {first:.1f} | {ok:.1f} | {med_s} | {mean_s} ± {spread:.1f} | {n} |"
         )
 
+    lines.extend(["", "## By workflow kind", ""])
+    lines.append("| Kind | Language | Success @ K % | Mean ± SD tokens | N |")
+    lines.append("| --- | --- | --- | --- | --- |")
+    for kind in sorted({r.task_kind for r in results}):
+        for language in sorted({r.language for r in results}):
+            subset = [r for r in results if r.task_kind == kind and r.language == language]
+            if not subset:
+                continue
+            success = sum(1 for r in subset if r.success) / len(subset) * 100
+            mean = statistics.mean(r.total_tokens for r in subset)
+            spread = statistics.pstdev(r.total_tokens for r in subset) if len(subset) > 1 else 0.0
+            lines.append(
+                f"| {kind} | {LANG_META[language]['label']} | {success:.1f} | "
+                f"{mean:.1f} ± {spread:.1f} | {len(subset)} |"
+            )
+
     lines.extend(["", "## Per task-replicate", ""])
-    lines.append("| Task | Lang | Rep | Success | First-try | Attempts | Tokens | Last outcome |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- |")
+    lines.append("| Task | Kind | Lang | Rep | Success | First-try | Attempts | Tokens | Last outcome |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in results:
         last = r.attempts[-1].outcome if r.attempts else "—"
         lines.append(
-            f"| {r.task} | {r.language} | {r.replicate} | {r.success} | {r.first_try} | "
+            f"| {r.task} | {r.task_kind} | {r.language} | {r.replicate} | {r.success} | {r.first_try} | "
             f"{len(r.attempts)} | {r.total_tokens} | {last} |"
         )
     lines.append("")
@@ -509,6 +639,7 @@ def record_to_json(rec: AttemptRecord) -> dict:
     return {
         "suite": rec.suite,
         "task": rec.task,
+        "task_kind": rec.task_kind,
         "language": rec.language,
         "model": rec.model,
         "temperature": rec.temperature,
@@ -529,10 +660,8 @@ def record_to_json(rec: AttemptRecord) -> dict:
 def resolve_tasks(suite: str, only: list[str] | None) -> list[str]:
     if suite == "smoke":
         tasks = list(SMOKE_TASKS)
-    elif suite == "full":
-        tasks = sorted(p.name for p in PROMPTS_DIR.iterdir() if (p / "prompt.md").exists())
-        if not tasks:
-            die("no task prompts found under bench/llm/tasks")
+    elif suite == "core":
+        tasks = list(CORE_TASKS)
     else:
         die(f"unknown suite: {suite}")
     if only:
@@ -569,32 +698,57 @@ def resolve_endpoint(provider: str, model_arg: str | None) -> tuple[str, str, st
         if not api_key:
             die("OPENAI_API_KEY is required for --provider openai")
         return base_url, api_key, model, 120.0
+    if provider == "gemini":
+        base_url = os.environ.get("GEMINI_BASE_URL", DEFAULT_GEMINI_BASE)
+        model = model_arg or os.environ.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            die("GEMINI_API_KEY is required for --provider gemini (set it in .env or the shell)")
+        return base_url, api_key, model, 120.0
     die(f"unknown provider: {provider}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="VOL LLM generate/repair harness")
-    parser.add_argument("--suite", choices=["smoke", "full"], default="smoke")
+    load_environment()
+    parser = argparse.ArgumentParser(description="VOL LLM workflow benchmark harness")
+    parser.add_argument("--suite", choices=["smoke", "core"], default="smoke")
     parser.add_argument("--langs", default="vol,go", help="Comma-separated: vol,go")
     parser.add_argument("--tasks", default="", help="Comma-separated task ids (optional filter)")
     parser.add_argument(
         "--provider",
-        choices=["ollama", "openai"],
+        choices=["ollama", "openai", "gemini"],
         default=os.environ.get("VOL_LLM_PROVIDER", "ollama"),
         help="API provider (default: ollama)",
     )
     parser.add_argument(
         "--model",
         default=None,
-        help=f"Model id (ollama default: {DEFAULT_OLLAMA_MODEL}; openai default: {DEFAULT_OPENAI_MODEL})",
+        help=(
+            f"Model id (ollama: {DEFAULT_OLLAMA_MODEL}; openai: {DEFAULT_OPENAI_MODEL}; "
+            f"gemini: {DEFAULT_GEMINI_MODEL})"
+        ),
     )
     parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--replicates", type=int, default=1)
+    parser.add_argument("--replicates", type=int, default=3)
     parser.add_argument("--max-repairs", type=int, default=2, dest="max_repairs")
     parser.add_argument("--max-tokens", type=int, default=2048, dest="max_tokens")
+    parser.add_argument(
+        "--request-timeout",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="Maximum time for one model request; provider default when omitted",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Use reference solutions; no API")
     parser.add_argument("--out-dir", type=Path, default=None, help="Results directory")
     args = parser.parse_args()
+
+    if args.request_timeout is not None and args.request_timeout <= 0:
+        parser.error("--request-timeout must be greater than zero")
+    if args.replicates <= 0:
+        parser.error("--replicates must be greater than zero")
+    if args.max_repairs < 0:
+        parser.error("--max-repairs cannot be negative")
 
     languages = [p.strip() for p in args.langs.split(",") if p.strip()]
     for lang in languages:
@@ -603,12 +757,14 @@ def main() -> None:
 
     only = [t.strip() for t in args.tasks.split(",") if t.strip()] or None
     tasks = resolve_tasks(args.suite, only)
-    suite_name = "smoke_v0" if args.suite == "smoke" else "full_v0"
+    suite_name = "smoke_v1" if args.suite == "smoke" else "core_v1"
 
     if args.dry_run:
         base_url, api_key, model_name, request_timeout = "", None, "dry-run/reference", 120.0
     else:
         base_url, api_key, model_name, request_timeout = resolve_endpoint(args.provider, args.model)
+    if args.request_timeout is not None:
+        request_timeout = args.request_timeout
 
     if "go" in languages and subprocess.run(["go", "version"], capture_output=True).returncode != 0:
         die("go toolchain not found")
@@ -621,6 +777,7 @@ def main() -> None:
     # Sanitize model for filenames: qwen3:4b-instruct -> qwen3_4b-instruct
     model_slug = re.sub(r"[^\w.-]+", "_", model_name)
     jsonl_path = out_dir / f"{suite_name}_{mode}_{model_slug}_{stamp}.jsonl"
+    partial_jsonl_path = jsonl_path.with_suffix(".partial.jsonl")
     summary_path = out_dir / f"{suite_name}_{mode}_{model_slug}_{stamp}.md"
 
     model_label = model_name
@@ -631,7 +788,7 @@ def main() -> None:
         f"model={model_label} base={base_url or '-'} tasks={len(tasks)} langs={languages}"
     )
 
-    with jsonl_path.open("w", encoding="utf-8") as jsonl:
+    with partial_jsonl_path.open("w", encoding="utf-8") as jsonl:
         for language in languages:
             for task in tasks:
                 for replicate in range(1, args.replicates + 1):
@@ -658,6 +815,8 @@ def main() -> None:
                     status = "OK" if tr.success else "FAIL"
                     last = tr.attempts[-1].outcome if tr.attempts else "?"
                     print(f"    {status} attempts={len(tr.attempts)} last={last} tokens={tr.total_tokens}")
+
+    partial_jsonl_path.replace(jsonl_path)
 
     summary = summarize(
         results,

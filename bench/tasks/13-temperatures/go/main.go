@@ -16,6 +16,9 @@ func main() {
 		}
 	}
 	avg := total / len(temps)
+	if hot+mild+cold != len(temps) || avg != 24 {
+		panic("invalid temperature report")
+	}
 	fmt.Println("Days measured: " + fmt.Sprint(len(temps)))
 	fmt.Println("Average: " + fmt.Sprint(avg))
 	fmt.Println("Hot days (28+): " + fmt.Sprint(hot))

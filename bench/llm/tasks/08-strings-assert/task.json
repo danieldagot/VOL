@@ -1,0 +1,7 @@
+{
+  "kind": "repair",
+  "source_checks": {
+    "vol": ["\\bassert\\s*\\(", "\\.len\\b"],
+    "go": ["\\bpanic\\s*\\(", "\\blen\\s*\\("]
+  }
+}

@@ -363,35 +363,6 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 				Fix:     "Use `.len` for array element count or string Unicode scalar count.",
 			}
 		}
-		if node.Name.Lexeme == "sum" {
-			array, ok := object.([]any)
-			if !ok {
-				return nil, i.runtime(node.Position(), "R019", "`.sum` requires an array.")
-			}
-			var sum any = int64(0)
-			for _, item := range array {
-				operator := Token{Kind: TokenPlus, Lexeme: "+", Pos: node.Name.Pos}
-				sum, d = i.evaluateBinaryValues(operator, sum, item)
-				if d != nil {
-					return nil, d
-				}
-			}
-			return sum, nil
-		}
-		if node.Name.Lexeme == "copy" {
-			array, ok := object.([]any)
-			if !ok {
-				return nil, i.runtime(node.Position(), "R031", "`.copy` requires an array.")
-			}
-			return shallowCopyArray(array), nil
-		}
-		if node.Name.Lexeme == "deep_copy" {
-			array, ok := object.([]any)
-			if !ok {
-				return nil, i.runtime(node.Position(), "R032", "`.deep_copy` requires an array.")
-			}
-			return deepCopyArray(array), nil
-		}
 		if node.Name.Lexeme == "byte_len" {
 			if text, ok := object.(string); ok {
 				return int64(len(text)), nil
@@ -460,6 +431,12 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "where" {
 			return i.evaluateWhere(property, node.Arguments)
 		}
+		if property, ok := node.Callee.(*Property); ok {
+			switch property.Name.Lexeme {
+			case "sum", "copy", "deep_copy":
+				return i.evaluateArrayOperation(property, node.Arguments)
+			}
+		}
 		callee, d := i.evaluate(node.Callee)
 		if d != nil {
 			return nil, d
@@ -500,6 +477,43 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		return i.call(fn, arguments)
 	}
 	return nil, i.runtime(expression.Position(), "R999", "Unsupported expression.")
+}
+
+func (i *interpreter) evaluateArrayOperation(property *Property, arguments []Expression) (any, *Diagnostic) {
+	value, d := i.evaluate(property.Object)
+	if d != nil {
+		return nil, d
+	}
+	if d := i.requireValue(value, property.Object.Position()); d != nil {
+		return nil, d
+	}
+	array, ok := value.([]any)
+	if !ok {
+		switch property.Name.Lexeme {
+		case "sum":
+			return nil, i.runtime(property.Position(), "R019", "`.sum()` requires an array.")
+		case "copy":
+			return nil, i.runtime(property.Position(), "R031", "`.copy()` requires an array.")
+		default:
+			return nil, i.runtime(property.Position(), "R032", "`.deep_copy()` requires an array.")
+		}
+	}
+	switch property.Name.Lexeme {
+	case "sum":
+		var sum any = int64(0)
+		for _, item := range array {
+			operator := Token{Kind: TokenPlus, Lexeme: "+", Pos: property.Name.Pos}
+			sum, d = i.evaluateBinaryValues(operator, sum, item)
+			if d != nil {
+				return nil, d
+			}
+		}
+		return sum, nil
+	case "copy":
+		return shallowCopyArray(array), nil
+	default:
+		return deepCopyArray(array), nil
+	}
 }
 
 func (i *interpreter) evaluateWhere(property *Property, arguments []Expression) (any, *Diagnostic) {

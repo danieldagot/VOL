@@ -12,7 +12,7 @@ Stop expanding the language surface until the current core is boringly precise:
 
 - values, variables, functions
 - `if` / `elif` / `else`, `repeat`, `while`, `? :`
-- arrays, `.each`, `.where`, `.sum`
+- arrays, `.each`, `.where`, `.sum()`
 - built-ins already accepted by the interpreter
 
 Immediate documentation and design work:
@@ -60,9 +60,9 @@ Immediate documentation and design work:
 - [x] Conditional loops with `while` (Supported; no alternate spellings).
 - [x] Arrays, indexing, and bounds checking.
 - [x] Array assignment shares references (see `SPEC.md` §3.3).
-- [x] Explicit array clone: `a.copy` (shallow) and `a.deep_copy` (recursive). See `SPEC.md` §3.3.
+- [x] Explicit array clone: `a.copy()` (shallow) and `a.deep_copy()` (recursive). See `SPEC.md` §3.3.
 - [x] Collection iteration with `.each`.
-- [x] Filtering with `.where` and aggregation with `.sum`.
+- [x] Filtering with `.where` and aggregation with `.sum()`.
 - [x] `.where` predicates are pure by rule; side effects use `.each` (`SPEC.md` §4.4).
 - [ ] Purity diagnostics / checks for `.where` predicates.
 - [x] Functions, parameters, calls, and return values.
@@ -129,18 +129,18 @@ single JSON object on stderr. The human form is still the default.
 ### Explicit array clone ✓ implemented
 
 Language rule (§3.3): `:=` / `=` and argument passing share array identity.
-Use `.copy` for a shallow clone or `.deep_copy` for a recursive clone:
+Use `.copy()` for a shallow clone or `.deep_copy()` for a recursive clone:
 
 ```vol
 a := [1, 2]
-b := a.copy
+b := a.copy()
 b[0] = 9
 print a          // [1, 2]
 print b          // [9, 2]
 
 inner := [1, 2]
 outer := [inner]
-dc := outer.deep_copy
+dc := outer.deep_copy()
 dc[0][0] = 99
 print inner      // [1, 2] — not affected
 ```
@@ -225,7 +225,7 @@ vol simplify --write file.vol
 ```
 
 For example, it may suggest replacing an accumulator loop containing a filter
-with `numbers.where(_ > 5).sum`. Rewrites must be optional, deterministic, and
+with `numbers.where(_ > 5).sum()`. Rewrites must be optional, deterministic, and
 proven safe with respect to mutation, side effects, ordering, and error behavior.
 
 ## Projects and Modules
@@ -379,8 +379,9 @@ task success / total tokens consumed
 
 including generated code, compiler or runtime diagnostics, repair prompts, and
 revisions across a fixed task suite. Protocol is defined in
-[`LLM_BENCHMARK.md`](LLM_BENCHMARK.md); harness and published results are still
-todo.
+[`LLM_BENCHMARK.md`](LLM_BENCHMARK.md). The protocol-v1 harness and one
+Gemini core-suite result are implemented; more models and realistic backend
+tasks are still required before making broad claims.
 
 **Static source token density** (step 1 — implemented) is measured in
 [`bench/`](bench/README.md): hand-written equivalent programs in VOL, Go, Rust,
@@ -393,7 +394,7 @@ not LLM task-success efficiency.
 - ~~What is VOL's exact mutability model?~~ **Decided and implemented:** mutable by default;
   opt-in `const name := expr` (shallow; `S030`/`R030`). See `SPEC.md` §5.2.
 - ~~Array assignment: shared, copy, or move?~~ **Decided and implemented:** shared references;
-  `.copy` (shallow) and `.deep_copy` (recursive) are available. See `SPEC.md` §3.3.
+  `.copy()` (shallow) and `.deep_copy()` (recursive) are available. See `SPEC.md` §3.3.
 - ~~Is `if` an expression, a statement, or both?~~ **Decided:** statement with
   `elif`/`else`; use `? :` for expression values. See `SPEC.md` §5.3 / §4.2.1.
 - ~~What syntax should replace or represent a conventional `while` loop?~~

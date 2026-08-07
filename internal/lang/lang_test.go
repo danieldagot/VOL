@@ -139,7 +139,7 @@ func TestReturnOutsideFunctionIsRejected(t *testing.T) {
 
 func TestWhereAndSumSemanticForm(t *testing.T) {
 	output, diagnostic := run(t, `numbers := [4, 7, 2, 9]
-total := numbers.where(_ > 5).sum
+total := numbers.where(_ > 5).sum()
 print total`)
 	if diagnostic != nil {
 		t.Fatal(diagnostic)

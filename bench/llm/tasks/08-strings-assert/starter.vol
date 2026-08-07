@@ -1,0 +1,6 @@
+word := "hello"
+length := word.length
+doubled := word + "!"
+print length
+print doubled
+assert(length == 6, "Expected length 5")

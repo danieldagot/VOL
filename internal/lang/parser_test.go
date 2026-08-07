@@ -57,6 +57,22 @@ func TestParserOperatorPrecedence(t *testing.T) {
 	}
 }
 
+func TestParserNotBindsAfterComparison(t *testing.T) {
+	program, diagnostic := Parse("precedence.vol", "print not value == 1")
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	expression := program.Statements[0].(*PrintStatement).Value
+	not, ok := expression.(*Unary)
+	if !ok || not.Operator.Kind != TokenNot {
+		t.Fatalf("root = %#v", expression)
+	}
+	equality, ok := not.Right.(*Binary)
+	if !ok || equality.Operator.Kind != TokenEqualEqual {
+		t.Fatalf("not right = %#v", not.Right)
+	}
+}
+
 func TestParserTracksExportsAndVisibility(t *testing.T) {
 	program, diagnostic := Parse("exports.vol", `export value, work
 value := 1

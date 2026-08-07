@@ -38,11 +38,40 @@ Those require a generate/repair harness. Protocol:
 
 ```sh
 make llm-dry                      # reference solutions only — not an LLM result
-make llm-ollama                   # live smoke via local Ollama (qwen3:4b-instruct)
+make llm-ollama                   # live 2-task smoke via local Ollama
+make llm-core                     # live 5-task core, 3 replicates
 make llm-ollama MODEL=llama3.1:8b
+# run one task, failing a model request after 30 seconds:
+make llm-ollama MODEL=llama3.1:8b TASKS=06-where-sum REQUEST_TIMEOUT=30
+# direct equivalent:
+uv run python llm/harness/run_generate_repair.py --provider ollama --model llama3.1:8b \
+  --suite smoke --tasks 06-where-sum --request-timeout 30
 # cloud:
 # OPENAI_API_KEY=… uv run python llm/harness/run_generate_repair.py --provider openai --suite smoke
+# Gemini (loads GEMINI_API_KEY and optional GEMINI_MODEL from ../.env):
+uv run python llm/harness/run_generate_repair.py --provider gemini --suite smoke
 ```
+
+The workflow benchmark has a 2-task `smoke` suite for wiring checks and a
+5-task `core` suite for reported comparisons. Core covers generation, seeded
+repair, and modification, and defaults to three replicates:
+
+```sh
+uv run python llm/harness/run_generate_repair.py --provider gemini --suite core
+```
+
+The separate static-density benchmark below still contains 13 tasks. Those 13
+are not the LLM workflow suite.
+
+The first core-v1 Gemini run is recorded in
+[`llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md`](llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md).
+Both languages passed every replicate; VOL used about 2.1% more workflow tokens
+overall. Treat this as narrow suite evidence, not a real-world language ranking.
+
+`--tasks` accepts a comma-separated list of task IDs (for example,
+`01-hello,07-functions`). `--request-timeout SECONDS` caps each model API
+request; omit it to use the provider default (600 seconds for Ollama, 120
+seconds for cloud endpoints).
 
 Tracked also in [`IDEAS.md`](../IDEAS.md) under *Compiler Metrics and LLM Evaluation*.
 
@@ -141,7 +170,7 @@ implementations producing identical stdout.
 | 03-conditions | branch on bool + int | `if`/`else`, `and` |
 | 04-loops | countdown + fixed repeats | `while`, `repeat` |
 | 05-arrays-each | index, length, iterate | arrays, `.len`, `.each` |
-| 06-where-sum | filter + aggregate | `.where`, `.sum`, `assert` |
+| 06-where-sum | filter + aggregate | `.where`, `.sum()`, `assert` |
 | 07-functions | two named functions | `fn`, `return` |
 | 08-strings-assert | string ops + assertion | `.len`, `+`, `assert` |
 
@@ -158,7 +187,7 @@ implementations producing identical stdout.
 
 ## Interpreting results
 
-A ratio below 1.0 on task 06-where-sum reflects VOL's `.where(...).sum`
+A ratio below 1.0 on task 06-where-sum reflects VOL's `.where(...).sum()`
 compression compared with explicit filter loops in Go/Zig or iterator chains in
 Rust.
 

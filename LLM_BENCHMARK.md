@@ -1,6 +1,6 @@
-# VOL LLM Generate / Repair Benchmark (Protocol)
+# VOL LLM Workflow Benchmark (Protocol v1)
 
-> Status: **protocol + harness scaffolded; live generate/repair results not yet run**  
+> Status: **protocol and harness implemented; one Gemini core-v1 run published**
 > Companion to: [`bench/`](bench/README.md) (source token density only)
 
 This document defines how VOL measures whether it is actually better for
@@ -32,7 +32,7 @@ LLM-optimization claim fails for that suite. Report the loss honestly.
 | Success within ≤ K repair rounds | Human readability preference |
 | Total tokens to success or give-up | Native performance / binary size |
 | How often structured diagnostics enable a fix | Ownership, types, or backend quality |
-| Relative cost vs Go (v0 baseline) | “Meaning per Token” as a single magic score |
+| Relative cost vs Go (baseline) | “Meaning per Token” as a single magic score |
 
 Tokenizer note: absolute token counts depend on the model’s tokenizer. Always
 report model id + tokenizer (or API usage fields) with every table.
@@ -69,54 +69,55 @@ Optional secondary metrics:
 
 ---
 
-## 4. Suite S (v0)
+## 4. Suite S (v1)
 
-Reuse the existing density tasks. Do **not** invent a second task set until v0
-has results.
+The workflow benchmark is deliberately smaller than the 13-task static-density
+set. Fewer, richer tasks allow at least three replicates without spending most
+of the budget on redundant syntax exercises.
 
-### 4.1 Full suite (13 tasks)
+### 4.1 Smoke suite (2 tasks)
 
-| ID | Task dir | Intent exercised |
+| ID | Workflow | Intent exercised |
 | --- | --- | --- |
-| 01 | `bench/tasks/01-hello` | values, strings, `print`, `string()` |
-| 02 | `bench/tasks/02-arithmetic` | `:=`, arithmetic, assignment |
-| 03 | `bench/tasks/03-conditions` | `if` / `elif` / `else`, comparisons |
-| 04 | `bench/tasks/04-loops` | `while`, `repeat` |
-| 05 | `bench/tasks/05-arrays-each` | arrays, `.each` |
-| 06 | `bench/tasks/06-where-sum` | `.where`, `.sum`, `assert` |
-| 07 | `bench/tasks/07-functions` | `fn`, `return`, calls |
-| 08 | `bench/tasks/08-strings-assert` | strings, `assert` |
-| 09 | `bench/tasks/09-grade-report` | combined control flow |
-| 10 | `bench/tasks/10-fibonacci` | functions + loops |
-| 11 | `bench/tasks/11-leaderboard` | larger combined program |
-| 12 | `bench/tasks/12-revenue` | aggregation-style logic |
-| 13 | `bench/tasks/13-temperatures` | filtering / reporting |
+| `01-hello` | generation | runner and basic output sanity check |
+| `07-functions` | generation | functions, calls, strings, integer conversion |
 
-### 4.2 Smoke suite (recommended first run)
+Smoke validates wiring. It is not sufficient evidence for a language claim.
 
-Run these five before the full 13:
+### 4.2 Core suite (5 tasks)
 
-`01-hello`, `02-arithmetic`, `03-conditions`, `06-where-sum`, `07-functions`
+| ID | Workflow | Intent exercised |
+| --- | --- | --- |
+| `05-arrays-each` | generation | collection mutation, iteration, filtering |
+| `08-strings-assert` | seeded repair | repair invalid property use, output logic, invariant |
+| `10-fibonacci` | generation | loop, mutable state, iterative computation |
+| `11-leaderboard` | modification | preserve and extend a working program |
+| `13-temperatures` | generation | aggregation, categories, multiple invariants |
+
+Run each `(task, language)` at least three times. Report results separately by
+workflow kind as well as in aggregate.
 
 ### 4.3 Success criterion
 
-Identical to [`bench/harness/check_stdout.py`](bench/harness/check_stdout.py):
+A task succeeds only when all checks pass:
 
-- Process exit code 0
-- stdout **exactly** equals `bench/tasks/<id>/expected.txt`  
-  (including newlines; no extra trailing blank line unless expected)
+- process exit code is 0;
+- stdout exactly equals `bench/tasks/<id>/expected.txt`;
+- every language-specific source constraint in `task.json` matches.
 
-Wrong stdout with exit 0 is a failure (`wrong_output`).  
-Non-zero exit is a failure (`diag_error`), with stderr/JSON captured for repair.
+Source constraints enforce explicit requirements such as using a loop,
+preserving starter collections, or retaining an invariant check. They must be
+minimal and declared before a run. Failure is `source_check_failed` and its
+message is eligible for a repair turn.
 
-### 4.4 Languages (v0)
+### 4.4 Languages (v1)
 
 | Language | Runner | Notes |
 | --- | --- | --- |
 | VOL | `vol run <file.vol>` or `go run ./cmd/vol run <file.vol>` | Primary subject |
 | Go | `go run main.go` | Baseline |
 
-Rust / Zig are optional later. Density already covers them; generate/repair v0
+Rust / Zig are optional later. Density already covers them; workflow v1
 optimizes for one clean baseline.
 
 ---
@@ -128,7 +129,7 @@ Record for every published table:
 | Field | Rule |
 | --- | --- |
 | Model id | Exact API / local id (e.g. `gpt-4.1-mini`, `claude-…`) |
-| Temperature | Fixed; recommend `0` or `0.2` for v0 |
+| Temperature | Fixed; recommend `0` or `0.2` for v1 |
 | Top-p / other | Fixed or “API default” (state which) |
 | Max output tokens | Cap high enough for largest smoke task; same for all langs |
 | Seed | Set when the API supports it |
@@ -166,7 +167,7 @@ VOL card must include at least:
 - `:=` / `=` / opt-in `const`
 - `if` / `elif` / `else` (statement); `? :` for values
 - `repeat`, `while`, `.each`
-- arrays, `.len`, `.where(_ …)`, `.sum`
+- arrays, `.len`, `.where(_ …)`, `.sum()`
 - `fn` / `return`; missing return is `nothing` (do not assign it)
 - `print`, `string()`, `assert`
 - integer overflow traps
@@ -184,12 +185,13 @@ bench/llm/cards/go_v0.md
 Bump the version suffix when the card changes; never silently edit a card used
 in a published result table.
 
-### 6.3 Task cards
+### 6.3 Task artifacts
 
-For each task, a frozen prompt under:
+For each task, store a frozen prompt and machine-readable metadata:
 
 ```text
 bench/llm/tasks/<id>/prompt.md
+bench/llm/tasks/<id>/task.json
 ```
 
 Must include:
@@ -198,6 +200,11 @@ Must include:
 - Exact expected stdout in a fenced `text` block (copy of `expected.txt`)
 - Constraints: single file; no network; no stdin unless the task requires it
 - Language placeholder: `Write the program in {{LANG}}.`
+
+`task.json` records the workflow kind (`generation`, `repair`, or
+`modification`) and minimal language-specific source checks. Repair and
+modification tasks may also contain `starter.vol` and `starter.go`; the prompt
+uses `{{STARTER}}` to insert the matching source.
 
 Do **not** paste the reference `main.vol` / `main.go` into the prompt. Those
 files are oracles for density and for humans writing task cards—not for the model.
@@ -212,8 +219,9 @@ transcript) containing:
    model sees `code`, `message`, `fix`)
 3. Instruction: return a full corrected program, not a diff
 
-Max repair rounds **K = 2** for v0 (attempts 0..2 = 3 total generations).  
-After that: mark `gave_up` and stop spending tokens on that task replicate.
+Max repair rounds **K = 2** for v1 (attempts 0..2 = 3 total generations).
+After that, preserve the final failure outcome and stop spending tokens on that
+task replicate.
 
 ---
 
@@ -249,10 +257,16 @@ uv run python llm/harness/run_generate_repair.py --provider ollama --model qwen3
 # or:
 make llm-ollama
 make llm-ollama MODEL=llama3.1:8b
+# restrict a run to selected tasks and cap each model request (seconds)
+make llm-ollama MODEL=llama3.1:8b TASKS=06-where-sum REQUEST_TIMEOUT=30
 ```
 
 Optional env: `OLLAMA_HOST` / `OLLAMA_BASE_URL` (default `http://localhost:11434/v1`),
 `OLLAMA_MODEL`. No API key required.
+
+Use `--tasks ID[,ID...]` to select tasks explicitly. Use
+`--request-timeout SECONDS` to override the provider's per-model-request
+timeout; this is distinct from the maximum repair count.
 
 ### Live with OpenAI-compatible cloud
 
@@ -263,12 +277,37 @@ uv run python llm/harness/run_generate_repair.py --provider openai --suite smoke
   --model gpt-4.1-mini --temperature 0 --replicates 3 --max-repairs 2
 ```
 
+### Live with Google Gemini
+
+Copy `.env.example` to `.env`, then set your key without committing it:
+
+```text
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-3.6-flash
+```
+
+Run Gemini through Google's OpenAI-compatible endpoint:
+
+```text
+cd bench
+uv run python llm/harness/run_generate_repair.py --provider gemini --suite core \
+  --temperature 0 --replicates 3 --max-repairs 2
+```
+
+The harness loads `.env` from the repository root or `bench/.env`. Shell
+variables take precedence. `GEMINI_BASE_URL` is optional.
+
+HTTP 429 and transient 5xx responses are retried with a bounded provider-aware
+delay. While a run is active, records use a `.partial.jsonl` suffix; the harness
+renames the file to `.jsonl` only after every task-replicate finishes.
+
 Each replicate writes a JSONL record approximately:
 
 ```json
 {
-  "suite": "smoke_v0",
-  "task": "06-where-sum",
+  "suite": "core_v1",
+  "task": "08-strings-assert",
+  "task_kind": "repair",
   "language": "vol",
   "model": "…",
   "temperature": 0,
@@ -284,8 +323,8 @@ Each replicate writes a JSONL record approximately:
 }
 ```
 
-Outcomes: `success` | `diag_error` | `wrong_output` | `timeout` | `gave_up` |
-`extract_error` (could not recover source from model output).
+Outcomes: `success` | `diag_error` | `wrong_output` | `source_check_failed` |
+`timeout` | `extract_error` (could not recover source from model output).
 
 Strip markdown fences if present; if multiple files appear, take the largest
 code block or fail `extract_error`.
@@ -320,7 +359,7 @@ Until then, README must continue to say generate/repair is **not** measured.
 3. **Frozen artifacts** — cards, prompts, model id, K, temperature committed with results.
 4. **Matched context** — language cards within ~20% token budget of each other.
 5. **Supported surface only** — do not score tasks that need Planned syntax.
-6. **Same runner timeouts** for every language (recommend 5s CPU per attempt for v0).
+6. **Same runner timeouts** for every language (recommend 5s CPU per attempt for v1).
 7. **Report failures** — a VOL loss is a valid scientific result.
 
 ---
@@ -338,15 +377,15 @@ cannot be recomputed from committed JSONL.
 ## 11. Implementation checklist
 
 - [x] Add frozen `bench/llm/cards/vol_v0.md` and `go_v0.md`
-- [x] Add frozen `bench/llm/tasks/<id>/prompt.md` for smoke suite
-      (`01-hello`, `02-arithmetic`, `03-conditions`, `06-where-sum`, `07-functions`)
-- [ ] Add prompts for remaining full-suite tasks (04, 05, 08–13)
+- [x] Add the 2-task smoke suite (`01-hello`, `07-functions`)
+- [x] Add the 5-task core suite with generation, repair, and modification tasks
+- [x] Add `task.json` source constraints and language-specific starter programs
 - [x] Implement `run_generate_repair.py` (OpenAI-compatible API + local runners + `--dry-run`)
 - [x] Wire VOL failures through `vol --json run` for repair context
-- [ ] Run smoke suite, N ≥ 3, VOL vs Go, one model (live API)
-- [ ] Commit JSONL + summary markdown under `bench/llm/results/`
-- [ ] Update README with numbers and disclaimers
-- [ ] Only then expand models / Rust / full suite
+- [x] Run core suite, N ≥ 3, VOL vs Go, one model (live API)
+- [x] Store JSONL + summary markdown under `bench/llm/results/`
+- [x] Update README with numbers and disclaimers
+- [ ] Only then expand models or languages
 
 ---
 

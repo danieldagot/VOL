@@ -10,9 +10,10 @@
 #   make count   — count tokens and write results/density*.csv + density.md
 #   make bench   — run both in sequence
 #   make llm-dry    — validate LLM harness runners with reference solutions (not a benchmark)
-#   make llm-ollama — live smoke vs Go using local Ollama (default model qwen3:4b-instruct)
+#   make llm-ollama — live 2-task smoke suite using local Ollama
+#   make llm-core   — live 5-task core suite with 3 replicates
 
-.PHONY: bench check count sync llm-dry llm-ollama
+.PHONY: bench check count sync llm-dry llm-ollama llm-core
 
 bench: check count
 
@@ -28,7 +29,14 @@ count: sync
 llm-dry: sync
 	uv run python llm/harness/run_generate_repair.py --dry-run --suite smoke
 
-# Override model: make llm-ollama MODEL=llama3.1:8b
+# Optional overrides:
+#   make llm-ollama MODEL=llama3.1:8b
+#   make llm-ollama TASKS=06-where-sum REQUEST_TIMEOUT=30
 MODEL ?= qwen3:4b-instruct
+TASKS ?=
+REQUEST_TIMEOUT ?=
 llm-ollama: sync
-	uv run python llm/harness/run_generate_repair.py --provider ollama --model $(MODEL) --suite smoke --replicates 1
+	uv run python llm/harness/run_generate_repair.py --provider ollama --model $(MODEL) --suite smoke --replicates 1 --tasks "$(TASKS)" $(if $(REQUEST_TIMEOUT),--request-timeout $(REQUEST_TIMEOUT),)
+
+llm-core: sync
+	uv run python llm/harness/run_generate_repair.py --provider ollama --model $(MODEL) --suite core --replicates 3 --tasks "$(TASKS)" $(if $(REQUEST_TIMEOUT),--request-timeout $(REQUEST_TIMEOUT),)

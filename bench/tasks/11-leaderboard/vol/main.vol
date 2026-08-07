@@ -1,8 +1,8 @@
 player1 := [8, 6, 9, 5, 10, 7]
 player2 := [7, 8, 6, 9, 8, 8]
 
-p1_total := player1.sum
-p2_total := player2.sum
+p1_total := player1.sum()
+p2_total := player2.sum()
 winner := p1_total > p2_total ? "Player 1" : "Player 2"
 
 p1_strong := player1.where(_ >= 8)

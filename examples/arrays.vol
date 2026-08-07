@@ -11,20 +11,20 @@ scores.each score {
     }
 }
 
-// Array assignment shares references; .copy gives an independent top-level copy.
+// Array assignment shares references; .copy() gives an independent top-level copy.
 original := [1, 2, 3]
 shared := original
 shared[0] = 9
 print original        // [9, 2, 3] — shared mutation
 
 baseline := [1, 2, 3]
-isolated := baseline.copy
+isolated := baseline.copy()
 isolated[0] = 9
 print baseline        // [1, 2, 3] — unchanged
 
-// .deep_copy also isolates nested arrays.
+// .deep_copy() also isolates nested arrays.
 inner := [10, 20]
 nested := [inner, [30]]
-deep := nested.deep_copy
+deep := nested.deep_copy()
 deep[0][0] = 99
 print inner           // [10, 20] — unchanged by deep copy

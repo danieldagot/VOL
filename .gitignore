@@ -22,6 +22,11 @@ go.work.sum
 .DS_Store
 Thumbs.db
 
+# Local secrets
+.env
+.env.*
+!.env.example
+
 # bench/ — Python tooling artifacts (Go toolchain ignores .py files naturally)
 bench/.venv/
 bench/**/__pycache__/
@@ -30,3 +35,4 @@ bench/.python-version
 # LLM harness dry-run noise (commit live run artifacts deliberately)
 bench/llm/results/*_dryrun_*.jsonl
 bench/llm/results/*_dryrun_*.md
+bench/llm/results/*.partial.jsonl

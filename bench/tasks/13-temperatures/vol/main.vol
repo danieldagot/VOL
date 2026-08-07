@@ -3,7 +3,10 @@ temps := [22, 18, 25, 31, 29, 17, 24, 28, 20, 26]
 hot := temps.where(_ >= 28)
 mild := temps.where(_ >= 20).where(_ < 28)
 cold := temps.where(_ < 20)
-avg := temps.sum / temps.len
+avg := temps.sum() / temps.len
+
+assert(hot.len + mild.len + cold.len == temps.len, "Categories must cover every day.")
+assert(avg == 24, "Unexpected average.")
 
 print "Days measured: " + string(temps.len)
 print "Average: " + string(avg)
