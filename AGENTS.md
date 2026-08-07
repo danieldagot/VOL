@@ -187,8 +187,8 @@ Machine (`Diagnostic` JSON shape; `vol --json`):
 ```
 
 Ownership or borrow diagnostics belong only after those semantics exist in
-[`SPEC.md`](SPEC.md). Prefer `const`-assignment errors once `const` is
-implemented, not Rust-style “declare mutable” defaults.
+[`SPEC.md`](SPEC.md). Prefer `const`-assignment errors (`S030`/`R030`) for
+immutable bindings, not Rust-style “declare mutable” defaults.
 
 ---
 
@@ -477,7 +477,7 @@ Run:
 ```text
 gofmt -w <changed Go files>
 go test ./...
-go run ./cmd/vol ./examples/first.vol
+go run ./cmd/vol run ./examples/first.vol
 git diff --check
 ```
 

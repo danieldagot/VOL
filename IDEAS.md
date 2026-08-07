@@ -36,7 +36,7 @@ Immediate documentation and design work:
 - [x] Define the abstract syntax tree (AST).
 - [x] Track precise source locations on every syntax node.
 - [x] Create deterministic human-readable diagnostics.
-- [ ] Create machine-readable JSON diagnostics.
+- [x] Create machine-readable JSON diagnostics.
 - [x] Implement lexical scopes.
 - [x] Implement an interpreter.
 - [x] Add table-driven parser, semantic, runtime, diagnostic, CLI, and example conformance tests.

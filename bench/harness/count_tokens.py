@@ -25,7 +25,7 @@ Limitations:
     - Measures source token density of hand-written equivalent programs only.
     - Does NOT measure LLM task-success efficiency or generate/repair cost.
     - Ratios depend on the chosen tokenizer; different models tokenize differently.
-    - Suite is small (8 tasks) and uses only VOL features that are currently
+    - Suite is small (13 tasks) and uses only VOL features that are currently
       implemented in the interpreter.
 """
 
@@ -101,7 +101,7 @@ def main() -> None:
         "> **What this does not measure:** LLM task-success rate or generate/repair cost.",
         "> **Tokenizer note:** ratios depend on the tokenizer; GPT, Claude, and other models",
         "> tokenize differently. Numbers are reported per tokenizer.",
-        "> **Suite size:** 8 tasks, using only currently-implemented VOL features.\n",
+        "> **Suite size:** 13 tasks, using only currently-implemented VOL features.\n",
     ]
 
     for tok_name in TOKENIZERS:

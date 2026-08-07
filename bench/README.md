@@ -34,7 +34,7 @@ density_ratio(L) = vol_tokens / L_tokens
 - Which language an LLM produces more correct code for
 
 Those require a generate/repair harness and are tracked separately in
-[`IDEAS.md`](../VOL/IDEAS.md) under *Compiler Metrics and LLM Evaluation*.
+[`IDEAS.md`](../IDEAS.md) under *Compiler Metrics and LLM Evaluation*.
 
 Tokenizer choice affects absolute counts. Numbers are always reported alongside
 the tokenizer name. GPT, Claude, and other models may tokenize differently.
@@ -120,7 +120,7 @@ toolchain to be installed.
 
 ## Task suite
 
-All 8 tasks use only VOL features that are currently implemented in the
+All 13 tasks use only VOL features that are currently implemented in the
 interpreter (as of the VOL prototype). Each task has four equivalent
 implementations producing identical stdout.
 
@@ -157,7 +157,7 @@ all four languages. Differences there reflect keyword weight, required
 boilerplate (`fn main`, `package main`, `println!`, etc.), and type annotation
 requirements.
 
-Do not generalize from 8 tasks. This suite exists to anchor the "denser syntax"
+Do not generalize from 13 tasks. This suite exists to anchor the "denser syntax"
 claim to measured numbers, not to prove overall LLM workflow superiority.
 
 ---

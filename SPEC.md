@@ -164,7 +164,7 @@ identifier   = (letter | "_") (letter | digit | "_")*
 integer      = digit+
 float        = digit+ "." digit+
 string       = '"' string-char* '"'
-keyword      = "and" | "elif" | "else" | "export" | "false" | "fn" | "if"
+keyword      = "and" | "const" | "elif" | "else" | "export" | "false" | "fn" | "if"
              | "not" | "or" | "print" | "repeat" | "return" | "true" | "while"
 operator     = ":=" | ":" | "?" | "=" | "==" | "!=" | "<" | "<=" | ">" | ">="
              | "+" | "-" | "*" | "/" | "." | ","
@@ -405,6 +405,9 @@ Known properties:
 | --- | --- |
 | `array.len` | element count as integer |
 | `string.len` | Unicode scalar count as integer (not bytes) |
+| `string.byte_len` | UTF-8 byte count as integer (`R033` on non-string) |
+| `array.copy` | shallow copy of the array (`R031` on non-array) |
+| `array.deep_copy` | recursive deep clone of the array (`R032` on non-array) |
 | `array.sum` | left fold of `+` starting from integer `0` |
 | `array.where(condition)` | eager filter; see below |
 
@@ -480,7 +483,7 @@ statement   = block-stmt
 
 block       = "{" statement* "}"
 block-stmt  = block
-declaration = identifier ":=" expression
+declaration = "const"? identifier ":=" expression
 assignment  = (identifier | index-expr) "=" expression
 each-stmt   = expression ".each" identifier block
 if-stmt     = "if" expression block ("elif" expression block)* ("else" block)?
@@ -511,6 +514,7 @@ Statement separation:
 
 ```vol
 name := expression
+const name := expression
 name = expression
 ```
 
@@ -679,6 +683,7 @@ Static errors:
 | `S001` | duplicate declaration in the same scope |
 | `S002` | use of an undefined name |
 | `S003` | wrong argument count for a known function/builtin/`.where` |
+| `S030` | assignment to a `const` binding |
 
 Additional resolution rules:
 
@@ -766,6 +771,8 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `E117` | duplicate export |
 | `E118` | export of unknown name |
 | `E119` | missing statement separator newline |
+| `E120` | expected a name after `const` |
+| `E121` | expected `:=` after const name |
 
 ### 8.3 Runtime codes
 
@@ -800,6 +807,10 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `R027` | assertion failed |
 | `R028` | integer overflow |
 | `R029` | expected a value, got `nothing` |
+| `R030` | assignment to a `const` binding |
+| `R031` | `.copy` on non-array |
+| `R032` | `.deep_copy` on non-array |
+| `R033` | `.byte_len` on non-string |
 | `R999` | internal unsupported expression |
 
 ---
@@ -868,11 +879,10 @@ tests before calling it Supported.
 
 ---
 
-## 11. Open decisions (do not pretend these are settled)
+## 11. Decided core rules
 
-Track progress in [`IDEAS.md`](IDEAS.md).
-
-#### Decided
+These core rules are settled for the prototype. Track remaining open questions
+and Planned work in [`IDEAS.md`](IDEAS.md).
 
 - **Mutability default (§5.2):** bindings are **mutable by default**. Opt-in
   immutability uses `const name := expression` with shallow semantics
@@ -892,9 +902,7 @@ Track progress in [`IDEAS.md`](IDEAS.md).
 - **`if` (§5.3):** statement only, with `elif` / `else`. Value choice uses
   `? :` (§4.2.1). Expression-`if` is not part of the language.
 
-There are no remaining open core decisions in this section. Track new questions
-in [`IDEAS.md`](IDEAS.md). Implementers and LLMs must follow the concrete
-behavior in sections 1–9.
+Implementers and LLMs must follow the concrete behavior in sections 1–9.
 
 ---
 

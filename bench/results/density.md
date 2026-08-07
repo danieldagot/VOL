@@ -7,7 +7,7 @@ A ratio < 1.0 means VOL is denser (fewer tokens) under that tokenizer.
 > **What this does not measure:** LLM task-success rate or generate/repair cost.
 > **Tokenizer note:** ratios depend on the tokenizer; GPT, Claude, and other models
 > tokenize differently. Numbers are reported per tokenizer.
-> **Suite size:** 8 tasks, using only currently-implemented VOL features.
+> **Suite size:** 13 tasks, using only currently-implemented VOL features.
 
 ## Token density — tokenizer: `cl100k_base`
 
