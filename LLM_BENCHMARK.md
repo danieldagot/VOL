@@ -1,6 +1,6 @@
-# VOL LLM Workflow Benchmark (Protocol v1)
+# VOL LLM Workflow Benchmark (Protocol v1.1)
 
-> Status: **protocol and harness implemented; one Gemini core-v1 run published**
+> Status: **protocol v1.1 harness implemented; Gemini `core_v2` VOL vs Python published; Go/`core_v1` historical**
 > Companion to: [`bench/`](bench/README.md) (source token density only)
 
 This document defines how VOL measures whether it is actually better for
@@ -32,7 +32,7 @@ LLM-optimization claim fails for that suite. Report the loss honestly.
 | Success within ≤ K repair rounds | Human readability preference |
 | Total tokens to success or give-up | Native performance / binary size |
 | How often structured diagnostics enable a fix | Ownership, types, or backend quality |
-| Relative cost vs Go (baseline) | “Meaning per Token” as a single magic score |
+| Relative cost vs Python (default baseline) and optional Go | “Meaning per Token” as a single magic score |
 
 Tokenizer note: absolute token counts depend on the model’s tokenizer. Always
 report model id + tokenizer (or API usage fields) with every table.
@@ -57,23 +57,37 @@ Also report the three headline rates (do not collapse into one number only):
 
 | Metric | Definition |
 | --- | --- |
-| **First-try success** | Share of tasks where attempt 0 stdout matches `expected.txt` |
+| **First-try success** | Share of tasks where attempt 0 stdout matches `expected.txt` (for diagnostic repair, attempt 0 already includes seed diagnostics) |
 | **Success @ K** | Share of tasks solved within ≤ K repairs (K default = 2) |
 | **Tokens to success** | Mean / median total tokens among successful tasks; separately report mean tokens among failures (capped at give-up) |
+
+Always split **prompt** vs **completion** tokens in published summaries. Also report:
+
+| Accounting | Definition |
+| --- | --- |
+| **Cold** | Sum of provider `prompt_tokens` + `completion_tokens` (language card re-sent every request) |
+| **Warm** | Cold with estimated language-card tokens subtracted from each prompt (`cl100k_base` estimate of the frozen card). Models amortized / cached-card cost. |
+
+Warm is an accounting view, not a separate API mode. Provider usage fields remain the source of cold totals.
 
 Optional secondary metrics:
 
 - Mean repair rounds among successes
 - Failure mix: parse / resolve / runtime / wrong stdout / timeout
 - Diagnostic usefulness: fraction of failed attempts whose next repair succeeds
+- VOL vs baseline deltas (Python by default; Go optional) for prompt, completion, cold total, and warm total
 
 ---
 
-## 4. Suite S (v1)
+## 4. Suite S (v1.1 / `core_v2`)
 
 The workflow benchmark is deliberately smaller than the 13-task static-density
 set. Fewer, richer tasks allow at least three replicates without spending most
 of the budget on redundant syntax exercises.
+
+Harness suite ids: smoke → `smoke_v1`; core → `core_v2` (protocol v1.1).
+Historical Gemini results under `core_v1` used pre-diagnostic repair prompts and
+must not be mixed into v1.1 tables.
 
 ### 4.1 Smoke suite (2 tasks)
 
@@ -89,7 +103,7 @@ Smoke validates wiring. It is not sufficient evidence for a language claim.
 | ID | Workflow | Intent exercised |
 | --- | --- | --- |
 | `05-arrays-each` | generation | collection mutation, iteration, filtering |
-| `08-strings-assert` | seeded repair | repair invalid property use, output logic, invariant |
+| `08-strings-assert` | diagnostic repair | fix seeded failure using real runner diagnostics |
 | `10-fibonacci` | generation | loop, mutable state, iterative computation |
 | `11-leaderboard` | modification | preserve and extend a working program |
 | `13-temperatures` | generation | aggregation, categories, multiple invariants |
@@ -110,15 +124,18 @@ preserving starter collections, or retaining an invariant check. They must be
 minimal and declared before a run. Failure is `source_check_failed` and its
 message is eligible for a repair turn.
 
-### 4.4 Languages (v1)
+### 4.4 Languages (v1.1)
 
 | Language | Runner | Notes |
 | --- | --- | --- |
 | VOL | `vol run <file.vol>` or `go run ./cmd/vol run <file.vol>` | Primary subject |
-| Go | `go run main.go` | Baseline |
+| Python | `python main.py` (CPython 3.11+) | **Default baseline** — interpreted peer for the current prototype |
+| Go | `go run main.go` | Optional systems-language baseline (`--langs vol,go` or `vol,python,go`) |
 
-Rust / Zig are optional later. Density already covers them; workflow v1
-optimizes for one clean baseline.
+While VOL is an interpreter prototype, prefer Python as the workflow baseline.
+Go remains useful for a compiled-language comparison and for continuity with
+historical `core_v1` / early `core_v2` tables. Rust / Zig stay optional; density
+already covers them.
 
 ---
 
@@ -152,8 +169,8 @@ Each request has three parts:
 3. **Task card** — natural-language description of behavior + the exact expected
    stdout (from `expected.txt`).
 
-Never give VOL the full `SPEC.md` while Go gets nothing. Matched card length
-budgets beat “dump the manual.”
+Never give VOL the full `SPEC.md` while a baseline gets nothing. Matched card
+length budgets beat “dump the manual.”
 
 ### 6.2 Language cards (budget)
 
@@ -172,18 +189,25 @@ VOL card must include at least:
 - `print`, `string()`, `assert`
 - integer overflow traps
 
-Go card: equivalently dense stdlib-only reminders (`fmt`, slices, `for`), not a
-tour of Effective Go.
+Python card: equivalently dense stdlib-only reminders (`print`, lists, `for`,
+`assert`), not a tour of the standard library.
+
+Go card (optional baseline): equivalently dense stdlib-only reminders (`fmt`,
+slices, `for`), not a tour of Effective Go.
 
 Store frozen cards under:
 
 ```text
-bench/llm/cards/vol_v0.md
-bench/llm/cards/go_v0.md
+bench/llm/cards/vol_v0.md      # Surface Freeze SF-0 (SPEC Prototype v0)
+bench/llm/cards/python_v0.md   # matched Python baseline for SF-0 (default)
+bench/llm/cards/go_v0.md       # matched Go baseline for SF-0 (optional)
 ```
 
-Bump the version suffix when the card changes; never silently edit a card used
-in a published result table.
+Cards are bound to the language **surface freeze** (`SF-0` in [`SPEC.md`](SPEC.md)
+§0). Bump the card version suffix (`vol_v1`, …) only with a freeze bump or a
+deliberate card-only revision that does not add language features. Never silently
+edit a card used in a published result table; published summaries must name the
+freeze and card versions.
 
 ### 6.3 Task artifacts
 
@@ -202,24 +226,34 @@ Must include:
 - Language placeholder: `Write the program in {{LANG}}.`
 
 `task.json` records the workflow kind (`generation`, `repair`, or
-`modification`) and minimal language-specific source checks. Repair and
-modification tasks may also contain `starter.vol` and `starter.go`; the prompt
-uses `{{STARTER}}` to insert the matching source.
+`modification`) and minimal language-specific source checks. Modification
+tasks may embed working source via `{{STARTER}}`. Repair tasks use
+`"seed": "starter"` and must **not** paste the broken starter into the prompt
+without diagnostics—the harness attaches it after a real failed run.
 
-Do **not** paste the reference `main.vol` / `main.go` into the prompt. Those
-files are oracles for density and for humans writing task cards—not for the model.
+Do **not** paste the reference `main.vol` / `main.py` / `main.go` into the
+prompt. Those files are oracles for density and for humans writing task
+cards—not for the model.
 
-### 6.4 Repair turn
+### 6.4 Repair turn (diagnostic)
 
-On failure, send one additional user message (same conversation or explicit
-transcript) containing:
+**Seeded diagnostic repair** (`kind: repair`, `seed: starter`):
 
-1. The previous source
-2. The tool result: exit code + stderr (prefer `vol --json run` for VOL so the
-   model sees `code`, `message`, `fix`)
-3. Instruction: return a full corrected program, not a diff
+1. Harness runs `starter.vol` / `starter.py` / `starter.go` **before** any model call.
+2. The starter **must fail** (exit ≠ 0, wrong stdout, or source-check failure).
+3. Attempt 0’s user message includes the language card, task card, failed
+   source, exit code, and stderr (`vol --json` for VOL so the model sees
+   `code`, `message`, `fix`).
+4. The model returns a full corrected program, not a diff.
 
-Max repair rounds **K = 2** for v1 (attempts 0..2 = 3 total generations).
+This measures whether diagnostics help. Do **not** ask the model to rewrite an
+obviously broken starter in the clear without first attaching runner output.
+
+**Follow-up repairs** (generation / modification failures, or repair attempt > 0):
+send one additional user message containing previous source, exit code, and
+stderr, with the same “full corrected program” instruction.
+
+Max repair rounds **K = 2** (attempts 0..2 = 3 total model generations).
 After that, preserve the final failure outcome and stop spending tokens on that
 task replicate.
 
@@ -305,7 +339,7 @@ Each replicate writes a JSONL record approximately:
 
 ```json
 {
-  "suite": "core_v1",
+  "suite": "core_v2",
   "task": "08-strings-assert",
   "task_kind": "repair",
   "language": "vol",
@@ -315,6 +349,11 @@ Each replicate writes a JSONL record approximately:
   "attempt": 0,
   "prompt_tokens": 0,
   "completion_tokens": 0,
+  "card_tokens_est": 0,
+  "prompt_tokens_warm": 0,
+  "tokens_cold": 0,
+  "tokens_warm": 0,
+  "repair_seeded": true,
   "exit_code": 1,
   "outcome": "diag_error",
   "diagnostic_code": "R022",
@@ -323,8 +362,10 @@ Each replicate writes a JSONL record approximately:
 }
 ```
 
-Outcomes: `success` | `diag_error` | `wrong_output` | `source_check_failed` |
-`timeout` | `extract_error` (could not recover source from model output).
+`repair_seeded` is true on attempt 0 of diagnostic-repair tasks (seed failure
+already attached). Outcomes: `success` | `diag_error` | `wrong_output` |
+`source_check_failed` | `timeout` | `extract_error` (could not recover source
+from model output).
 
 Strip markdown fences if present; if multiple files appear, take the largest
 code block or fail `extract_error`.
@@ -335,20 +376,25 @@ code block or fail `extract_error`.
 
 ### 8.1 Per-language summary
 
-| Language | First-try % | Success @ K % | Median tokens (success) | Mean tokens (all) | N |
-| --- | --- | --- | --- | --- | --- |
-| VOL | | | | | |
-| Go | | | | | |
+The harness markdown includes cold totals, prompt vs completion means, warm
+(card-amortized) totals, and VOL vs each baseline deltas. Minimum headline table:
+
+| Language | First-try % | Success @ K % | Mean cold | Mean prompt | Mean completion | Mean warm | N |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| VOL | | | | | | | |
+| Python | | | | | | | |
 
 ### 8.2 Headlines to put in README later
 
-Only after a frozen run:
+Only after a frozen **`core_v2`** run that includes the languages being claimed:
 
-- VOL vs Go success @ K (absolute points)
-- VOL vs Go total-token ratio on successes (and on all attempts)
-- Clear disclaimer: model, date, suite, K, card versions
+- VOL vs Python success @ K (absolute points); optional VOL vs Go
+- VOL vs baseline cold and warm total-token ratios
+- Prompt vs completion deltas (so card cost is visible)
+- Clear disclaimer: model, date, suite, protocol, K, card versions
 
-Until then, README must continue to say generate/repair is **not** measured.
+Keep historical VOL-vs-Go `core_v1` / early `core_v2` results labeled; do not
+mix them into Python-baseline tables without naming both baselines.
 
 ---
 
@@ -377,15 +423,22 @@ cannot be recomputed from committed JSONL.
 ## 11. Implementation checklist
 
 - [x] Add frozen `bench/llm/cards/vol_v0.md` and `go_v0.md`
+- [x] Add frozen `bench/llm/cards/python_v0.md` (default interpreter baseline)
 - [x] Add the 2-task smoke suite (`01-hello`, `07-functions`)
 - [x] Add the 5-task core suite with generation, repair, and modification tasks
 - [x] Add `task.json` source constraints and language-specific starter programs
 - [x] Implement `run_generate_repair.py` (OpenAI-compatible API + local runners + `--dry-run`)
 - [x] Wire VOL failures through `vol --json run` for repair context
-- [x] Run core suite, N ≥ 3, VOL vs Go, one model (live API)
+- [x] Run core suite, N ≥ 3, VOL vs Go, one model (live API) — historical `core_v1`
 - [x] Store JSONL + summary markdown under `bench/llm/results/`
 - [x] Update README with numbers and disclaimers
-- [ ] Only then expand models or languages
+- [x] Report prompt vs completion and cold vs warm (card-amortized) in summaries
+- [x] Seeded diagnostic repair: failing starter runs before attempt 0 (`core_v2`)
+- [x] Publish a frozen `core_v2` live run (Gemini) — VOL vs Go
+- [x] Bind cards to Surface Freeze SF-0 (`SPEC.md` §0; `vol_v0` / `python_v0` / `go_v0`)
+- [x] Publish frozen `core_v2` live run with default `--langs vol,python` (Gemini)
+- [ ] Publish ≥1 other model on `core_v2` before syntax optimization
+- [ ] Only then optimize VOL syntax for the table (requires SF-1)
 
 ---
 

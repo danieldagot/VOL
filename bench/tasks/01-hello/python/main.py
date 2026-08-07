@@ -1,0 +1,4 @@
+language = "VOL"
+version = 1
+print("Hello from " + language)
+print("Prototype version " + str(version))

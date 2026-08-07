@@ -2,6 +2,7 @@
   "kind": "generation",
   "source_checks": {
     "vol": ["\\.where\\s*\\(", "\\.sum\\s*\\(", "\\bassert\\s*\\("],
-    "go": ["\\brange\\b", "\\bpanic\\s*\\("]
+    "go": ["\\brange\\b", "\\bpanic\\s*\\("],
+    "python": ["\\bfor\\b", "\\bassert\\b|AssertionError|raise\\b"]
   }
 }

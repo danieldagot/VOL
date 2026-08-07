@@ -2,6 +2,7 @@
   "kind": "generation",
   "source_checks": {
     "vol": ["\\bwhile\\b|\\brepeat\\b", "\\w+\\s*=\\s*\\w+"],
-    "go": ["\\bfor\\b"]
+    "go": ["\\bfor\\b"],
+    "python": ["\\bfor\\b|\\bwhile\\b"]
   }
 }

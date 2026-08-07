@@ -53,20 +53,29 @@ uv run python llm/harness/run_generate_repair.py --provider gemini --suite smoke
 ```
 
 The workflow benchmark has a 2-task `smoke` suite for wiring checks and a
-5-task `core` suite for reported comparisons. Core covers generation, seeded
-repair, and modification, and defaults to three replicates:
+5-task `core` suite (`core_v2`, protocol v1.1) for reported comparisons. Core
+covers generation, diagnostic-seeded repair, and modification, and defaults to
+three replicates. Default languages are `vol,python` (interpreter baseline);
+pass `--langs vol,go` or `--langs vol,python,go` for Go. Summaries report prompt
+vs completion and cold vs warm (card-amortized) totals:
 
 ```sh
 uv run python llm/harness/run_generate_repair.py --provider gemini --suite core
+# optional compiled baseline:
+uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol,go
 ```
 
 The separate static-density benchmark below still contains 13 tasks. Those 13
 are not the LLM workflow suite.
 
-The first core-v1 Gemini run is recorded in
+The published protocol-v1.1 (`core_v2`) Gemini run with the default Python
+baseline is
+[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-022642.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-022642.md).
+Both languages reached 100% first-try and success @ K; VOL was about +10.0% cold
+tokens and about −4.9% warm tokens vs Python. Earlier VOL vs Go:
+[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-021122.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-021122.md).
+Historical non-diagnostic `core_v1`:
 [`llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md`](llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md).
-Both languages passed every replicate; VOL used about 2.1% more workflow tokens
-overall. Treat this as narrow suite evidence, not a real-world language ranking.
 
 `--tasks` accepts a comma-separated list of task IDs (for example,
 `01-hello,07-functions`). `--request-timeout SECONDS` caps each model API

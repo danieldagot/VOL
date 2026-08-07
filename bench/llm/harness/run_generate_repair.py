@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run_generate_repair.py — VOL LLM workflow benchmark harness (protocol v1).
+run_generate_repair.py — VOL LLM workflow benchmark harness (protocol v1.1).
 
 See ../../LLM_BENCHMARK.md (repo root: LLM_BENCHMARK.md).
 
@@ -10,6 +10,11 @@ Modes:
   --provider gemini   Google Gemini via its OpenAI-compatible endpoint
   --dry-run           Skip the model; run frozen reference solutions from bench/tasks.
                       Use this to validate runners/summary wiring. NOT a benchmark result.
+
+Protocol v1.1 notes:
+  - Summaries report prompt vs completion tokens and cold vs warm (card-amortized) totals.
+  - kind=repair with seed=starter: harness runs the broken starter first and attaches
+    real exit code + diagnostics on the first model turn (diagnostic repair).
 
 Environment:
   .env                            loaded from bench/.env or the repository root
@@ -22,9 +27,11 @@ Environment:
 
 Examples:
   uv run python llm/harness/run_generate_repair.py --dry-run
+  uv run python llm/harness/run_generate_repair.py --dry-run --suite core --langs vol,python
   uv run python llm/harness/run_generate_repair.py --provider ollama --model qwen3:4b-instruct
   uv run python llm/harness/run_generate_repair.py --provider openai --model gpt-4.1-mini
   uv run python llm/harness/run_generate_repair.py --provider gemini --model gemini-3.6-flash
+  uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol,go
 """
 
 from __future__ import annotations
@@ -44,6 +51,12 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+import tiktoken
+
+# Card-size estimates use this encoding for cold/warm accounting. Absolute counts
+# still come from each provider's usage fields; warm totals subtract this estimate.
+CARD_TOKENIZER = "cl100k_base"
+
 BENCH_ROOT = Path(__file__).resolve().parents[2]  # .../bench
 VOL_REPO = BENCH_ROOT.parent
 TASKS_DIR = BENCH_ROOT / "tasks"
@@ -61,18 +74,29 @@ CORE_TASKS = [
     "13-temperatures",
 ]
 
+# Cards bound to Surface Freeze SF-0 (SPEC.md §0). Bump filenames with SF-1+.
+# Default workflow baseline is Python (interpreted peer); Go remains optional.
 LANG_META = {
     "vol": {
         "card": "vol_v0.md",
         "label": "VOL",
         "ext": ".vol",
         "prompt_lang": "VOL",
+        "freeze": "SF-0",
+    },
+    "python": {
+        "card": "python_v0.md",
+        "label": "Python",
+        "ext": ".py",
+        "prompt_lang": "Python",
+        "freeze": "SF-0",
     },
     "go": {
         "card": "go_v0.md",
         "label": "Go",
         "ext": ".go",
         "prompt_lang": "Go",
+        "freeze": "SF-0",
     },
 }
 
@@ -100,12 +124,20 @@ def load_dotenv(path: Path) -> None:
         if line.startswith("export "):
             line = line[7:].lstrip()
         if "=" not in line:
-            die(f"invalid .env entry at {path}:{line_number}: expected KEY=VALUE")
+            print(
+                f"warning: skipping non KEY=VALUE line in {path}:{line_number}",
+                file=sys.stderr,
+            )
+            continue
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip()
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
-            die(f"invalid .env key at {path}:{line_number}: {key!r}")
+            print(
+                f"warning: skipping invalid .env key in {path}:{line_number}: {key!r}",
+                file=sys.stderr,
+            )
+            continue
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
         os.environ.setdefault(key, value)
@@ -136,6 +168,8 @@ class AttemptRecord:
     stderr: str = ""
     source: str = ""
     dry_run: bool = False
+    card_tokens_est: int = 0
+    repair_seeded: bool = False
 
 
 @dataclass
@@ -147,10 +181,26 @@ class TaskResult:
     success: bool
     first_try: bool
     attempts: list[AttemptRecord] = field(default_factory=list)
+    seed_diagnostic_code: str | None = None
 
     @property
     def total_tokens(self) -> int:
+        """Cold total: measured prompt + completion across attempts."""
         return sum(a.prompt_tokens + a.completion_tokens for a in self.attempts)
+
+    @property
+    def prompt_tokens(self) -> int:
+        return sum(a.prompt_tokens for a in self.attempts)
+
+    @property
+    def completion_tokens(self) -> int:
+        return sum(a.completion_tokens for a in self.attempts)
+
+    def warm_tokens(self, card_tokens: int) -> int:
+        """Warm total: subtract estimated language-card tokens from every prompt."""
+        return sum(
+            max(0, a.prompt_tokens - card_tokens) + a.completion_tokens for a in self.attempts
+        )
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -232,6 +282,11 @@ def run_source(language: str, source: str, vol_prefix: list[str], vol_cwd: str |
             path.write_text(source, encoding="utf-8")
             stdout, stderr, rc, timed_out = run_cmd(["go", "run", str(path)])
             return stdout, stderr, rc, timed_out, None
+        if language == "python":
+            path = tmp_path / "main.py"
+            path.write_text(source, encoding="utf-8")
+            stdout, stderr, rc, timed_out = run_cmd([sys.executable, str(path)])
+            return stdout, stderr, rc, timed_out, None
         die(f"unsupported language: {language}")
 
 
@@ -239,6 +294,18 @@ def load_card(language: str) -> str:
     path = CARDS_DIR / LANG_META[language]["card"]
     if not path.exists():
         die(f"missing language card: {path}")
+    return path.read_text(encoding="utf-8")
+
+
+def estimate_card_tokens(card: str) -> int:
+    enc = tiktoken.get_encoding(CARD_TOKENIZER)
+    return len(enc.encode(card))
+
+
+def load_starter(task: str, language: str) -> str:
+    path = PROMPTS_DIR / task / f"starter{LANG_META[language]['ext']}"
+    if not path.exists():
+        die(f"missing starter source: {path}")
     return path.read_text(encoding="utf-8")
 
 
@@ -266,6 +333,8 @@ def load_task_config(task: str) -> dict:
         die(f"invalid task metadata {path}: {exc}")
     if config.get("kind") not in {"generation", "repair", "modification"}:
         die(f"invalid task kind in {path}")
+    if config["kind"] == "repair" and config.get("seed", "starter") != "starter":
+        die(f"unsupported repair seed in {path}: {config.get('seed')!r}")
     return config
 
 
@@ -311,21 +380,8 @@ SYSTEM_PROMPT = (
 )
 
 
-def build_initial_messages(language: str, task: str) -> list[dict[str, str]]:
-    card = load_card(language)
-    task_prompt = load_task_prompt(task, language)
-    user = (
-        f"{card.rstrip()}\n\n---\n\n{task_prompt.rstrip()}\n\n"
-        "Return only the complete source file."
-    )
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user},
-    ]
-
-
-def build_repair_message(source: str, exit_code: int | None, stderr: str) -> dict[str, str]:
-    body = (
+def format_failure_block(source: str, exit_code: int | None, stderr: str) -> str:
+    return (
         "The previous program failed.\n\n"
         f"Exit code: {exit_code}\n\n"
         f"Diagnostics:\n{stderr.strip() or '(empty)'}\n\n"
@@ -333,7 +389,30 @@ def build_repair_message(source: str, exit_code: int | None, stderr: str) -> dic
         f"```\n{source.rstrip()}\n```\n\n"
         "Return a full corrected program (not a diff)."
     )
-    return {"role": "user", "content": body}
+
+
+def build_initial_messages(
+    language: str,
+    task: str,
+    *,
+    seed_failure: tuple[str, int | None, str] | None = None,
+) -> list[dict[str, str]]:
+    card = load_card(language)
+    task_prompt = load_task_prompt(task, language)
+    parts = [card.rstrip(), "---", task_prompt.rstrip()]
+    if seed_failure is not None:
+        source, exit_code, stderr = seed_failure
+        parts.extend(["---", format_failure_block(source, exit_code, stderr)])
+    else:
+        parts.append("Return only the complete source file.")
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": "\n\n".join(parts)},
+    ]
+
+
+def build_repair_message(source: str, exit_code: int | None, stderr: str) -> dict[str, str]:
+    return {"role": "user", "content": format_failure_block(source, exit_code, stderr)}
 
 
 def normalize_openai_base(url: str) -> str:
@@ -438,6 +517,31 @@ def chat_completion(
     return content, prompt_tokens, completion_tokens
 
 
+def prepare_repair_seed(
+    *,
+    task: str,
+    language: str,
+    expected: str,
+    source_checks: list[str],
+    vol_prefix: list[str],
+    vol_cwd: str | None,
+) -> tuple[str, int | None, str, str | None]:
+    """Run the broken starter; it must fail so diagnostics reach the model."""
+    starter = load_starter(task, language)
+    stdout, stderr, rc, timed_out, diag = run_source(language, starter, vol_prefix, vol_cwd)
+    outcome, validation_error = judge(stdout, rc, timed_out, expected, starter, source_checks)
+    if validation_error:
+        stderr = validation_error
+    if outcome == "success":
+        die(
+            f"repair starter for {task}/{language} unexpectedly succeeds; "
+            "seeded diagnostic repair requires a failing starter"
+        )
+    if timed_out or rc is None:
+        die(f"repair starter for {task}/{language} timed out before producing diagnostics")
+    return starter, rc, stderr, diag
+
+
 def run_task_replicate(
     *,
     suite: str,
@@ -454,6 +558,7 @@ def run_task_replicate(
     request_timeout: float,
     vol_prefix: list[str],
     vol_cwd: str | None,
+    card_tokens_est: int,
 ) -> TaskResult:
     expected = load_expected(task)
     task_config = load_task_config(task)
@@ -467,11 +572,28 @@ def run_task_replicate(
         success=False,
         first_try=False,
     )
-    messages = build_initial_messages(language, task)
+
+    seed_failure: tuple[str, int | None, str] | None = None
+    repair_seeded = False
+    if task_kind == "repair":
+        starter, seed_rc, seed_stderr, seed_diag = prepare_repair_seed(
+            task=task,
+            language=language,
+            expected=expected,
+            source_checks=source_checks,
+            vol_prefix=vol_prefix,
+            vol_cwd=vol_cwd,
+        )
+        seed_failure = (starter, seed_rc, seed_stderr)
+        result.seed_diagnostic_code = seed_diag
+        repair_seeded = True
+
+    messages = build_initial_messages(language, task, seed_failure=seed_failure)
 
     for attempt in range(0, max_repairs + 1):
         if dry_run:
             # Attempt 0 uses the reference solution (validates runners).
+            # For repair tasks the broken starter already failed in prepare_repair_seed.
             content = load_reference(task, language)
             prompt_tokens = completion_tokens = 0
         else:
@@ -505,6 +627,8 @@ def run_task_replicate(
                 stderr="could not extract source from model output",
                 source=content,
                 dry_run=dry_run,
+                card_tokens_est=card_tokens_est,
+                repair_seeded=repair_seeded and attempt == 0,
             )
             result.attempts.append(rec)
             if attempt >= max_repairs:
@@ -543,6 +667,8 @@ def run_task_replicate(
             stderr=stderr,
             source=source,
             dry_run=dry_run,
+            card_tokens_est=card_tokens_est,
+            repair_seeded=repair_seeded and attempt == 0,
         )
         result.attempts.append(rec)
 
@@ -567,29 +693,74 @@ def run_task_replicate(
     return result
 
 
-def summarize(results: list[TaskResult], *, suite: str, model: str, temperature: float, max_repairs: int, dry_run: bool) -> str:
+def _mean_sd(values: list[float]) -> tuple[str, str]:
+    if not values:
+        return "—", "0.0"
+    mean = statistics.mean(values)
+    spread = statistics.pstdev(values) if len(values) > 1 else 0.0
+    return f"{mean:.1f}", f"{spread:.1f}"
+
+
+def _pct_delta(vol: float, baseline: float) -> str:
+    if baseline == 0:
+        return "—"
+    return f"{(vol - baseline) / baseline * 100:+.1f}%"
+
+
+def _baseline_languages(languages: list[str]) -> list[str]:
+    return [lang for lang in languages if lang != "vol"]
+
+
+def summarize(
+    results: list[TaskResult],
+    *,
+    suite: str,
+    model: str,
+    temperature: float,
+    max_repairs: int,
+    dry_run: bool,
+    card_tokens: dict[str, int],
+) -> str:
+    languages = sorted({r.language for r in results})
     lines: list[str] = [
-        f"# VOL LLM generate/repair results",
+        "# VOL LLM generate/repair results",
         "",
         f"- Date: {date.today().isoformat()}",
         f"- Suite: `{suite}`",
+        f"- Protocol: v1.1",
         f"- Model: `{model}`",
         f"- Temperature: {temperature}",
         f"- Max repairs (K): {max_repairs}",
         f"- Dry-run: {dry_run}",
-        f"- Cards: `vol_v0.md`, `go_v0.md`",
+        f"- Surface freeze: SF-0",
+        (
+            "- Cards: "
+            + ", ".join(f"`{LANG_META[lang]['card']}`" for lang in languages)
+            + " (SF-0)"
+        ),
+        (
+            f"- Card tokens (est. `{CARD_TOKENIZER}`): "
+            + ", ".join(
+                f"{LANG_META[lang]['label']}={card_tokens[lang]}"
+                for lang in languages
+            )
+        ),
         "",
         "> Dry-run uses reference solutions and is **not** an LLM benchmark result."
         if dry_run
         else "> Live API run. Recompute from committed JSONL if numbers are quoted.",
         "",
+        "> **Cold** totals use provider `prompt_tokens` + `completion_tokens` (language card",
+        "> re-sent every request). **Warm** subtracts the estimated card tokens from each",
+        "> prompt (amortized / cached-card accounting).",
+        "",
         "## Summary",
         "",
-        "| Language | First-try % | Success @ K % | Median tokens (success) | Mean ± SD tokens (all) | N task-replicates |",
+        "| Language | First-try % | Success @ K % | Median cold (success) | Mean ± SD cold (all) | N task-replicates |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
 
-    for language in sorted({r.language for r in results}):
+    for language in languages:
         subset = [r for r in results if r.language == language]
         n = len(subset)
         first = sum(1 for r in subset if r.first_try) / n * 100 if n else 0.0
@@ -597,45 +768,157 @@ def summarize(results: list[TaskResult], *, suite: str, model: str, temperature:
         success_tokens = [r.total_tokens for r in subset if r.success]
         all_tokens = [r.total_tokens for r in subset]
         med = statistics.median(success_tokens) if success_tokens else float("nan")
-        mean = statistics.mean(all_tokens) if all_tokens else float("nan")
-        spread = statistics.pstdev(all_tokens) if len(all_tokens) > 1 else 0.0
+        mean_s, spread_s = _mean_sd(all_tokens)
         med_s = f"{med:.0f}" if success_tokens else "—"
-        mean_s = f"{mean:.1f}" if all_tokens else "—"
         label = LANG_META[language]["label"]
         lines.append(
-            f"| {label} | {first:.1f} | {ok:.1f} | {med_s} | {mean_s} ± {spread:.1f} | {n} |"
+            f"| {label} | {first:.1f} | {ok:.1f} | {med_s} | {mean_s} ± {spread_s} | {n} |"
         )
 
-    lines.extend(["", "## By workflow kind", ""])
-    lines.append("| Kind | Language | Success @ K % | Mean ± SD tokens | N |")
+    lines.extend(["", "## Prompt vs completion (cold, all attempts)", ""])
+    lines.append(
+        "| Language | Mean prompt | Mean completion | Mean cold total | "
+        "Prompt share | Completion share |"
+    )
+    lines.append("| --- | --- | --- | --- | --- | --- |")
+    mix: dict[str, tuple[float, float, float]] = {}
+    for language in languages:
+        subset = [r for r in results if r.language == language]
+        if not subset:
+            continue
+        mean_p = statistics.mean(r.prompt_tokens for r in subset)
+        mean_c = statistics.mean(r.completion_tokens for r in subset)
+        mean_t = statistics.mean(r.total_tokens for r in subset)
+        mix[language] = (mean_p, mean_c, mean_t)
+        p_share = (mean_p / mean_t * 100) if mean_t else 0.0
+        c_share = (mean_c / mean_t * 100) if mean_t else 0.0
+        lines.append(
+            f"| {LANG_META[language]['label']} | {mean_p:.1f} | {mean_c:.1f} | "
+            f"{mean_t:.1f} | {p_share:.1f}% | {c_share:.1f}% |"
+        )
+
+    if "vol" in mix:
+        vp, vc, vt = mix["vol"]
+        for baseline in _baseline_languages(list(mix)):
+            if baseline not in mix:
+                continue
+            bp, bc, bt = mix[baseline]
+            blabel = LANG_META[baseline]["label"]
+            lines.extend(
+                [
+                    "",
+                    f"## VOL vs {blabel} token deltas (cold means)",
+                    "",
+                    f"| Metric | VOL vs {blabel} |",
+                    "| --- | --- |",
+                    f"| Generated completion tokens | {_pct_delta(vc, bc)} |",
+                    f"| Prompt tokens | {_pct_delta(vp, bp)} |",
+                    f"| Total workflow tokens (cold) | {_pct_delta(vt, bt)} |",
+                    f"| Abs. prompt delta / task-replicate | {vp - bp:+.1f} |",
+                    f"| Abs. completion delta / task-replicate | {vc - bc:+.1f} |",
+                ]
+            )
+
+    lines.extend(["", "## Cold vs warm (card amortized)", ""])
+    lines.append(
+        "| Language | Mean cold | Mean warm | Warm − cold | Card est. |"
+    )
     lines.append("| --- | --- | --- | --- | --- |")
+    for language in languages:
+        subset = [r for r in results if r.language == language]
+        if not subset:
+            continue
+        card = card_tokens.get(language, 0)
+        cold = [float(r.total_tokens) for r in subset]
+        warm = [float(r.warm_tokens(card)) for r in subset]
+        mean_cold = statistics.mean(cold)
+        mean_warm = statistics.mean(warm)
+        lines.append(
+            f"| {LANG_META[language]['label']} | {mean_cold:.1f} | {mean_warm:.1f} | "
+            f"{mean_warm - mean_cold:+.1f} | {card} |"
+        )
+
+    if "vol" in languages:
+        vol_sub = [r for r in results if r.language == "vol"]
+        vol_warm = statistics.mean(r.warm_tokens(card_tokens["vol"]) for r in vol_sub)
+        for baseline in _baseline_languages(languages):
+            base_sub = [r for r in results if r.language == baseline]
+            if not base_sub:
+                continue
+            base_warm = statistics.mean(
+                r.warm_tokens(card_tokens[baseline]) for r in base_sub
+            )
+            blabel = LANG_META[baseline]["label"]
+            lines.extend(
+                [
+                    "",
+                    f"Warm VOL vs {blabel} total: {_pct_delta(vol_warm, base_warm)} "
+                    f"(means {vol_warm:.1f} vs {base_warm:.1f}).",
+                ]
+            )
+
+    lines.extend(["", "## By workflow kind", ""])
+    lines.append(
+        "| Kind | Language | Success @ K % | Mean cold | Mean prompt | Mean completion | N |"
+    )
+    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
     for kind in sorted({r.task_kind for r in results}):
-        for language in sorted({r.language for r in results}):
+        for language in languages:
             subset = [r for r in results if r.task_kind == kind and r.language == language]
             if not subset:
                 continue
             success = sum(1 for r in subset if r.success) / len(subset) * 100
-            mean = statistics.mean(r.total_tokens for r in subset)
-            spread = statistics.pstdev(r.total_tokens for r in subset) if len(subset) > 1 else 0.0
+            mean_t = statistics.mean(r.total_tokens for r in subset)
+            mean_p = statistics.mean(r.prompt_tokens for r in subset)
+            mean_c = statistics.mean(r.completion_tokens for r in subset)
             lines.append(
                 f"| {kind} | {LANG_META[language]['label']} | {success:.1f} | "
-                f"{mean:.1f} ± {spread:.1f} | {len(subset)} |"
+                f"{mean_t:.1f} | {mean_p:.1f} | {mean_c:.1f} | {len(subset)} |"
+            )
+
+    repair_rows = [r for r in results if r.task_kind == "repair"]
+    if repair_rows:
+        lines.extend(
+            [
+                "",
+                "## Diagnostic repair notes",
+                "",
+                "- Repair tasks seed a failing starter **before** attempt 0.",
+                "- Attempt 0 already includes exit code + diagnostics (not a blind rewrite).",
+                "- `First-try` on repair means the model fixed the seed in one diagnostic turn.",
+                "",
+            ]
+        )
+        lines.append("| Task | Lang | Rep | Seed diag | Success | First-try | Attempts | Cold tokens | Last outcome |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+        for r in repair_rows:
+            last = r.attempts[-1].outcome if r.attempts else "—"
+            seed = r.seed_diagnostic_code or "—"
+            lines.append(
+                f"| {r.task} | {r.language} | {r.replicate} | {seed} | {r.success} | "
+                f"{r.first_try} | {len(r.attempts)} | {r.total_tokens} | {last} |"
             )
 
     lines.extend(["", "## Per task-replicate", ""])
-    lines.append("| Task | Kind | Lang | Rep | Success | First-try | Attempts | Tokens | Last outcome |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    lines.append(
+        "| Task | Kind | Lang | Rep | Success | First-try | Attempts | "
+        "Cold | Prompt | Completion | Warm | Last outcome |"
+    )
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in results:
         last = r.attempts[-1].outcome if r.attempts else "—"
+        card = card_tokens.get(r.language, 0)
         lines.append(
-            f"| {r.task} | {r.task_kind} | {r.language} | {r.replicate} | {r.success} | {r.first_try} | "
-            f"{len(r.attempts)} | {r.total_tokens} | {last} |"
+            f"| {r.task} | {r.task_kind} | {r.language} | {r.replicate} | {r.success} | "
+            f"{r.first_try} | {len(r.attempts)} | {r.total_tokens} | {r.prompt_tokens} | "
+            f"{r.completion_tokens} | {r.warm_tokens(card)} | {last} |"
         )
     lines.append("")
     return "\n".join(lines)
 
 
 def record_to_json(rec: AttemptRecord) -> dict:
+    warm_prompt = max(0, rec.prompt_tokens - rec.card_tokens_est)
     return {
         "suite": rec.suite,
         "task": rec.task,
@@ -647,6 +930,11 @@ def record_to_json(rec: AttemptRecord) -> dict:
         "attempt": rec.attempt,
         "prompt_tokens": rec.prompt_tokens,
         "completion_tokens": rec.completion_tokens,
+        "card_tokens_est": rec.card_tokens_est,
+        "prompt_tokens_warm": warm_prompt,
+        "tokens_cold": rec.prompt_tokens + rec.completion_tokens,
+        "tokens_warm": warm_prompt + rec.completion_tokens,
+        "repair_seeded": rec.repair_seeded,
         "exit_code": rec.exit_code,
         "outcome": rec.outcome,
         "diagnostic_code": rec.diagnostic_code,
@@ -712,7 +1000,11 @@ def main() -> None:
     load_environment()
     parser = argparse.ArgumentParser(description="VOL LLM workflow benchmark harness")
     parser.add_argument("--suite", choices=["smoke", "core"], default="smoke")
-    parser.add_argument("--langs", default="vol,go", help="Comma-separated: vol,go")
+    parser.add_argument(
+        "--langs",
+        default="vol,python",
+        help="Comma-separated languages: vol,python,go (default: vol,python)",
+    )
     parser.add_argument("--tasks", default="", help="Comma-separated task ids (optional filter)")
     parser.add_argument(
         "--provider",
@@ -757,7 +1049,8 @@ def main() -> None:
 
     only = [t.strip() for t in args.tasks.split(",") if t.strip()] or None
     tasks = resolve_tasks(args.suite, only)
-    suite_name = "smoke_v1" if args.suite == "smoke" else "core_v1"
+    # core_v2: diagnostic-seeded repair + cold/warm summary (protocol v1.1)
+    suite_name = "smoke_v1" if args.suite == "smoke" else "core_v2"
 
     if args.dry_run:
         base_url, api_key, model_name, request_timeout = "", None, "dry-run/reference", 120.0
@@ -768,6 +1061,15 @@ def main() -> None:
 
     if "go" in languages and subprocess.run(["go", "version"], capture_output=True).returncode != 0:
         die("go toolchain not found")
+    if "python" in languages:
+        probe = subprocess.run(
+            [sys.executable, "-c", "import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)"],
+            capture_output=True,
+        )
+        if probe.returncode != 0:
+            die(f"Python 3.11+ required for python runner (using {sys.executable})")
+
+    card_tokens = {lang: estimate_card_tokens(load_card(lang)) for lang in languages}
 
     vol_prefix, vol_cwd = get_vol_prefix()
     out_dir = args.out_dir or RESULTS_DIR
@@ -785,7 +1087,8 @@ def main() -> None:
 
     print(
         f"suite={suite_name} mode={mode} provider={args.provider if not args.dry_run else 'none'} "
-        f"model={model_label} base={base_url or '-'} tasks={len(tasks)} langs={languages}"
+        f"model={model_label} base={base_url or '-'} tasks={len(tasks)} langs={languages} "
+        f"card_tokens={card_tokens}"
     )
 
     with partial_jsonl_path.open("w", encoding="utf-8") as jsonl:
@@ -808,13 +1111,19 @@ def main() -> None:
                         request_timeout=request_timeout,
                         vol_prefix=vol_prefix,
                         vol_cwd=vol_cwd,
+                        card_tokens_est=card_tokens[language],
                     )
                     results.append(tr)
                     for attempt in tr.attempts:
                         jsonl.write(json.dumps(record_to_json(attempt), ensure_ascii=False) + "\n")
                     status = "OK" if tr.success else "FAIL"
                     last = tr.attempts[-1].outcome if tr.attempts else "?"
-                    print(f"    {status} attempts={len(tr.attempts)} last={last} tokens={tr.total_tokens}")
+                    warm = tr.warm_tokens(card_tokens[language])
+                    seed = f" seed_diag={tr.seed_diagnostic_code}" if tr.seed_diagnostic_code else ""
+                    print(
+                        f"    {status} attempts={len(tr.attempts)} last={last} "
+                        f"cold={tr.total_tokens} warm={warm}{seed}"
+                    )
 
     partial_jsonl_path.replace(jsonl_path)
 
@@ -825,6 +1134,7 @@ def main() -> None:
         temperature=args.temperature,
         max_repairs=args.max_repairs,
         dry_run=args.dry_run,
+        card_tokens=card_tokens,
     )
     summary_path.write_text(summary, encoding="utf-8")
     print()

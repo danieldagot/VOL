@@ -1,7 +1,9 @@
 {
   "kind": "repair",
+  "seed": "starter",
   "source_checks": {
     "vol": ["\\bassert\\s*\\(", "\\.len\\b"],
-    "go": ["\\bpanic\\s*\\(", "\\blen\\s*\\("]
+    "go": ["\\bpanic\\s*\\(", "\\blen\\s*\\("],
+    "python": ["\\bassert\\b", "\\blen\\s*\\("]
   }
 }

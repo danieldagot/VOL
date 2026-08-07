@@ -33,9 +33,11 @@ VOL aims to combine concise, intent-oriented source code with memory safety,
 predictable execution, and native performance.
 
 **Current reality:** VOL is a tree-walking interpreter prototype with a small
-provisional syntax. There is no native backend, static type system, ownership
-checker, or standard library. Keep vision and implementation status distinct in
-every document.
+provisional syntax. **Surface Freeze SF-0** pins that Supported surface
+([`SPEC.md`](SPEC.md) §0) and the LLM card `bench/llm/cards/vol_v0.md`. Do not
+add Planned syntax under SF-0. There is no native backend, static type system,
+ownership checker, or standard library. Keep vision and implementation status
+distinct in every document.
 
 Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 
@@ -202,8 +204,9 @@ Priority:
 4. Performance
 5. Compile speed
 
-Near-term project priority: freeze the implemented surface and specify it
-precisely before adding major features. See `IDEAS.md`.
+Near-term project priority: **SF-0 is active** — keep the frozen surface precise
+(tests, diagnostics, docs) and build foundations (formatter, error model,
+modules) before an SF-1 feature bump. See `IDEAS.md` and `SPEC.md` §0.
 
 ---
 

@@ -1,6 +1,6 @@
 # VOL Language Specification (Prototype v0)
 
-> Status: **living draft for the current interpreter**  
+> Status: **Surface Freeze SF-0** (Prototype v0 Supported surface is frozen)  
 > Audience: humans and LLMs  
 > Source of truth for behavior: this file plus the tests in `internal/lang`
 
@@ -19,6 +19,7 @@ Related docs:
 | [`README.md`](README.md) | Project status and examples |
 | [`IDEAS.md`](IDEAS.md) | Planned features and open questions |
 | [`AGENTS.md`](AGENTS.md) | Project vision and contribution rules |
+| [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | Frozen LLM language card for SF-0 |
 
 This file is the single source for implemented syntax, vocabulary, and semantics.
 Planned words such as `parallel` belong only in [`IDEAS.md`](IDEAS.md).
@@ -55,6 +56,27 @@ Notation:
 
 **Supported** means implemented and covered by tests. **Provisional** means
 implemented and tested, but spelling or meaning may change.
+
+### Surface freeze SF-0
+
+**SF-0** freezes the Supported / Provisional surface described in this document
+(Prototype v0) and in §11 Decided. The matching LLM card is
+[`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md).
+
+| Allowed under SF-0 | Requires bumping to SF-1 (or later) |
+| --- | --- |
+| Bug fixes that restore documented behavior | New keywords or operators |
+| Clearer diagnostics / `fix` text for existing codes | New collection ops (e.g. `.count`, lazy views) |
+| Tests, examples, and doc sync for existing forms | Anonymous/`=>` functions, pipeline operators |
+| Card wording edits that do **not** add features | Any form that expands the Supported vocabulary |
+| Resolver/interpreter fixes for spec holes | Modules, types, ownership, stdlib APIs |
+
+During SF-0, do **not** implement Planned syntax from [`IDEAS.md`](IDEAS.md).
+Park ideas there; ship them only with a freeze bump, SPEC updates, tests, and a
+new card version (`vol_v1.md`, …).
+
+Published LLM tables must name the freeze and card (`SF-0` / `vol_v0`). Do not
+mix results that used different freeze IDs.
 
 ### Syntax principles
 
@@ -728,7 +750,10 @@ Pipeline:
 3. Resolve errors abort before execute.
 4. Runtime errors abort program execution immediately.
 
-There is no `try` / `catch` and no error values yet.
+There is no `try` / `catch` and no error values yet. **Future direction**
+(Planned only — see [`IDEAS.md`](IDEAS.md) “Error / result model”): hybrid
+traps for programmer/invariant failures plus Result values for expected
+operational failure; optional dual-return sugar later. Not part of SF-0.
 
 The CLI emits diagnostics as human-readable text by default. Pass `--json`
 anywhere in the command to receive a single JSON object on stderr instead:
@@ -875,6 +900,8 @@ Do not treat these as specified just because vision docs mention them:
 - packages/imports beyond local `export` metadata
 - `parallel`, async, channels
 - wrapping integer arithmetic and overflow build modes (default is trap; see §4.3)
+- Result / recoverable error values and dual-return sugar (direction in
+  [`IDEAS.md`](IDEAS.md); today all failures abort — §8)
 - native memory layout / allocators
 - C or LLVM backends
 
@@ -905,6 +932,10 @@ and Planned work in [`IDEAS.md`](IDEAS.md).
 - **`while` (§5.5):** permanent Supported vocabulary; no alternate spellings.
 - **`if` (§5.3):** statement only, with `elif` / `else`. Value choice uses
   `? :` (§4.2.1). Expression-`if` is not part of the language.
+- **Error model direction (§8, Planned):** hybrid traps for bugs/invariants;
+  Result for expected operational failure; no exception-primary model;
+  optional dual-return sugar later. **Not implemented** — SF-0 still aborts
+  on every failure. Details in [`IDEAS.md`](IDEAS.md).
 
 Implementers and LLMs must follow the concrete behavior in sections 1–9.
 
@@ -930,11 +961,14 @@ Details and commands live in [`IDEAS.md`](IDEAS.md).
 
 When changing language behavior:
 
-1. Update this specification (including the quick vocabulary tables when forms change).
-2. Add or adjust tests in `internal/lang`.
-3. Update `README.md` examples if users should learn the change.
-4. Move completed plans out of `IDEAS.md`.
-5. Run:
+1. If the change adds, removes, or renames Supported surface, **bump the surface
+   freeze** (SF-0 → SF-1, …), add a new language card version, and note the bump
+   in [`IDEAS.md`](IDEAS.md) / README. Pure bugfixes and doc sync stay on SF-0.
+2. Update this specification (including the quick vocabulary tables when forms change).
+3. Add or adjust tests in `internal/lang`.
+4. Update `README.md` examples if users should learn the change.
+5. Move completed plans out of `IDEAS.md`.
+6. Run:
 
 ```text
 go test ./...

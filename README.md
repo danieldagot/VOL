@@ -37,6 +37,10 @@ This README separates **what works today** from **long-term design targets**. Tr
 
 ### What Actually Works
 
+**Surface Freeze SF-0:** the Supported Prototype v0 syntax in [`SPEC.md`](SPEC.md)
+is frozen. New vocabulary (arrows, pipes, `.count`, etc.) waits for an SF-1 bump.
+LLM card: [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md).
+
 - integer, floating-point, Boolean, and string literals
 - inferred variable declarations with `:=`
 - variable assignment with `=`
@@ -72,7 +76,7 @@ This README separates **what works today** from **long-term design targets**. Tr
 - static type checking
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter
-- a published compatibility policy and versioned conformance corpus
+- a published compatibility policy and versioned conformance corpus (SF-0 is the first surface pin)
 - broader LLM workflow results across more models and realistic backend tasks
 - initial language-server support
 
@@ -81,7 +85,8 @@ This README separates **what works today** from **long-term design targets**. Tr
 - typed function signatures
 - explicit type syntax
 - ownership and borrowing semantics (local inference vs API contracts)
-- error propagation
+- error propagation / Result values (direction: hybrid traps + Result, optional
+  dual-return sugar later — see [`IDEAS.md`](IDEAS.md); not implemented)
 - optional and nullable values
 - structs, methods, enums, and tagged unions
 - modules, packages, and imports
@@ -229,21 +234,34 @@ cd bench && uv sync && uv run python harness/count_tokens.py
 
 ## LLM Workflow Benchmark
 
-One protocol-v1 core run is available for `gemini-3.5-flash-lite`, temperature
-0, three replicates, and at most two repair rounds. The suite has five tasks
-covering generation, seeded repair, and modification:
+The default workflow baseline is **Python** (interpreted peer for the current
+prototype). Go remains an optional compiled baseline (`--langs vol,go`).
 
-| Language | First-try success | Success @ K | Mean total tokens |
-| --- | ---: | ---: | ---: |
-| Go | 100% | 100% | 789.3 |
-| VOL | 100% | 100% | 805.5 |
+One protocol-v1.1 (`core_v2`) run is published for `gemini-3.5-flash-lite`,
+temperature 0, three replicates, and at most two repair rounds — **VOL vs
+Python**. The suite has five tasks covering generation, diagnostic-seeded
+repair, and modification. Summaries split prompt vs completion and report cold
+totals (card re-sent every request) plus warm totals (estimated language-card
+cost amortized away).
 
-VOL used about 2.1% more workflow tokens overall in this run. It used fewer
-tokens on the modification task, but more on generation and seeded repair.
-This small synthetic suite does not establish real-world superiority for either
-language and does not measure runtime performance.
+| Language | First-try | Success @ K | Mean cold | Mean warm | Mean completion |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Python | 100% | 100% | 763.8 | 427.8 | 136.0 |
+| VOL | 100% | 100% | 839.9 | 406.9 | 112.0 |
 
-Full result: [`bench/llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md`](bench/llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md).
+VOL used about 10.0% more **cold** workflow tokens and about 4.9% fewer **warm**
+tokens than Python. Completions were about 17.6% smaller; prompts were about
+15.9% larger (language-card teaching cost). Every replicate succeeded on the
+first try, including diagnostic repair (`R007` for VOL).
+
+An earlier VOL-vs-Go `core_v2` run is kept for comparison. This small synthetic
+suite does not establish real-world superiority for any language and does not
+measure runtime performance. A second model on `core_v2` is still needed before
+treating results as stable.
+
+Full result (VOL vs Python): [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-022642.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-022642.md).
+Earlier VOL vs Go: [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-021122.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-021122.md).
+Historical non-diagnostic `core_v1`: [`bench/llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md`](bench/llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md).
 Protocol and limitations: [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md).
 
 ## Requirements

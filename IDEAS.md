@@ -8,7 +8,11 @@ specified and tested.
 
 ## Near-Term Priority: Precise Core Before New Features
 
-Stop expanding the language surface until the current core is boringly precise:
+**Surface Freeze SF-0 is active** (see [`SPEC.md`](SPEC.md) §0). The Supported
+Prototype v0 surface and LLM card `bench/llm/cards/vol_v0.md` are frozen.
+Do not expand the language until foundations below justify an SF-1 bump.
+
+Frozen core (do not grow under SF-0):
 
 - values, variables, functions
 - `if` / `elif` / `else`, `repeat`, `while`, `? :`
@@ -20,13 +24,16 @@ Immediate documentation and design work:
 - [x] Write `SPEC.md` covering lexical grammar, expression grammar, types/values,
       scopes, evaluation order, numeric behavior, arrays/strings, mutation,
       functions, control flow, and failure behavior for the implemented core.
+- [x] Declare Surface Freeze SF-0 (SPEC + `vol_v0` language card).
 - [ ] Keep `SPEC.md` synchronized whenever interpreter behavior changes.
-- [ ] Resolve the open decisions listed in `SPEC.md` section 11 one at a time,
-      with tests, before adding major new syntax.
-- [x] Write `LLM_BENCHMARK.md` with a falsifiable generate/repair protocol
-      (task success / total tokens; reuses `bench/tasks`). Harness and results
-      still todo—see checklist in that file.
+- [x] Error/result model sketch (hybrid traps + Result; dual-return sugar later).
+- [ ] Foundations before SF-1: smaller matched language card, formatter design,
+      modules sketch (still Planned — not syntax).
+- [x] Write `LLM_BENCHMARK.md` with a falsifiable generate/repair protocol;
+      harness + Gemini `core_v2` published — see checklist in that file.
 - [ ] Keep Planned syntax out of `SPEC.md`; only Supported and Provisional forms belong there.
+- [x] Publish frozen `core_v2` with default Python baseline (`--langs vol,python`).
+- [ ] Publish ≥1 other model on `core_v2` before treating LLM results as stable.
 
 ## Near-Term Foundation
 
@@ -166,6 +173,76 @@ Remaining open items:
 - `const` function parameters — Planned; parameters stay mutable for now.
 - Deeper freeze / ownership of array elements — deferred to ownership design.
 
+### Syntactic sugar from familiar languages (arrows + pipes)
+
+**Blocked by Surface Freeze SF-0.** Desired surface sugar inspired by languages
+used so far (JS arrow functions, PowerShell pipelines). Both are **Planned**
+only — not accepted syntax. Prefer one canonical form per intent; do not ship
+JS `=>` and PowerShell `|` and keep today’s `fn` / `.where` / `.sum` as three
+competing spellings without a rule. Revisit only with an SF-1 bump.
+
+#### Anonymous / arrow functions
+
+Today: only named `fn name(params) { ... }`, plus `_` inside `.where` predicates.
+Wanted: short first-class functions for callbacks and local helpers (JS feel).
+
+Candidate shapes (pick one later; do not implement all):
+
+```vol
+// A — anonymous fn (same keyword as named functions)
+double := fn(x) { return x * 2 }
+
+// B — expression arrow (JS-like)
+double := (x) => x * 2
+add := (a, b) => a + b
+
+// C — keep `_` for collection predicates; named/anonymous fn elsewhere
+items.where(_ > 5)
+```
+
+Open questions:
+
+- Prefer anonymous `fn` (A) over `=>` (B) unless JS familiarity is worth a second glyph.
+- Expression body vs block body; required parens for a single parameter?
+- Does arrow/`fn` replace `_` in `.where`, or coexist? Coexistence needs a clear
+  canonical form for the formatter and language card.
+- Closures already exist for nested named `fn`; anonymous forms must share the
+  same capture and `nothing` / `return` rules (`SPEC.md` §5.8).
+
+#### Pipeline sugar
+
+Today: method chaining expresses collection intent —
+
+```vol
+nums.where(_ > 0).sum()
+```
+
+Wanted: PowerShell-like left-to-right pipelines for “pass this into the next
+step.” Bare `|` is attractive from shells but conflicts with a future bitwise OR
+in a systems language — prefer `|>` (or keep method chains only) unless `|` is
+explicitly reserved for pipes and bitwise uses another spelling.
+
+Candidate shapes:
+
+```vol
+// Method chain (already Supported — default until pipes are specified)
+nums.where(_ > 0).sum()
+
+// First-arg / pipeline sugar (Elixir/F#-like), not shell stdout
+result := nums |> where(_ > 0) |> sum
+
+// Bare | (PowerShell-like) — only if bitwise OR is deferred or respelt
+result := nums | where(_ > 0) | sum
+```
+
+Open questions:
+
+- Semantics: value as first argument (`x |> f` ⇒ `f(x)`), special method-name
+  RHS (`x |> where(...)`), or collection-only pipeline?
+- Eager vs lazy; interaction with `.where` purity and future `.map` / reduce.
+- Formatter canonical form: method chain vs `|>` when both would be legal.
+- Do not document `|` as Supported until bitwise-or policy is decided.
+
 ### Parallel intent
 
 ```vol
@@ -176,6 +253,58 @@ parallel {
 
 Automatic parallelization must preserve correctness and predictable resource use.
 Exact semantics, scheduling, allocation, and failure behavior are undecided.
+
+### Error / result model (design direction — not syntax)
+
+**Direction decided; blocked for implementation by Surface Freeze SF-0** (and by
+missing types / stdlib). Today the interpreter only **aborts** on failure
+(`SPEC.md` §8): no `try`/`catch`, no error values. That interim behavior stays
+until an SF bump ships the model below.
+
+**Hybrid rule:**
+
+1. **Traps (language / programmer mistakes)** — keep aborting with diagnostics:
+   overflow (`R028`), bounds, type mistakes, div-by-zero, failed `assert`, and
+   similar invariant breaks. These are not meant to be handled as normal values.
+2. **Result values (expected operational failure)** — when I/O, parse, net, DB,
+   and similar APIs exist, they return a Result-like success/failure value the
+   program can inspect or propagate. Prefer one canonical Result shape over
+   exceptions.
+3. **No exceptions** as the primary error model (`try`/`catch` is not planned
+   as the default).
+
+**Canonical form (Planned spelling — pick exact names with types/SF-1):**
+
+```vol
+// Illustrative only — not accepted today
+result := open("config.json")   // Result[File, Error] (or equivalent tags)
+match result {
+    ok file { /* use file */ }
+    err e { /* handle or return err */ }
+}
+```
+
+**Future dual-return sugar (optional, not canonical alone):**
+
+Go-style multi-assign may be added later as **sugar over Result**, not a second
+competing model. Ignoring the error binding must remain a diagnosable mistake
+(same discipline as discarding an unchecked Result).
+
+```vol
+// Illustrative sugar — not accepted today; desugars to Result
+file, err := open("config.json")
+if err != none {
+    return err
+}
+```
+
+Open follow-ups (do not invent surface until types exist):
+
+- Exact Result / error type spelling and whether `?` propagate is worth tokens.
+- Trap vs Result boundary for decode / parse helpers.
+- Unused-Result and ignored-`err` diagnostics.
+- Interaction with `nothing` / `R029` (separate: missing return ≠ error value).
+- Whether built-in `input` stays trap (`R024`) or becomes Result when I/O grows.
 
 ### Modules and imports
 
@@ -410,7 +539,10 @@ not LLM task-success efficiency.
   See `SPEC.md` §4.4.
 - ~~Missing return value?~~ **Decided:** `nothing` if unused as a statement
   result; `R029` if assigned or used as a value. See `SPEC.md` §5.8.
-- How are fallible operations and errors represented?
+- ~~How are fallible operations and errors represented?~~ **Direction decided
+  (not implemented):** hybrid — traps for bugs/invariants; Result for expected
+  operational failure; no exception-primary model; optional Go-style dual-return
+  sugar later over Result. See “Error / result model” above.
 - How are nullable or optional values represented?
 - How are structs, enums, and tagged unions declared?
 - How are modules and packages organized?
@@ -419,3 +551,5 @@ not LLM task-success efficiency.
 - What guarantees does automatic parallelization provide?
 - Which build modes control bounds and overflow checking?
 - Which ownership questions can be inferred locally, and which need API contracts?
+- Anonymous functions: anonymous `fn`, JS-style `=>`, or only `_` in `.where`?
+- Pipeline sugar: method chains only, `|>`, or bare `|` — and what is `|` vs bitwise OR?

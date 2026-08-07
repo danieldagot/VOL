@@ -2,6 +2,7 @@
   "kind": "generation",
   "source_checks": {
     "vol": ["scores\\s*\\[\\s*3\\s*\\]\\s*=", "\\.each\\b"],
-    "go": ["scores\\s*\\[\\s*3\\s*\\]\\s*=", "\\brange\\b"]
+    "go": ["scores\\s*\\[\\s*3\\s*\\]\\s*=", "\\brange\\b"],
+    "python": ["scores\\s*\\[\\s*3\\s*\\]\\s*=", "\\bfor\\b"]
   }
 }
