@@ -1,0 +1,10 @@
+fn greet(name) {
+    return "Hello, " + name
+}
+
+fn square(number) {
+    return number * number
+}
+
+print greet("friend")
+print "Six squared is " + string(square(6))

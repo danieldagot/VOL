@@ -6,32 +6,34 @@ Items here are exploratory, not promises. Accepted language behavior belongs in 
 
 ## Near-Term Foundation
 
-- [ ] Define tokens and lexical rules.
-- [ ] Implement the lexer.
-- [ ] Implement the parser.
-- [ ] Define the abstract syntax tree (AST).
-- [ ] Track precise source locations on every syntax node.
-- [ ] Create deterministic human-readable diagnostics.
+- [x] Define tokens and lexical rules.
+- [x] Implement the lexer.
+- [x] Implement the parser.
+- [x] Define the abstract syntax tree (AST).
+- [x] Track precise source locations on every syntax node.
+- [x] Create deterministic human-readable diagnostics.
 - [ ] Create machine-readable JSON diagnostics.
-- [ ] Implement lexical scopes.
-- [ ] Implement an interpreter.
-- [ ] Add snapshot and conformance tests.
+- [x] Implement lexical scopes.
+- [x] Implement an interpreter.
+- [x] Add table-driven parser, semantic, runtime, diagnostic, CLI, and example conformance tests.
+- [x] Add parser fuzz seeds and CI checks for formatting, vet, races, and coverage.
+- [ ] Add versioned diagnostic snapshots when the diagnostic presentation is stable.
 
 ## Initial Language Features
 
-- [ ] Integer, floating-point, Boolean, and string literals.
-- [ ] Variables with inferred types.
+- [x] Integer, floating-point, Boolean, and string literals.
+- [x] Variables with inferred types.
 - [ ] Explicit mutability rules.
-- [ ] Arithmetic, comparison, and Boolean operators.
-- [ ] Blocks using braces.
-- [ ] `if` and `else` expressions or statements.
-- [ ] `repeat` loops.
-- [ ] Conditional loops.
-- [ ] Arrays, indexing, and bounds checking.
-- [ ] Collection iteration with `.each`.
-- [ ] Functions, parameters, calls, and return values.
-- [ ] Comments.
-- [ ] Basic built-ins such as printing, length, and assertions.
+- [x] Arithmetic, comparison, and Boolean operators.
+- [x] Blocks using braces.
+- [x] `if` and `else` statements.
+- [x] `repeat` loops.
+- [x] Conditional loops (provisional `while`).
+- [x] Arrays, indexing, and bounds checking.
+- [x] Collection iteration with `.each`.
+- [x] Functions, parameters, calls, and return values.
+- [x] Comments.
+- [x] Basic built-ins for printing, input, length, assertions, conversion, and arguments.
 
 ## Formatter
 

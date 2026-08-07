@@ -17,6 +17,17 @@ func run(t *testing.T, source string) (string, *Diagnostic) {
 	return output.String(), diagnostic
 }
 
+func runWith(t *testing.T, source, input string, args ...string) (string, *Diagnostic) {
+	t.Helper()
+	program, diagnostic := Parse("test.vol", source)
+	if diagnostic != nil {
+		return "", diagnostic
+	}
+	var output bytes.Buffer
+	diagnostic = ExecuteWithOptions(program, &output, ExecuteOptions{Input: strings.NewReader(input), Args: args})
+	return output.String(), diagnostic
+}
+
 func TestFirstProgram(t *testing.T) {
 	source := `numbers := [4, 7, 2, 9]
 total := 0
@@ -143,5 +154,101 @@ func TestWhereRequiresBooleanCondition(t *testing.T) {
 result := numbers.where(_ + 1)`)
 	if diagnostic == nil || diagnostic.Code != "R022" {
 		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestResolverRejectsUndefinedNameBeforeExecution(t *testing.T) {
+	_, diagnostic := run(t, "print missing")
+	if diagnostic == nil || diagnostic.Code != "S002" || diagnostic.Fix == "" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestResolverRejectsUndefinedAssignment(t *testing.T) {
+	_, diagnostic := run(t, "missing = 1")
+	if diagnostic == nil || diagnostic.Code != "S002" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestResolverRejectsDuplicateNames(t *testing.T) {
+	cases := []string{
+		"value := 1\nvalue := 2",
+		"fn work() { return 1 }\nfn work() { return 2 }",
+		"fn work(item, item) { return item }",
+		"input := 1",
+	}
+	for _, source := range cases {
+		_, diagnostic := run(t, source)
+		if diagnostic == nil || diagnostic.Code != "S001" {
+			t.Errorf("source %q: got %#v", source, diagnostic)
+		}
+	}
+}
+
+func TestResolverAllowsNestedShadowing(t *testing.T) {
+	output, diagnostic := run(t, "value := 1\nif true { value := 2\nprint value }\nprint value")
+	if diagnostic != nil || output != "2\n1\n" {
+		t.Fatalf("output %q, diagnostic %#v", output, diagnostic)
+	}
+}
+
+func TestResolverRejectsWrongFunctionArgumentCount(t *testing.T) {
+	_, diagnostic := run(t, "fn add(a, b) { return a + b }\nprint add(1)")
+	if diagnostic == nil || diagnostic.Code != "S003" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestForwardFunctionCall(t *testing.T) {
+	output, diagnostic := run(t, "print answer()\nfn answer() { return 42 }")
+	if diagnostic != nil || output != "42\n" {
+		t.Fatalf("output %q, diagnostic %#v", output, diagnostic)
+	}
+}
+
+func TestNestedFunctionDeclaration(t *testing.T) {
+	output, diagnostic := run(t, "fn outer() { fn inner() { return 9 }\nreturn inner() }\nprint outer()")
+	if diagnostic != nil || output != "9\n" {
+		t.Fatalf("output %q, diagnostic %#v", output, diagnostic)
+	}
+}
+
+func TestInputStringAssertAndArgs(t *testing.T) {
+	source := `name := input("Name: ")
+assert(name == "Ada", "unexpected name")
+print "Hello, " + name
+print string(42)
+print args.length
+print args[0]`
+	output, diagnostic := runWith(t, source, "Ada\n", "first", "second")
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "Name: Hello, Ada\n42\n2\nfirst\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestAssertFailureUsesMessage(t *testing.T) {
+	_, diagnostic := run(t, `assert(false, "not ready")`)
+	if diagnostic == nil || diagnostic.Code != "R027" || diagnostic.Message != "not ready" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestImprovedRuntimeTypeMessage(t *testing.T) {
+	_, diagnostic := run(t, `print "count: " + 2`)
+	if diagnostic == nil || diagnostic.Code != "R013" || !strings.Contains(diagnostic.Message, "string and integer") {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestBuiltinArityIsResolved(t *testing.T) {
+	for _, source := range []string{"input(1, 2)", "assert()", "string()"} {
+		_, diagnostic := run(t, source)
+		if diagnostic == nil || diagnostic.Code != "S003" {
+			t.Errorf("source %q: got %#v", source, diagnostic)
+		}
 	}
 }

@@ -1,0 +1,12 @@
+scores := [72, 95, 81, 64]
+
+print scores
+print "Students: " + string(scores.length)
+
+scores[3] = 70
+
+scores.each score {
+    if score >= 80 {
+        print "High score: " + string(score)
+    }
+}

@@ -6,6 +6,7 @@ type TokenKind int
 
 const (
 	TokenEOF TokenKind = iota
+	TokenNewline
 	TokenIdentifier
 	TokenInteger
 	TokenFloat

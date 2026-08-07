@@ -1,0 +1,5 @@
+print "Argument count: " + string(args.length)
+
+args.each argument {
+    print "Received: " + argument
+}

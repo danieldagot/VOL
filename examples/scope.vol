@@ -1,0 +1,8 @@
+message := "outside"
+
+if true {
+    message := "inside"
+    print message
+}
+
+print message

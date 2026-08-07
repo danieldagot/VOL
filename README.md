@@ -57,21 +57,26 @@ This README describes both the current prototype and the long-term direction. Tr
 - array iteration with `.each`
 - collection filtering with `.where(...)` and numeric aggregation with `.sum`
 - `print`
+- interactive text input with `input()` or `input(prompt)`
+- runtime checks with `assert(condition)` or `assert(condition, message)`
+- value-to-string conversion with `string(value)`
+- command-line arguments through the built-in `args` array
 - functions declared with `fn`, parameters, calls, and `return`
 - module export lists that may appear before or after definitions
 - line comments beginning with `//`
 - source-located parser and runtime diagnostics
-- automated interpreter tests
+- table-driven lexer, parser, resolver, interpreter, diagnostic, CLI, and executable-example tests
+- fuzz seed coverage ensuring arbitrary parser input does not panic
+- continuous integration with formatting, vet, race-detection, and coverage checks
 
 ### What Is Missing
 
-- symbol resolution before execution
 - static type checking
 - explicit mutability rules
 - improved diagnostic suggestions
 - canonical VOL formatter
 - JSON compiler diagnostics
-- expanded conformance tests
+- a published compatibility policy and versioned conformance corpus
 - initial language-server support
 
 ### What Is Still an Open Experiment
@@ -199,13 +204,36 @@ examples         example VOL programs
 ## Run the Example
 
 ```text
-go run ./cmd/vol ./examples/first.vol
+go run ./cmd/vol run ./examples/first.vol
 ```
 
 Expected output:
 
 ```text
 16
+```
+
+## Example Programs
+
+The `examples` folder contains small programs that can be run independently:
+
+| File | Demonstrates |
+| --- | --- |
+| `hello.vol` | Values, strings, printing, and conversion |
+| `conditions.vol` | Comparisons and Boolean conditions |
+| `loops.vol` | `while`, `repeat`, and assignment |
+| `arrays.vol` | Arrays, indexing, length, and `.each` |
+| `collections.vol` | `.where`, `.sum`, and `assert` |
+| `functions.vol` | Function declarations, calls, parameters, and returns |
+| `scope.vol` | Lexical scopes and shadowing |
+| `interaction.vol` | Interactive input and assertions |
+| `arguments.vol` | Command-line arguments |
+
+For example:
+
+```text
+.\vol.exe run .\examples\functions.vol
+.\vol.exe run .\examples\arguments.vol -- apple banana
 ```
 
 ## Build the CLI
@@ -219,11 +247,35 @@ On Windows:
 
 ```text
 go build ./cmd/vol
-.\vol.exe .\examples\first.vol
+.\vol.exe run .\examples\first.vol
 ```
+
+The command-line interface uses `vol run <file.vol>`. Arguments following the
+file are available to the program in the built-in `args` array. An optional `--`
+separates VOL options from program arguments:
+
+```text
+.\vol.exe run .\program.vol -- first second
+```
+
+The original shorthand
+`vol <file.vol>` is also accepted for compatibility.
 
 ## Run the Tests
 
 ```text
 go test ./...
 ```
+
+For the same deeper checks used in continuous integration:
+
+```text
+gofmt -l .
+go vet ./...
+go test -race -coverprofile=coverage.out ./...
+```
+
+The test suite covers successful behavior, stable diagnostic codes, source locations,
+invalid types and arities, collection and numeric boundaries, lexical scoping,
+short-circuiting, built-in I/O failures, CLI exit behavior, and every checked-in
+example program.

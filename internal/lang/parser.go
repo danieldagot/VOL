@@ -18,6 +18,7 @@ func Parse(file, source string) (*Program, *Diagnostic) {
 
 func (p *parser) program() (*Program, *Diagnostic) {
 	program := &Program{File: p.file}
+	p.skipNewlines()
 	for !p.check(TokenEOF) {
 		statement, diagnostic := p.statement()
 		if diagnostic != nil {
@@ -26,6 +27,9 @@ func (p *parser) program() (*Program, *Diagnostic) {
 		program.Statements = append(program.Statements, statement)
 		if declaration, ok := statement.(*ExportStatement); ok {
 			program.Exports = append(program.Exports, declaration.Names...)
+		}
+		if diagnostic := p.finishStatement(TokenEOF); diagnostic != nil {
+			return nil, diagnostic
 		}
 	}
 	declared := map[string]bool{}
@@ -56,6 +60,13 @@ func (p *parser) program() (*Program, *Diagnostic) {
 }
 
 func (p *parser) statement() (Statement, *Diagnostic) {
+	if p.match(TokenLeftBrace) {
+		body, diagnostic := p.blockAfterOpen(p.previous())
+		if diagnostic != nil {
+			return nil, diagnostic
+		}
+		return &BlockStatement{Body: body}, nil
+	}
 	if p.match(TokenExport) {
 		return p.exportStatement(p.previous())
 	}
@@ -188,11 +199,15 @@ func (p *parser) ifStatement(keyword Token) (Statement, *Diagnostic) {
 		return nil, d
 	}
 	var otherwise *Block
+	checkpoint := p.current
+	p.skipNewlines()
 	if p.match(TokenElse) {
 		otherwise, d = p.block()
 		if d != nil {
 			return nil, d
 		}
+	} else {
+		p.current = checkpoint
 	}
 	return &IfStatement{Keyword: keyword, Condition: condition, Then: then, Else: otherwise}, nil
 }
@@ -224,13 +239,21 @@ func (p *parser) block() (*Block, *Diagnostic) {
 	if !p.match(TokenLeftBrace) {
 		return nil, p.error(p.peek(), "E104", "Expected `{` to begin a block.")
 	}
-	block := &Block{Open: p.previous()}
+	return p.blockAfterOpen(p.previous())
+}
+
+func (p *parser) blockAfterOpen(open Token) (*Block, *Diagnostic) {
+	block := &Block{Open: open}
+	p.skipNewlines()
 	for !p.check(TokenRightBrace) && !p.check(TokenEOF) {
 		statement, d := p.statement()
 		if d != nil {
 			return nil, d
 		}
 		block.Statements = append(block.Statements, statement)
+		if d := p.finishStatement(TokenRightBrace); d != nil {
+			return nil, d
+		}
 	}
 	if !p.match(TokenRightBrace) {
 		return nil, p.error(p.peek(), "E105", "Expected `}` to close the block.")
@@ -408,6 +431,24 @@ func (p *parser) peekNext() Token {
 	return p.tokens[p.current+1]
 }
 func (p *parser) previous() Token { return p.tokens[p.current-1] }
+func (p *parser) skipNewlines() {
+	for p.match(TokenNewline) {
+	}
+}
+func (p *parser) finishStatement(terminator TokenKind) *Diagnostic {
+	if p.check(terminator) || p.check(TokenEOF) {
+		return nil
+	}
+	if p.match(TokenNewline) {
+		p.skipNewlines()
+		return nil
+	}
+	// A closing brace makes block-bodied statements self-delimiting.
+	if p.previous().Kind == TokenRightBrace {
+		return nil
+	}
+	return p.error(p.peek(), "E119", "Expected a newline after the statement.")
+}
 func (p *parser) error(token Token, code, message string) *Diagnostic {
 	return &Diagnostic{Code: code, Message: message, File: p.file, Pos: token.Pos}
 }

@@ -37,11 +37,18 @@ func lex(file, source string) ([]Token, *Diagnostic) {
 			continue
 		}
 		if unicode.IsDigit(r) {
-			tokens = append(tokens, l.number())
+			token := l.number()
+			if !validNumber(token) {
+				return nil, l.errorAt(token.Pos, "E006", "Numeric literal is outside the supported range.")
+			}
+			tokens = append(tokens, token)
 			continue
 		}
 
 		switch r {
+		case '\n':
+			l.advance()
+			tokens = append(tokens, Token{Kind: TokenNewline, Lexeme: "\n", Pos: pos})
 		case '"':
 			token, diagnostic := l.stringToken()
 			if diagnostic != nil {
@@ -178,7 +185,7 @@ func (l *lexer) stringToken() (Token, *Diagnostic) {
 func (l *lexer) skipWhitespaceAndComments() {
 	for !l.atEnd() {
 		r, _ := l.peek()
-		if unicode.IsSpace(r) {
+		if unicode.IsSpace(r) && r != '\n' {
 			l.advance()
 			continue
 		}
@@ -245,3 +252,12 @@ func parseInteger(token Token) int64 {
 	return value
 }
 func parseFloat(token Token) float64 { value, _ := strconv.ParseFloat(token.Lexeme, 64); return value }
+
+func validNumber(token Token) bool {
+	if token.Kind == TokenInteger {
+		_, err := strconv.ParseInt(token.Lexeme, 10, 64)
+		return err == nil
+	}
+	_, err := strconv.ParseFloat(token.Lexeme, 64)
+	return err == nil
+}

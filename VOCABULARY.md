@@ -32,6 +32,10 @@ These are contextual names rather than reserved keywords.
 | `value.length` | Gets the number of elements in an array or characters in a string. | `len(value)`, `value.len()`, or `value.length` | Supported |
 | `items.where(condition)` | Keeps items for which the condition is true; `_` is the current item. | `filter` | Supported |
 | `items.sum` | Adds all numeric items. | `sum`, `reduce`, or iterator sum | Supported |
+| `input()` | Reads one line of text; an optional string argument is shown as a prompt. | standard input or `readLine` | Supported |
+| `assert(condition)` | Stops with a diagnostic when a Boolean condition is false; accepts an optional message. | assertion | Supported |
+| `string(value)` | Converts a value to its display string. | `toString` or formatting | Supported |
+| `args` | Array of command-line arguments passed after the source file. | `argv` | Supported |
 
 ## Core Symbols
 
@@ -46,7 +50,14 @@ These are contextual names rather than reserved keywords.
 | `items[index]` | Reads or replaces an array element at an index. | Array indexing | Supported |
 | `// text` | Adds a comment that continues to the end of the line. | Line comment | Supported |
 
+Newlines separate simple statements; a closing brace self-delimits a block-bodied
+statement. Blank lines and a line comment's terminating newline cannot cause adjacent
+expressions to merge. Integer literals are signed 64-bit values after unary negation,
+and decimal floating-point literals must fit in a finite 64-bit floating-point value.
+Out-of-range numeric literals are rejected.
+
 Arithmetic operators are `+`, `-`, `*`, and `/`. Comparison operators are `==`, `!=`, `<`, `<=`, `>`, and `>=`.
+Mixed integer and floating-point comparisons use their numeric values.
 
 ## Examples
 

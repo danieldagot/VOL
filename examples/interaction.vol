@@ -1,0 +1,5 @@
+name := input("What is your name? ")
+assert(name.length > 0, "Name cannot be empty.")
+
+print "Hello, " + name
+print "You passed " + string(args.length) + " command arguments."

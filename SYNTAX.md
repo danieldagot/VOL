@@ -40,6 +40,12 @@ Initial literal types:
 - Booleans
 - strings
 
+The prototype accepts unsigned decimal source spelling for integers and decimal
+floating-point values with digits on both sides of the dot. Unary `-` supplies
+negative values. Integer literals must fit in a signed 64-bit value, and floating
+literals must fit in a finite 64-bit floating-point value. An out-of-range literal
+is rejected with diagnostic `E006`; it is never silently replaced or made infinite.
+
 ## Variables
 
 Type inference:
@@ -89,6 +95,8 @@ not failed
 ```
 
 Operator precedence must be formally defined and kept small and predictable.
+Mixed integer and floating-point comparisons compare their numeric values, including
+`==` and `!=`.
 
 ## Blocks and Scope
 
@@ -101,7 +109,14 @@ Braces define scope:
 }
 ```
 
+A standalone block is a statement. Its declarations shadow outer declarations and
+leave scope at the closing brace.
+
 Indentation is canonical formatting, but it does not define scope.
+
+A newline is required between consecutive simple statements. A closing brace
+self-delimits a block-bodied statement, so another statement may follow that brace
+on the same line. Missing separators are rejected with diagnostic `E119`.
 
 ## Conditions
 
@@ -224,21 +239,41 @@ The exact symbol-selection syntax and module resolver are not implemented yet.
 
 ## Built-In Operations
 
-Desired concise form:
+Output remains a concise statement:
 
 ```vol
 print "hello"
-assert ready
 ```
 
-Parenthesized calls remain under consideration where they improve clarity:
+The initial interactive and checking operations use ordinary call syntax:
 
 ```vol
-print("hello")
-assert(ready)
+name := input("Name: ")
+assert(name.length > 0, "Name cannot be empty.")
+text := string(42)
 ```
 
-VOL should select one canonical form before the syntax is stabilized.
+`input()` reads one line from standard input and removes its line ending. Its
+optional string argument is written as a prompt first. `assert` requires a
+Boolean condition and accepts an optional string failure message. `string`
+returns the display representation of one value.
+
+The built-in `args` array contains command-line arguments passed after the source
+file. For example, `vol run program.vol -- first second` provides
+`["first", "second"]`. The separator is optional with the current CLI.
+
+Built-in names cannot be redeclared at module scope.
+
+## Name Resolution
+
+Names are resolved before execution. Duplicate declarations in the same lexical
+scope and references to undefined names are errors. Nested scopes may shadow
+outer names. Function names are visible throughout their module, allowing a call
+before the corresponding declaration. Function parameters and `.each` item names
+belong to their function or iteration scope.
+
+Calls to known VOL functions and built-ins are checked for the correct number of
+arguments before execution.
 
 ## Parallel Intent
 

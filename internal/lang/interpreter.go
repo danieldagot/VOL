@@ -1,9 +1,12 @@
 package lang
 
 import (
+	"bufio"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
+	"strings"
 )
 
 type environment struct {
@@ -37,6 +40,7 @@ func (e *environment) assign(name string, value any) bool {
 
 type interpreter struct {
 	output io.Writer
+	input  *bufio.Reader
 	env    *environment
 	file   string
 }
@@ -48,8 +52,34 @@ type function struct {
 
 type returnValue struct{ value any }
 
+type ExecuteOptions struct {
+	Input io.Reader
+	Args  []string
+}
+
+type builtinFunction struct {
+	name string
+	call func([]any, Position) (any, *Diagnostic)
+}
+
 func Execute(program *Program, output io.Writer) *Diagnostic {
-	i := &interpreter{output: output, env: newEnvironment(nil), file: program.File}
+	return ExecuteWithOptions(program, output, ExecuteOptions{Input: strings.NewReader("")})
+}
+
+func ExecuteWithOptions(program *Program, output io.Writer, options ExecuteOptions) *Diagnostic {
+	if d := Resolve(program); d != nil {
+		return d
+	}
+	if options.Input == nil {
+		options.Input = strings.NewReader("")
+	}
+	i := &interpreter{output: output, input: bufio.NewReader(options.Input), env: newEnvironment(nil), file: program.File}
+	i.installBuiltins(options.Args)
+	for _, statement := range program.Statements {
+		if fn, ok := statement.(*FunctionDeclaration); ok {
+			i.env.define(fn.Name.Lexeme, &function{declaration: fn, closure: i.env})
+		}
+	}
 	for _, statement := range program.Statements {
 		if d := i.execute(statement); d != nil {
 			return d
@@ -60,13 +90,16 @@ func Execute(program *Program, output io.Writer) *Diagnostic {
 
 func (i *interpreter) execute(statement Statement) *Diagnostic {
 	switch node := statement.(type) {
+	case *BlockStatement:
+		return i.executeBlock(node.Body, newEnvironment(i.env))
 	case *ExportStatement:
 		// Export declarations are module metadata and have no runtime behavior.
 	case *FunctionDeclaration:
-		if _, exists := i.env.values[node.Name.Lexeme]; exists {
-			return i.runtime(node.Name.Pos, "R001", "Name `"+node.Name.Lexeme+"` is already declared in this scope.")
+		// Module functions are installed before execution so forward calls are valid.
+		// A nested function is installed when execution reaches its declaration.
+		if _, exists := i.env.values[node.Name.Lexeme]; !exists {
+			i.env.define(node.Name.Lexeme, &function{declaration: node, closure: i.env})
 		}
-		i.env.define(node.Name.Lexeme, &function{declaration: node, closure: i.env})
 	case *ReturnStatement:
 		value, d := i.evaluate(node.Value)
 		if d != nil {
@@ -286,6 +319,16 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if d != nil {
 			return nil, d
 		}
+		if builtin, ok := callee.(*builtinFunction); ok {
+			arguments := make([]any, len(node.Arguments))
+			for index, argument := range node.Arguments {
+				arguments[index], d = i.evaluate(argument)
+				if d != nil {
+					return nil, d
+				}
+			}
+			return builtin.call(arguments, node.Position())
+		}
 		fn, ok := callee.(*function)
 		if !ok {
 			return nil, i.runtime(node.Position(), "R017", "Only functions can be called.")
@@ -396,8 +439,14 @@ func (i *interpreter) evaluateBinary(node *Binary) (any, *Diagnostic) {
 func (i *interpreter) evaluateBinaryValues(operator Token, left, right any) (any, *Diagnostic) {
 	switch operator.Kind {
 	case TokenEqualEqual:
+		if equal, ok := numbersEqual(left, right); ok {
+			return equal, nil
+		}
 		return reflect.DeepEqual(left, right), nil
 	case TokenBangEqual:
+		if equal, ok := numbersEqual(left, right); ok {
+			return !equal, nil
+		}
 		return !reflect.DeepEqual(left, right), nil
 	case TokenAnd, TokenOr:
 		rightBool, ok := right.(bool)
@@ -422,7 +471,7 @@ func (i *interpreter) evaluateBinaryValues(operator Token, left, right any) (any
 	if aok && bok {
 		return i.floatBinary(operator, a, b)
 	}
-	return nil, i.runtime(operator.Pos, "R013", "Operator `"+operator.Lexeme+"` cannot be applied to these values.")
+	return nil, i.runtime(operator.Pos, "R013", fmt.Sprintf("Operator `%s` cannot be applied to %s and %s.", operator.Lexeme, typeName(left), typeName(right)))
 }
 
 func (i *interpreter) integerBinary(operator Token, a, b int64) (any, *Diagnostic) {
@@ -482,6 +531,36 @@ func number(value any) (float64, bool) {
 	}
 	return 0, false
 }
+
+func numbersEqual(left, right any) (bool, bool) {
+	switch a := left.(type) {
+	case int64:
+		switch b := right.(type) {
+		case int64:
+			return a == b, true
+		case float64:
+			return integerEqualsFloat(a, b), true
+		}
+	case float64:
+		switch b := right.(type) {
+		case int64:
+			return integerEqualsFloat(b, a), true
+		case float64:
+			return a == b, true
+		}
+	}
+	return false, false
+}
+
+func integerEqualsFloat(integer int64, floating float64) bool {
+	const (
+		minimumIntegerFloat = -9223372036854775808.0
+		maximumIntegerFloat = 9223372036854775808.0
+	)
+	return floating >= minimumIntegerFloat && floating < maximumIntegerFloat &&
+		math.Trunc(floating) == floating && int64(floating) == integer
+}
+
 func (i *interpreter) arrayIndex(expr Expression, length int) (int, *Diagnostic) {
 	value, d := i.evaluate(expr)
 	if d != nil {
@@ -511,4 +590,68 @@ func display(value any) string {
 		return result + "]"
 	}
 	return fmt.Sprint(value)
+}
+
+func typeName(value any) string {
+	switch value.(type) {
+	case nil:
+		return "nothing"
+	case int64:
+		return "integer"
+	case float64:
+		return "float"
+	case bool:
+		return "Boolean"
+	case string:
+		return "string"
+	case []any:
+		return "array"
+	case *function, *builtinFunction:
+		return "function"
+	}
+	return "value"
+}
+
+func (i *interpreter) installBuiltins(arguments []string) {
+	args := make([]any, len(arguments))
+	for index, argument := range arguments {
+		args[index] = argument
+	}
+	i.env.define("args", args)
+	i.env.define("string", &builtinFunction{name: "string", call: func(values []any, pos Position) (any, *Diagnostic) { return display(values[0]), nil }})
+	i.env.define("input", &builtinFunction{name: "input", call: func(values []any, pos Position) (any, *Diagnostic) {
+		if len(values) == 1 {
+			prompt, ok := values[0].(string)
+			if !ok {
+				return nil, i.runtime(pos, "R023", "`input` prompt must be a string, got "+typeName(values[0])+".")
+			}
+			fmt.Fprint(i.output, prompt)
+		}
+		line, err := i.input.ReadString('\n')
+		if err != nil && len(line) == 0 {
+			if err == io.EOF {
+				return "", nil
+			}
+			return nil, i.runtime(pos, "R024", "Could not read input: "+err.Error())
+		}
+		return strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), nil
+	}})
+	i.env.define("assert", &builtinFunction{name: "assert", call: func(values []any, pos Position) (any, *Diagnostic) {
+		condition, ok := values[0].(bool)
+		if !ok {
+			return nil, i.runtime(pos, "R025", "`assert` condition must be Boolean, got "+typeName(values[0])+".")
+		}
+		if condition {
+			return nil, nil
+		}
+		message := "Assertion failed."
+		if len(values) == 2 {
+			text, ok := values[1].(string)
+			if !ok {
+				return nil, i.runtime(pos, "R026", "`assert` message must be a string, got "+typeName(values[1])+".")
+			}
+			message = text
+		}
+		return nil, i.runtime(pos, "R027", message)
+	}})
 }

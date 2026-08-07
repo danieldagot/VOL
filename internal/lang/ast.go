@@ -23,6 +23,13 @@ type Block struct {
 
 func (n *Block) Position() Position { return n.Open.Pos }
 
+type BlockStatement struct {
+	Body *Block
+}
+
+func (*BlockStatement) statement()           {}
+func (n *BlockStatement) Position() Position { return n.Body.Position() }
+
 type Declaration struct {
 	Name  Token
 	Value Expression
