@@ -55,7 +55,10 @@ This README describes both the current prototype and the long-term direction. Tr
 - indexed array assignment
 - array and string `.length`
 - array iteration with `.each`
+- collection filtering with `.where(...)` and numeric aggregation with `.sum`
 - `print`
+- functions declared with `fn`, parameters, calls, and `return`
+- module export lists that may appear before or after definitions
 - line comments beginning with `//`
 - source-located parser and runtime diagnostics
 - automated interpreter tests
@@ -65,7 +68,6 @@ This README describes both the current prototype and the long-term direction. Tr
 - symbol resolution before execution
 - static type checking
 - explicit mutability rules
-- functions, parameters, and return values
 - improved diagnostic suggestions
 - canonical VOL formatter
 - JSON compiler diagnostics
@@ -74,7 +76,7 @@ This README describes both the current prototype and the long-term direction. Tr
 
 ### What Is Still an Open Experiment
 
-- final function and call syntax
+- typed function signatures
 - explicit type syntax
 - ownership and borrowing syntax
 - error propagation
@@ -90,7 +92,7 @@ This README describes both the current prototype and the long-term direction. Tr
 - bounds-checking and overflow behavior across build modes
 - C and LLVM backend details
 
-See [`SYNTAX.md`](SYNTAX.md) for the current syntax direction and [`IDEAS.md`](IDEAS.md) for future work and open design questions.
+See [`VOCABULARY.md`](VOCABULARY.md) for a quick guide to VOL words and symbols, [`SYNTAX.md`](SYNTAX.md) for the current syntax direction, and [`IDEAS.md`](IDEAS.md) for future work and open design questions.
 
 ## Supported Examples
 
@@ -151,6 +153,13 @@ numbers.each number {
     }
 }
 
+print total
+```
+
+The same intent can be written in a concise semantic form:
+
+```vol
+total := numbers.where(_ > 5).sum
 print total
 ```
 

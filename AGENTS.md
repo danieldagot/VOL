@@ -338,6 +338,72 @@ Expose control only when the programmer needs to constrain behavior for correctn
 
 ---
 
+## Documentation and Feature Synchronization
+
+Language changes are incomplete until the implementation, tests, examples, and
+documentation agree. Whenever syntax, a keyword, or language behavior is added,
+removed, renamed, or changed, inspect and update every applicable file below.
+
+### Required documentation updates
+
+- `README.md`: Update the project-status lists and supported examples. Describe
+  only behavior that works in the current implementation.
+- `SYNTAX.md`: Define the grammar, semantics, restrictions, and canonical examples.
+  Mark designs as provisional when their behavior is not stable.
+- `VOCABULARY.md`: Add or update every keyword, contextual word, property, operator,
+  and core symbol. Keep its Supported and Provisional status accurate.
+- `IDEAS.md`: Record future work, unresolved design questions, formatter behavior,
+  and functionality that has been designed but not implemented. Move completed
+  behavior into the supported documentation instead of leaving contradictory plans.
+- `examples/*.vol`: Update or add a small executable example when a feature is
+  important enough to teach users directly.
+- `vol.config.json`: Update only when project discovery, roots, aliases, or other
+  project-level configuration changes.
+
+### Required implementation checks
+
+For a new or changed keyword or syntax form, inspect all relevant compiler layers:
+
+- `internal/lang/token.go` for token kinds.
+- `internal/lang/lexer.go` for keyword recognition and lexical rules.
+- `internal/lang/parser.go` for grammar and deterministic diagnostics.
+- `internal/lang/ast.go` for syntax-tree representation.
+- `internal/lang/interpreter.go` for current prototype behavior.
+- `internal/lang/lang_test.go` for successful cases, failure cases, source locations,
+  and interaction with existing syntax.
+
+When the compiler gains HIR, MIR, semantic analysis, formatters, module resolution,
+or native backends, update those layers as well. Do not treat parser acceptance as
+complete feature support when later stages cannot execute or compile the construct.
+
+### Status and consistency rules
+
+- Never label a form Supported unless it is implemented and covered by tests.
+- Use Provisional for implemented behavior whose spelling or semantics may change.
+- Keep Planned behavior in `IDEAS.md`; do not present it as executable syntax.
+- Use one canonical spelling in documentation unless multiple forms are an explicit
+  language feature.
+- When multiple forms are supported, document whether they are semantically
+  equivalent and which form the future formatter will emit.
+- Keep diagnostic codes stable. Add tests for every new error code and suggestion.
+- Preserve unrelated user changes when synchronizing documentation.
+
+### Verification before completion
+
+Run:
+
+```text
+gofmt -w <changed Go files>
+go test ./...
+go run ./cmd/vol ./examples/first.vol
+git diff --check
+```
+
+If a command cannot run, report that explicitly. A feature should not be described
+as complete while its relevant tests are failing.
+
+---
+
 ## Motto
 
 Write less.

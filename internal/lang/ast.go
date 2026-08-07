@@ -3,6 +3,7 @@ package lang
 type Program struct {
 	File       string
 	Statements []Statement
+	Exports    []Token
 }
 
 type Node interface{ Position() Position }
@@ -29,6 +30,33 @@ type Declaration struct {
 
 func (*Declaration) statement()           {}
 func (n *Declaration) Position() Position { return n.Name.Pos }
+
+type ExportStatement struct {
+	Keyword Token
+	Names   []Token
+}
+
+func (*ExportStatement) statement()           {}
+func (n *ExportStatement) Position() Position { return n.Keyword.Pos }
+
+type FunctionDeclaration struct {
+	Keyword    Token
+	Name       Token
+	Parameters []Token
+	Body       *Block
+	Public     bool
+}
+
+func (*FunctionDeclaration) statement()           {}
+func (n *FunctionDeclaration) Position() Position { return n.Keyword.Pos }
+
+type ReturnStatement struct {
+	Keyword Token
+	Value   Expression
+}
+
+func (*ReturnStatement) statement()           {}
+func (n *ReturnStatement) Position() Position { return n.Keyword.Pos }
 
 type Assignment struct {
 	Target Expression
@@ -143,3 +171,12 @@ type Property struct {
 
 func (*Property) expression()          {}
 func (n *Property) Position() Position { return n.Name.Pos }
+
+type Call struct {
+	Callee    Expression
+	Open      Token
+	Arguments []Expression
+}
+
+func (*Call) expression()          {}
+func (n *Call) Position() Position { return n.Open.Pos }

@@ -1,0 +1,8 @@
+{
+  "name": "vol",
+  "root": ".",
+  "paths": {
+    "@compiler": "compiler",
+    "@std": "std"
+  }
+}

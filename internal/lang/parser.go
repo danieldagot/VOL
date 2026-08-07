@@ -1,9 +1,10 @@
 package lang
 
 type parser struct {
-	file    string
-	tokens  []Token
-	current int
+	file          string
+	tokens        []Token
+	current       int
+	functionDepth int
 }
 
 func Parse(file, source string) (*Program, *Diagnostic) {
@@ -23,11 +24,55 @@ func (p *parser) program() (*Program, *Diagnostic) {
 			return nil, diagnostic
 		}
 		program.Statements = append(program.Statements, statement)
+		if declaration, ok := statement.(*ExportStatement); ok {
+			program.Exports = append(program.Exports, declaration.Names...)
+		}
+	}
+	declared := map[string]bool{}
+	for _, statement := range program.Statements {
+		switch declaration := statement.(type) {
+		case *FunctionDeclaration:
+			declared[declaration.Name.Lexeme] = true
+		case *Declaration:
+			declared[declaration.Name.Lexeme] = true
+		}
+	}
+	exported := map[string]bool{}
+	for _, name := range program.Exports {
+		if exported[name.Lexeme] {
+			return nil, p.error(name, "E117", "Name `"+name.Lexeme+"` is exported more than once.")
+		}
+		if !declared[name.Lexeme] {
+			return nil, p.error(name, "E118", "Cannot export unknown name `"+name.Lexeme+"`.")
+		}
+		exported[name.Lexeme] = true
+	}
+	for _, statement := range program.Statements {
+		if function, ok := statement.(*FunctionDeclaration); ok {
+			function.Public = exported[function.Name.Lexeme]
+		}
 	}
 	return program, nil
 }
 
 func (p *parser) statement() (Statement, *Diagnostic) {
+	if p.match(TokenExport) {
+		return p.exportStatement(p.previous())
+	}
+	if p.match(TokenFn) {
+		return p.functionDeclaration(p.previous())
+	}
+	if p.match(TokenReturn) {
+		keyword := p.previous()
+		if p.functionDepth == 0 {
+			return nil, p.error(keyword, "E115", "`return` can only be used inside a function.")
+		}
+		value, d := p.expression()
+		if d != nil {
+			return nil, d
+		}
+		return &ReturnStatement{Keyword: keyword, Value: value}, nil
+	}
 	if p.match(TokenPrint) {
 		keyword := p.previous()
 		value, d := p.expression()
@@ -85,6 +130,52 @@ func (p *parser) statement() (Statement, *Diagnostic) {
 		return &EachStatement{Collection: property.Object, Name: name, Body: body}, nil
 	}
 	return &ExpressionStatement{Value: expr}, nil
+}
+
+func (p *parser) exportStatement(keyword Token) (Statement, *Diagnostic) {
+	declaration := &ExportStatement{Keyword: keyword}
+	for {
+		if !p.check(TokenIdentifier) {
+			return nil, p.error(p.peek(), "E116", "Expected a name after `export`.")
+		}
+		declaration.Names = append(declaration.Names, p.advance())
+		if !p.match(TokenComma) {
+			break
+		}
+	}
+	return declaration, nil
+}
+
+func (p *parser) functionDeclaration(keyword Token) (Statement, *Diagnostic) {
+	if !p.check(TokenIdentifier) {
+		return nil, p.error(p.peek(), "E110", "Expected a function name after `fn`.")
+	}
+	name := p.advance()
+	if !p.match(TokenLeftParen) {
+		return nil, p.error(p.peek(), "E111", "Expected `(` after the function name.")
+	}
+	var parameters []Token
+	if !p.check(TokenRightParen) {
+		for {
+			if !p.check(TokenIdentifier) {
+				return nil, p.error(p.peek(), "E112", "Expected a parameter name.")
+			}
+			parameters = append(parameters, p.advance())
+			if !p.match(TokenComma) {
+				break
+			}
+		}
+	}
+	if !p.match(TokenRightParen) {
+		return nil, p.error(p.peek(), "E113", "Expected `)` after function parameters.")
+	}
+	p.functionDepth++
+	body, d := p.block()
+	p.functionDepth--
+	if d != nil {
+		return nil, d
+	}
+	return &FunctionDeclaration{Keyword: keyword, Name: name, Parameters: parameters, Body: body}, nil
 }
 
 func (p *parser) ifStatement(keyword Token) (Statement, *Diagnostic) {
@@ -193,6 +284,26 @@ func (p *parser) postfix() (Expression, *Diagnostic) {
 		return nil, d
 	}
 	for {
+		if p.match(TokenLeftParen) {
+			call := &Call{Callee: expr, Open: p.previous()}
+			if !p.check(TokenRightParen) {
+				for {
+					argument, d := p.expression()
+					if d != nil {
+						return nil, d
+					}
+					call.Arguments = append(call.Arguments, argument)
+					if !p.match(TokenComma) {
+						break
+					}
+				}
+			}
+			if !p.match(TokenRightParen) {
+				return nil, p.error(p.peek(), "E114", "Expected `)` after function arguments.")
+			}
+			expr = call
+			continue
+		}
 		if p.match(TokenLeftBracket) {
 			open := p.previous()
 			at, d := p.expression()

@@ -17,6 +17,9 @@ const (
 	TokenRepeat
 	TokenWhile
 	TokenPrint
+	TokenFn
+	TokenReturn
+	TokenExport
 	TokenAnd
 	TokenOr
 	TokenNot

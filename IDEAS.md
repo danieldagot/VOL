@@ -51,6 +51,45 @@ vol fmt .
 vol fmt --check .
 ```
 
+Formatting must only change presentation, never program structure. A separate
+future simplifier may recognize explicit algorithms and suggest equivalent VOL
+semantic operations, while preserving both source styles as valid language forms.
+
+Possible workflow:
+
+```text
+vol simplify --check file.vol
+vol simplify --diff file.vol
+vol simplify --write file.vol
+```
+
+For example, it may suggest replacing an accumulator loop containing a filter
+with `numbers.where(_ > 5).sum`. Rewrites must be optional, deterministic, and
+proven safe with respect to mutation, side effects, ordering, and error behavior.
+
+## Projects and Modules
+
+- [ ] Discover the nearest `vol.config.json` by walking from the source file toward the filesystem root.
+- [ ] Resolve imports relative to the configured project root.
+- [ ] Treat folders as module namespaces with one canonical resolution rule.
+- [ ] Resolve path aliases such as `@db/*` without source-relative traversal.
+- [ ] Reject aliases and imports that escape the project root unless explicitly allowed.
+- [ ] Detect import cycles and report their complete path deterministically.
+- [ ] Collect exports written anywhere in a module and format one sorted export list at the top.
+
+Proposed configuration:
+
+```json
+{
+  "name": "vol",
+  "root": ".",
+  "paths": {
+    "@compiler": "compiler",
+    "@std": "std"
+  }
+}
+```
+
 ## Language Server
 
 The language server must share the compiler's lexer, parser, syntax tree, semantic model, diagnostics, and source-location system.
@@ -171,4 +210,3 @@ The definitions of semantic density and MPT must be objective, reproducible, and
 - How does a programmer constrain inferred allocation?
 - What guarantees does automatic parallelization provide?
 - Which build modes control bounds and overflow checking?
-

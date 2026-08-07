@@ -168,19 +168,59 @@ users.each user {
 
 The compiler chooses the implementation of iteration. The programmer describes the intent.
 
-## Functions
-
-Provisional concise syntax:
+VOL also accepts a concise semantic form for common collection operations:
 
 ```vol
-add a, b {
+total := numbers.where(_ > 5).sum
+```
+
+Inside `where`, `_` means the current collection item. The explicit loop and the
+semantic form are both valid; programmers may choose the form that communicates
+their intent most clearly.
+
+## Functions
+
+Functions begin with `fn`. Names are private unless listed in an `export`
+declaration. An export may appear before or after a definition:
+
+```vol
+export add, double
+
+fn add(a, b) {
     return a + b
 }
 
-result := add 2, 3
+fn double(value) {
+    return value * 2
+}
+
+result := double(add(2, 3))
 ```
 
-Function declaration, parameter-type, return-type, and call syntax are not final.
+This is also valid:
+
+```vol
+fn start() {
+    print "started"
+}
+
+export start
+```
+
+The future formatter will collect exports into one canonical declaration at the
+top of the module. Parameter-type and return-type syntax are not final.
+
+## Modules and Imports
+
+VOL will use folders as module boundaries. Imports are project-root-relative or
+resolved through aliases from `vol.config.json`:
+
+```vol
+import "services/users"
+import "@db/models"
+```
+
+The exact symbol-selection syntax and module resolver are not implemented yet.
 
 ## Built-In Operations
 
@@ -273,7 +313,7 @@ The following must be designed before VOL has a stable grammar:
 
 - explicit types
 - immutable and mutable declarations
-- function signatures
+- typed function signatures
 - structs and methods
 - enums and tagged unions
 - error propagation

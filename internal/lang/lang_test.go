@@ -72,3 +72,76 @@ func TestDiagnosticHasSourceLocation(t *testing.T) {
 		t.Fatalf("unexpected diagnostic:\n%s", human)
 	}
 }
+
+func TestFunctionsCallsAndVisibility(t *testing.T) {
+	source := `fn Add(a, b) {
+    return a + b
+}
+fn double(value) {
+    return value * 2
+}
+export double
+print double(Add(2, 3))`
+	program, diagnostic := Parse("functions.vol", source)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	public := program.Statements[0].(*FunctionDeclaration)
+	private := program.Statements[1].(*FunctionDeclaration)
+	if public.Public || !private.Public {
+		t.Fatal("visibility was not derived from the export declaration")
+	}
+	var output bytes.Buffer
+	if diagnostic = Execute(program, &output); diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output.String() != "10\n" {
+		t.Fatalf("got %q", output.String())
+	}
+}
+
+func TestExportMayAppearBeforeDefinitions(t *testing.T) {
+	program, diagnostic := Parse("exports.vol", `export start, Config
+fn start() { return 1 }
+fn Config() { return 2 }`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if !program.Statements[1].(*FunctionDeclaration).Public || !program.Statements[2].(*FunctionDeclaration).Public {
+		t.Fatal("forward exports were not resolved")
+	}
+}
+
+func TestUnknownExportIsRejected(t *testing.T) {
+	_, diagnostic := Parse("exports.vol", "export missing")
+	if diagnostic == nil || diagnostic.Code != "E118" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestReturnOutsideFunctionIsRejected(t *testing.T) {
+	_, diagnostic := Parse("return.vol", "return 1")
+	if diagnostic == nil || diagnostic.Code != "E115" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestWhereAndSumSemanticForm(t *testing.T) {
+	output, diagnostic := run(t, `numbers := [4, 7, 2, 9]
+total := numbers.where(_ > 5).sum
+print total`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "16\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestWhereRequiresBooleanCondition(t *testing.T) {
+	_, diagnostic := run(t, `numbers := [1, 2]
+result := numbers.where(_ + 1)`)
+	if diagnostic == nil || diagnostic.Code != "R022" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}

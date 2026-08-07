@@ -41,6 +41,13 @@ type interpreter struct {
 	file   string
 }
 
+type function struct {
+	declaration *FunctionDeclaration
+	closure     *environment
+}
+
+type returnValue struct{ value any }
+
 func Execute(program *Program, output io.Writer) *Diagnostic {
 	i := &interpreter{output: output, env: newEnvironment(nil), file: program.File}
 	for _, statement := range program.Statements {
@@ -53,6 +60,19 @@ func Execute(program *Program, output io.Writer) *Diagnostic {
 
 func (i *interpreter) execute(statement Statement) *Diagnostic {
 	switch node := statement.(type) {
+	case *ExportStatement:
+		// Export declarations are module metadata and have no runtime behavior.
+	case *FunctionDeclaration:
+		if _, exists := i.env.values[node.Name.Lexeme]; exists {
+			return i.runtime(node.Name.Pos, "R001", "Name `"+node.Name.Lexeme+"` is already declared in this scope.")
+		}
+		i.env.define(node.Name.Lexeme, &function{declaration: node, closure: i.env})
+	case *ReturnStatement:
+		value, d := i.evaluate(node.Value)
+		if d != nil {
+			return d
+		}
+		panic(returnValue{value: value})
 	case *Declaration:
 		value, d := i.evaluate(node.Value)
 		if d != nil {
@@ -221,6 +241,21 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 				return int64(len([]rune(text))), nil
 			}
 		}
+		if node.Name.Lexeme == "sum" {
+			array, ok := object.([]any)
+			if !ok {
+				return nil, i.runtime(node.Position(), "R019", "`.sum` requires an array.")
+			}
+			var sum any = int64(0)
+			for _, item := range array {
+				operator := Token{Kind: TokenPlus, Lexeme: "+", Pos: node.Name.Pos}
+				sum, d = i.evaluateBinaryValues(operator, sum, item)
+				if d != nil {
+					return nil, d
+				}
+			}
+			return sum, nil
+		}
 		return nil, i.runtime(node.Position(), "R007", "Unknown property `"+node.Name.Lexeme+"`.")
 	case *Unary:
 		right, d := i.evaluate(node.Right)
@@ -243,8 +278,89 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		return nil, i.runtime(node.Position(), "R009", "Unary `-` requires a number.")
 	case *Binary:
 		return i.evaluateBinary(node)
+	case *Call:
+		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "where" {
+			return i.evaluateWhere(property, node.Arguments)
+		}
+		callee, d := i.evaluate(node.Callee)
+		if d != nil {
+			return nil, d
+		}
+		fn, ok := callee.(*function)
+		if !ok {
+			return nil, i.runtime(node.Position(), "R017", "Only functions can be called.")
+		}
+		if len(node.Arguments) != len(fn.declaration.Parameters) {
+			return nil, i.runtime(node.Position(), "R018", fmt.Sprintf("Function `%s` expects %d arguments, got %d.", fn.declaration.Name.Lexeme, len(fn.declaration.Parameters), len(node.Arguments)))
+		}
+		arguments := make([]any, len(node.Arguments))
+		for index, argument := range node.Arguments {
+			arguments[index], d = i.evaluate(argument)
+			if d != nil {
+				return nil, d
+			}
+		}
+		return i.call(fn, arguments)
 	}
 	return nil, i.runtime(expression.Position(), "R999", "Unsupported expression.")
+}
+
+func (i *interpreter) evaluateWhere(property *Property, arguments []Expression) (any, *Diagnostic) {
+	if len(arguments) != 1 {
+		return nil, i.runtime(property.Position(), "R020", "`.where` expects one condition.")
+	}
+	value, d := i.evaluate(property.Object)
+	if d != nil {
+		return nil, d
+	}
+	array, ok := value.([]any)
+	if !ok {
+		return nil, i.runtime(property.Position(), "R021", "`.where` requires an array.")
+	}
+	filtered := make([]any, 0, len(array))
+	for _, item := range array {
+		scope := newEnvironment(i.env)
+		scope.define("_", item)
+		previous := i.env
+		i.env = scope
+		condition, diagnostic := i.evaluate(arguments[0])
+		i.env = previous
+		if diagnostic != nil {
+			return nil, diagnostic
+		}
+		matches, ok := condition.(bool)
+		if !ok {
+			return nil, i.runtime(arguments[0].Position(), "R022", "`.where` condition must be Boolean.")
+		}
+		if matches {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered, nil
+}
+
+func (i *interpreter) call(fn *function, arguments []any) (value any, diagnostic *Diagnostic) {
+	scope := newEnvironment(fn.closure)
+	for index, parameter := range fn.declaration.Parameters {
+		scope.define(parameter.Lexeme, arguments[index])
+	}
+	returned := false
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				if result, ok := recovered.(returnValue); ok {
+					value, returned = result.value, true
+					return
+				}
+				panic(recovered)
+			}
+		}()
+		diagnostic = i.executeBlock(fn.declaration.Body, scope)
+	}()
+	if returned {
+		return value, nil
+	}
+	return nil, diagnostic
 }
 
 func (i *interpreter) evaluateBinary(node *Binary) (any, *Diagnostic) {
@@ -274,7 +390,11 @@ func (i *interpreter) evaluateBinary(node *Binary) (any, *Diagnostic) {
 	if d != nil {
 		return nil, d
 	}
-	switch node.Operator.Kind {
+	return i.evaluateBinaryValues(node.Operator, left, right)
+}
+
+func (i *interpreter) evaluateBinaryValues(operator Token, left, right any) (any, *Diagnostic) {
+	switch operator.Kind {
 	case TokenEqualEqual:
 		return reflect.DeepEqual(left, right), nil
 	case TokenBangEqual:
@@ -282,7 +402,7 @@ func (i *interpreter) evaluateBinary(node *Binary) (any, *Diagnostic) {
 	case TokenAnd, TokenOr:
 		rightBool, ok := right.(bool)
 		if !ok {
-			return nil, i.runtime(node.Position(), "R012", "Boolean operator requires Boolean values.")
+			return nil, i.runtime(operator.Pos, "R012", "Boolean operator requires Boolean values.")
 		}
 		return rightBool, nil
 	case TokenPlus:
@@ -294,19 +414,19 @@ func (i *interpreter) evaluateBinary(node *Binary) (any, *Diagnostic) {
 	}
 	if a, ok := left.(int64); ok {
 		if b, ok := right.(int64); ok {
-			return i.integerBinary(node, a, b)
+			return i.integerBinary(operator, a, b)
 		}
 	}
 	a, aok := number(left)
 	b, bok := number(right)
 	if aok && bok {
-		return i.floatBinary(node, a, b)
+		return i.floatBinary(operator, a, b)
 	}
-	return nil, i.runtime(node.Position(), "R013", "Operator `"+node.Operator.Lexeme+"` cannot be applied to these values.")
+	return nil, i.runtime(operator.Pos, "R013", "Operator `"+operator.Lexeme+"` cannot be applied to these values.")
 }
 
-func (i *interpreter) integerBinary(node *Binary, a, b int64) (any, *Diagnostic) {
-	switch node.Operator.Kind {
+func (i *interpreter) integerBinary(operator Token, a, b int64) (any, *Diagnostic) {
+	switch operator.Kind {
 	case TokenPlus:
 		return a + b, nil
 	case TokenMinus:
@@ -315,7 +435,7 @@ func (i *interpreter) integerBinary(node *Binary, a, b int64) (any, *Diagnostic)
 		return a * b, nil
 	case TokenSlash:
 		if b == 0 {
-			return nil, i.runtime(node.Position(), "R014", "Division by zero.")
+			return nil, i.runtime(operator.Pos, "R014", "Division by zero.")
 		}
 		return a / b, nil
 	case TokenLess:
@@ -327,10 +447,10 @@ func (i *interpreter) integerBinary(node *Binary, a, b int64) (any, *Diagnostic)
 	case TokenGreaterEqual:
 		return a >= b, nil
 	}
-	return nil, i.runtime(node.Position(), "R013", "Unsupported integer operator.")
+	return nil, i.runtime(operator.Pos, "R013", "Unsupported integer operator.")
 }
-func (i *interpreter) floatBinary(node *Binary, a, b float64) (any, *Diagnostic) {
-	switch node.Operator.Kind {
+func (i *interpreter) floatBinary(operator Token, a, b float64) (any, *Diagnostic) {
+	switch operator.Kind {
 	case TokenPlus:
 		return a + b, nil
 	case TokenMinus:
@@ -339,7 +459,7 @@ func (i *interpreter) floatBinary(node *Binary, a, b float64) (any, *Diagnostic)
 		return a * b, nil
 	case TokenSlash:
 		if b == 0 {
-			return nil, i.runtime(node.Position(), "R014", "Division by zero.")
+			return nil, i.runtime(operator.Pos, "R014", "Division by zero.")
 		}
 		return a / b, nil
 	case TokenLess:
@@ -351,7 +471,7 @@ func (i *interpreter) floatBinary(node *Binary, a, b float64) (any, *Diagnostic)
 	case TokenGreaterEqual:
 		return a >= b, nil
 	}
-	return nil, i.runtime(node.Position(), "R013", "Unsupported numeric operator.")
+	return nil, i.runtime(operator.Pos, "R013", "Unsupported numeric operator.")
 }
 func number(value any) (float64, bool) {
 	switch n := value.(type) {
