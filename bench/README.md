@@ -33,8 +33,18 @@ density_ratio(L) = vol_tokens / L_tokens
 - Generate, compile, and repair round-trip cost
 - Which language an LLM produces more correct code for
 
-Those require a generate/repair harness and are tracked separately in
-[`IDEAS.md`](../IDEAS.md) under *Compiler Metrics and LLM Evaluation*.
+Those require a generate/repair harness. Protocol:
+[`LLM_BENCHMARK.md`](../LLM_BENCHMARK.md). Harness:
+
+```sh
+make llm-dry                      # reference solutions only — not an LLM result
+make llm-ollama                   # live smoke via local Ollama (qwen3:4b-instruct)
+make llm-ollama MODEL=llama3.1:8b
+# cloud:
+# OPENAI_API_KEY=… uv run python llm/harness/run_generate_repair.py --provider openai --suite smoke
+```
+
+Tracked also in [`IDEAS.md`](../IDEAS.md) under *Compiler Metrics and LLM Evaluation*.
 
 Tokenizer choice affects absolute counts. Numbers are always reported alongside
 the tokenizer name. GPT, Claude, and other models may tokenize differently.

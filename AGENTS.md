@@ -312,13 +312,20 @@ Every build may report:
 - semantic density score
 - token count for a documented tokenizer
 
-Future metric:
+**Static source token density** (implemented today) is measured in
+[`bench/`](bench/README.md): equivalent hand-written programs in VOL, Go, Rust,
+and Zig are compared by token count under named OpenAI tokenizers. That measures
+source size only—not whether an LLM generates correct VOL, or how many tokens
+generate/repair workflows consume. See [`README.md`](README.md) for current ratios.
+
+Future metrics:
 
 Meaning per Token (MPT)
 
-MPT is undefined until `IDEAS.md` / `LLM_BENCHMARK.md` give an objective,
-reproducible definition. Prefer measuring task success against total tokens
-consumed across generation and repair, not source length alone.
+MPT is undefined as a single scalar. The operational generate/repair protocol
+is in [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md): task success relative to total
+tokens across generation, diagnostics, and repair (not source length alone).
+Harness runs and published result tables are still todo.
 
 ---
 
@@ -327,9 +334,10 @@ consumed across generation and repair, not source length alone.
 Current layout:
 
 ```text
-cmd/vol
-internal/lang
-examples
+cmd/vol          CLI entry point
+internal/lang    lexer, parser, AST, resolver, interpreter, diagnostics
+examples         executable VOL programs
+bench            source token density benchmark (VOL vs Go/Rust/Zig)
 ```
 
 Aspirational layout as the project grows:
@@ -366,7 +374,9 @@ Aspirational layout as the project grows:
 - Lexer
 - Parser
 - AST
+- Resolver
 - Interpreter
+- Structured diagnostics (human + JSON)
 
 ### Phase 2
 

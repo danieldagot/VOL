@@ -23,9 +23,9 @@ Immediate documentation and design work:
 - [ ] Keep `SPEC.md` synchronized whenever interpreter behavior changes.
 - [ ] Resolve the open decisions listed in `SPEC.md` section 11 one at a time,
       with tests, before adding major new syntax.
-- [ ] Write `LLM_BENCHMARK.md` with a small falsifiable task suite and metrics
-      based on task success relative to total generation, diagnostic, and repair
-      tokens—not source token count alone.
+- [x] Write `LLM_BENCHMARK.md` with a falsifiable generate/repair protocol
+      (task success / total tokens; reuses `bench/tasks`). Harness and results
+      still todo—see checklist in that file.
 - [ ] Keep Planned syntax out of `SPEC.md`; only Supported and Provisional forms belong there.
 
 ## Near-Term Foundation
@@ -378,8 +378,9 @@ task success / total tokens consumed
 ```
 
 including generated code, compiler or runtime diagnostics, repair prompts, and
-revisions across a fixed task suite. Document protocol and results in
-`LLM_BENCHMARK.md` when that work begins.
+revisions across a fixed task suite. Protocol is defined in
+[`LLM_BENCHMARK.md`](LLM_BENCHMARK.md); harness and published results are still
+todo.
 
 **Static source token density** (step 1 — implemented) is measured in
 [`bench/`](bench/README.md): hand-written equivalent programs in VOL, Go, Rust,

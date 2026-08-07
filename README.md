@@ -73,7 +73,7 @@ This README separates **what works today** from **long-term design targets**. Tr
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter
 - a published compatibility policy and versioned conformance corpus
-- LLM generation and repair benchmarks (source token density is measured in `bench/`; generate/repair task-success metrics are not)
+- LLM generation and repair benchmark *runs* (protocol defined in [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md); source token density is measured in `bench/`; generate/repair results are not yet collected)
 - initial language-server support
 
 ### What Is Still an Open Experiment

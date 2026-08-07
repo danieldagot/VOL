@@ -27,3 +27,6 @@ bench/.venv/
 bench/**/__pycache__/
 bench/**/*.pyc
 bench/.python-version
+# LLM harness dry-run noise (commit live run artifacts deliberately)
+bench/llm/results/*_dryrun_*.jsonl
+bench/llm/results/*_dryrun_*.md

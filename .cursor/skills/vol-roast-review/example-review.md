@@ -4,108 +4,159 @@ The following is a gold-standard example of voice, structure, and severity.
 When reviewing, match this energy against **current** docs — do not copy outdated
 findings if the repo has fixed them.
 
-**Current doc layout (use this, not the filenames inside the sample body):**
+**Current doc layout (use this, not historical filenames in older roasts):**
 `README.md`, `SPEC.md`, `IDEAS.md`, `AGENTS.md`, plus spot-checks of
-`internal/lang/` and `examples/`. `SYNTAX.md` and `VOCABULARY.md` were removed;
-implemented grammar and vocabulary live in `SPEC.md` only.
+`internal/lang/`, `examples/`, and `bench/`. `SYNTAX.md` and `VOCABULARY.md` were
+removed; implemented grammar and vocabulary live in `SPEC.md` only.
 
-The sample below is historical tone reference. Some concrete bugs it names may
-already be fixed; re-verify everything.
+The sample below reflects the project **after** `SPEC.md` became the single
+source of truth, `bench/` added source token density, and §11 settled core
+prototype rules. Re-verify everything before citing it in a live review.
 
 ---
 
-I read the current README, SYNTAX.md, VOCABULARY.md, IDEAS.md, and AGENTS.md.
+I read `README.md`, `SPEC.md`, `IDEAS.md`, `AGENTS.md`, spot-checked
+`internal/lang/`, and skimmed `bench/README.md`.
 
-Bottom line: the idea behind VOL is much better than the current language specification. Right now, VOL is a strong language manifesto attached to a small interpreter, not yet a serious systems-language specification. The repo itself accurately admits that the static type system, ownership model, explicit types, errors, optionals, structs, generics, async, allocator control, and backend are still open.
+**Bottom line:** VOL is no longer “manifesto plus vibes.” You actually shipped a
+living prototype spec, structured diagnostics, tests, CI, and a honest split
+between what works and what is vision. That is real progress. You are still not
+a systems language—you are a well-documented interpreter prototype with
+research ambitions and one partial measurement of source token density. The gap
+between AGENTS.md compiler fantasies and §10 “explicitly out of scope” is still
+the story.
 
-My score today
-Area	Score
-Core idea	8/10
-Surface syntax	7/10
-Simplicity	8/10
-Novelty	5/10
-Specification quality	3/10
-Systems-language semantics	2/10
-Actual evidence of LLM optimization	1/10
-Potential	9/10
+**My score today**
 
-The harshest version of the review is:
+| Area | Score |
+| --- | --- |
+| Core idea | 8/10 |
+| Surface syntax | 7/10 |
+| Simplicity | 8/10 |
+| Novelty | 5/10 |
+| Specification quality | 6/10 |
+| Systems-language semantics | 3/10 |
+| Actual evidence of LLM optimization | 3/10 |
+| Potential | 9/10 |
 
-VOL is currently a pitch deck wearing a parser.
+**The harshest version of the review is:**
+
+VOL finally wrote the spec—now it needs to stop treating research slides as semantics.
 
 And that's completely fixable at this stage.
 
-The roast
-You don't actually have a language specification yet. SYNTAX.md says that operator precedence “must be formally defined,” mutability isn't decided, if-as-expression isn't decided, while isn't final, parameter/return types aren't final, and major constructs are undecided. There's also no formal lexical grammar or EBNF. For something intended to be especially deterministic for LLMs, that is a major hole. An LLM should be able to answer exactly whether a + b * c, a +\n b, foo\n.bar(), or not a == b is legal and what it means.
+## The roast
 
-“Token optimized for LLMs” is currently an assertion, not a property. AGENTS.md says “Every token matters,” proposes build-time token counts and a future “Meaning per Token” metric—but MPT isn't defined. This is possibly the biggest conceptual weakness in VOL. Token counts depend on the tokenizer. GPT, Claude, Gemini, Llama, etc. won't necessarily tokenize :=, .where, each, &&, and and identically. More importantly, shortest source != best LLM language. If VOL uses 15% fewer tokens but causes 30% more compiler errors, it has failed. Your real metric should look more like:
+### You fixed the biggest doc sin
 
-task success / total tokens consumed, including generated code, compiler errors, repair prompts, and revisions.
+`SPEC.md` exists. It has lexical rules, expression precedence, evaluation order,
+array identity, `.where` / `.sum` semantics, a failure model with stable codes,
+conformance examples, and **§11 Decided** rules that actually answer questions
+the old split grammar docs punted on: mutable-by-default with opt-in `const`,
+overflow traps, `if` as statement vs `? :` for values, permanent `while`, `.len`
+vs rejected `.length`, and eager `.where` returning a new array. An LLM can now
+answer whether `not false == true` is legal—it is, and it prints `true` (§9.1).
 
-“Compiler infers ownership, borrowing and lifetimes” is doing absurd amounts of work. The vision says the compiler handles ownership analysis, borrow analysis, lifetime inference, escape analysis, vectorization and parallelization while avoiding a GC and retaining C-like performance. That's basically several PhDs hiding behind the word “infer.” Local ownership inference? Plausible. Eliminating ownership contracts from public APIs? Much harder. Eventually the specification must answer: who owns returned memory, can references escape, can two mutable aliases exist, what happens when inference is ambiguous, whether something gets copied, whether RC is permitted, and how FFI works. Those are language semantics, not optimizer implementation details.
-Your nicest feature, where, is also a semantic landmine. I like this:
+That moves you from “language design cosplay” to “prototype with rules.” Credit
+where due.
+
+### But “systems language” is still mostly a wardrobe
+
+`SPEC.md` §10 lists the elephant herd: static types, ownership, structs, modules,
+generics, backends—all explicitly out of scope. README admits the same with
+admirable honesty. Meanwhile AGENTS.md still talks about stack allocation when
+values don't escape, automatic vectorization, and ownership analysis. The docs
+*mostly* label inference as aspiration, but the **tone** still sells a compiler
+that does not exist. For a systems claim, i64/f64/bool/string/`[]any` is a toy
+value model, not a platform.
+
+### `.where` is specified—and still a future landmine
+
+This is much better than before:
+
+```vol
 total := numbers.where(_ > 5).sum
+```
 
-It's much closer to what VOL should be than conventional loops. But what does where return? New array? Lazy view? Iterator? Compiler IR that gets fused with sum? Does it allocate? Can the predicate mutate external state? What happens with nested _? Is order guaranteed? Can the compiler parallelize it? What happens on integer overflow during sum?
+`SPEC.md` §4.4 now says: eager new array, ordered, `_` binding rules, integer
+fold for `.sum`, overflow via normal `+` and `R028`. String `.len` is Unicode
+scalars; bytes are `.byte_len`. Good.
 
-For a normal scripting language, you can hand-wave some of that. For a language promising predictable native systems performance and no hidden unbounded allocation, you absolutely cannot.
+Two problems remain:
 
-“Vector-Oriented Language” currently isn't vector-oriented. The README calls it Vector-Oriented Language, while AGENTS.md calls it Vocabulary Optimized Language, and the README also jokes that it's Vibe-Oriented Language. Pick one identity. More importantly, .each, .where, and .sum are collection operations, not a vector programming model. If “Vector” means the compiler recognizes bulk operations and performs SIMD/vectorization, make that an actual semantic pillar. Otherwise the name promises something the language doesn't currently contain.
-The type system is the elephant missing from the room. Currently your literal model is essentially i64, f64, bool, string, arrays. A systems language eventually needs things like fixed-width integers, signed/unsigned behavior, conversion rules, layouts, structs, enums, references, pointers/handles, slices/views, alignment and ABI rules. Even the innocent-looking statement that string .length counts “characters” is under-specified. Does “character” mean bytes, Unicode scalar values, or grapheme clusters? In a systems language, that distinction is enormous.
-Your “one canonical way” principle already contradicts the language. You explicitly say to prefer one canonical way of expressing an operation. Then you allow both:
-numbers.each number {
-    ...
-}
+1. **Purity is decided in prose but not enforced.** The spec says impure `.where`
+   predicates are non-conforming and may break under future fusion—yet the
+   interpreter still evaluates them eagerly left-to-right. You are asking users
+   and LLMs to follow a rule the runtime does not police. That is spec/impl drift
+   with a time bomb.
 
-and
+2. **Performance story is still hand-wavy.** “Not parallel and not lazy in this
+   prototype” is honest—but AGENTS.md still dangles vectorization. Collection
+   syntax is not a vector programming model until fusion/SIMD semantics exist.
 
-numbers.where(_ > 5).sum
+### LLM optimization: half a datapoint is not a thesis
 
-and tell programmers to choose whichever communicates intent better. That's not necessarily bad language design—but then “one canonical way” isn't your principle. I'd change the principle to “one canonical representation for each distinct intent.” Filtering/summing and imperative iteration are genuinely different intents.
+README and `bench/` report ~36% fewer source tokens than Go (median, 13 tasks,
+two tokenizers). That is **real** and **labeled correctly** as source density
+only—not generate/repair success. IDEAS.md still tracks `LLM_BENCHMARK.md` as
+todo. AGENTS.md's Meaning per Token remains undefined.
 
-Your own documentation rules are already being violated. AGENTS.md says planned behavior belongs in IDEAS.md, while SYNTAX.md should contain implemented/provisional grammar; “Provisional” specifically means implemented behavior whose spelling or semantics may change. Yet SYNTAX.md contains a parallel { ... } syntax whose semantics haven't been decided, while VOCABULARY.md explicitly says parallel is only a design idea and isn't accepted by the interpreter. That's exactly the kind of ambiguity an AI-first language should aggressively eliminate.
-And there is an actual hilarious contradiction in VOCABULARY.md. The example labels Double as a “public function” because it's capitalized, then immediately says capitalization has no visibility meaning and functions are public only through export. Also the or row in the vocabulary table is mangled because the C-style || clashes with the Markdown table separators. Your AI-optimized language specification has been defeated by two pipe characters. 😄
-The biggest design issue
+So the fair roast is not “you have zero evidence.” It is: **you have one metric
+of a multi-metric claim.** Shortest source still loses if models produce 40%
+more `R028`/`S003`/`R029` and burn tokens fixing them. The next document that
+matters is not another syntax idea—it is falsifiable generate/repair numbers.
 
-I would stop adding language features right now.
+### Documentation hygiene is mostly healed
 
-Before parallel, async, generics, macros, HTTP syntax, or anything exciting, make VOL v0.1 semantically boring and ridiculously precise.
+Naming is stable: **Vocabulary Optimized Language** in README and AGENTS.md.
+The “one canonical way” principle was updated to **one canonical representation
+per distinct intent**—which legitimately allows `.each` vs `.where(...).sum`.
+Planned `parallel { }` lives in IDEAS.md, not executable grammar in SPEC.
 
-Take just this:
+Roast what's left: vision sections in AGENTS.md are long relative to the tiny
+implemented core; new contributors could still skim the top and overestimate
+readiness. Keep the “current reality” banner loud.
 
-values
-variables
-functions
-if
-repeat
-while
-arrays
-each
-where
-sum
+### Engineering substance improved
 
-And specify every corner of it.
+Resolver, JSON diagnostics (`vol --json`), stable codes with `fix` on some
+errors, table-driven tests, example conformance, fuzz non-panic, CI with race
+detector—this is how a language prototype earns trust. The interpreter is still
+tree-walking Go, not a backend, but the **process** looks serious now.
 
-In particular, create a real SPEC.md containing lexical grammar → formal expression grammar → type/value semantics → scopes → evaluation order → numeric behavior → arrays/string semantics → mutation → function semantics → control flow → failure behavior.
+## Biggest design issue
 
-Then define one second document that may be even more important for VOL:
+Do not add features. **Close the loop on the core you already claim.**
 
-LLM_BENCHMARK.md
+Pick the frozen surface from README (“What Actually Works”) and make it boringly
+complete:
 
-Your language's killer contribution shouldn't merely be unusual syntax. It should be the first language where you can say:
+- enforce or statically warn on `.where` purity—or demote purity to IDEAS until
+  you can enforce it
+- finish diagnostic `fix` coverage for the codes LLMs hit most
+- ship `LLM_BENCHMARK.md` with a tiny task suite (generate → compile/run → repair
+  token totals)
+- keep §11 synchronized with tests on every change
 
-“On these 100 programming tasks, VOL required 34% fewer generation tokens than Go, 41% fewer than Rust, produced 22% fewer compile failures, and required 37% fewer repair tokens.”
+## What to do next
 
-That would make VOL interesting.
+1. **`LLM_BENCHMARK.md`** — even 20 tasks with public prompts beats another keyword.
+2. **Purity** — reject impure `.where` in the interpreter *or* mark purity as
+   Planned-only in SPEC until then.
+3. **Demote vision tone** — shorten AGENTS compiler sections or label every bullet
+   “not specified.”
+4. **Types/memory** — when ready, one numbered SPEC section at a time with tests;
+   no stealth semantics.
 
-Without that benchmark, “LLM optimized” is marketing.
+## Keep / throw out
 
-With it, VOL becomes an experiment people can actually falsify, measure and improve.
+**Keep** ~80% of the surface: `:=`, braces, `fn`, `if`, arrays, structured
+errors, semantic compression (`.where(...).sum`).
 
-And one final opinion: don't try too hard to make the syntax look alien. :=, braces, fn, if, return, arrays, and normal expressions are good precisely because models have billions of tokens of training experience with similar constructs. Your innovation should be semantic compression like .where(...).sum, compiler inference, structured diagnostics, canonicalization, and higher-level intent—not inventing a weird glyph for everything.
+**Throw out** (for now) treating compiler inference, vectorization, and ownership
+elimination as implied behavior. Write the semantic rules first; let the optimizer
+be a later chapter.
 
-So I would keep about 80% of your existing surface syntax.
-
-I would throw out about 80% of the claims that the compiler will magically infer everything until you've written the semantic rules proving how it can.
-
-That's where I think VOL could become genuinely interesting.
+That's where VOL becomes interesting: **the first small systems language whose
+docs and benchmarks let you falsify the LLM workflow claim—not just count tokens
+in hand-written examples.**
