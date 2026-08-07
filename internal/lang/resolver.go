@@ -3,8 +3,9 @@ package lang
 import "fmt"
 
 type symbol struct {
-	kind  string
-	arity int
+	kind   string
+	arity  int
+	const_ bool
 }
 
 type resolver struct {
@@ -79,8 +80,13 @@ func (r *resolver) statement(statement Statement) *Diagnostic {
 		if d := r.expression(node.Value); d != nil {
 			return d
 		}
-		return r.declare(node.Name, symbol{kind: "value", arity: -1})
+		return r.declare(node.Name, symbol{kind: "value", arity: -1, const_: node.Const})
 	case *Assignment:
+		if target, ok := node.Target.(*Variable); ok {
+			if sym, found := r.lookup(target.Name.Lexeme); found && sym.const_ {
+				return r.error(target.Name, "S030", "Cannot assign to const binding `"+target.Name.Lexeme+"`.", "Declare a new binding instead, or remove `const` from the declaration.")
+			}
+		}
 		if d := r.expression(node.Target); d != nil {
 			return d
 		}

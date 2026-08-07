@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,18 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
+	// Strip --json flag from any position.
+	jsonMode := false
+	filtered := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "--json" {
+			jsonMode = true
+		} else {
+			filtered = append(filtered, a)
+		}
+	}
+	args = filtered
+
 	var path string
 	switch {
 	case len(args) >= 2 && args[0] == "run":
@@ -21,7 +34,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		// Keep the original command form working for existing users.
 		path = args[0]
 	default:
-		fmt.Fprintln(stderr, "usage: vol run <file.vol>")
+		fmt.Fprintln(stderr, "usage: vol [--json] run <file.vol>")
 		return 2
 	}
 
@@ -31,9 +44,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	reportDiagnostic := func(d *lang.Diagnostic) {
+		if jsonMode {
+			encoded, _ := json.Marshal(d)
+			fmt.Fprintln(stderr, string(encoded))
+		} else {
+			fmt.Fprintln(stderr, d.Human(string(source)))
+		}
+	}
+
 	program, diagnostic := lang.Parse(path, string(source))
 	if diagnostic != nil {
-		fmt.Fprintln(stderr, diagnostic.Human(string(source)))
+		reportDiagnostic(diagnostic)
 		return 1
 	}
 
@@ -45,7 +67,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if diagnostic = lang.ExecuteWithOptions(program, stdout, lang.ExecuteOptions{Input: os.Stdin, Args: programArgs}); diagnostic != nil {
-		fmt.Fprintln(stderr, diagnostic.Human(string(source)))
+		reportDiagnostic(diagnostic)
 		return 1
 	}
 	return 0

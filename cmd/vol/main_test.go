@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,7 +45,7 @@ func TestRunUsage(t *testing.T) {
 		if code := run(args, &stdout, &stderr); code != 2 {
 			t.Fatalf("args %#v: exit code %d, want 2", args, code)
 		}
-		if stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage: vol run <file.vol>") {
+		if stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage:") {
 			t.Fatalf("args %#v: stdout %q, stderr %q", args, stdout.String(), stderr.String())
 		}
 	}
@@ -103,6 +104,63 @@ func TestRunReportsFileParseAndRuntimeFailures(t *testing.T) {
 				t.Fatalf("stdout %q, stderr %q", stdout.String(), stderr.String())
 			}
 		})
+	}
+}
+
+func TestJSONModeEmitsDiagnosticJSON(t *testing.T) {
+	tests := []struct {
+		name string
+		args func(path string) []string
+	}{
+		{name: "--json before run", args: func(p string) []string { return []string{"--json", "run", p} }},
+		{name: "--json after run", args: func(p string) []string { return []string{"run", "--json", p} }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "bad.vol")
+			if err := os.WriteFile(path, []byte("print 1 / 0"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			var stdout, stderr bytes.Buffer
+			code := run(test.args(path), &stdout, &stderr)
+			if code != 1 {
+				t.Fatalf("exit code = %d", code)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("unexpected stdout %q", stdout.String())
+			}
+			var value map[string]any
+			if err := json.Unmarshal([]byte(strings.TrimSpace(stderr.String())), &value); err != nil {
+				t.Fatalf("stderr is not valid JSON: %v\nstderr: %q", err, stderr.String())
+			}
+			if value["code"] != "R014" {
+				t.Fatalf("JSON code = %v, want R014; full JSON: %s", value["code"], stderr.String())
+			}
+			if _, ok := value["position"]; !ok {
+				t.Fatalf("JSON missing position field; full JSON: %s", stderr.String())
+			}
+		})
+	}
+}
+
+func TestJSONModeUsageErrorIsNotJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--json"}, &stdout, &stderr); code != 2 {
+		t.Fatalf("exit code = %d", code)
+	}
+	if strings.HasPrefix(strings.TrimSpace(stderr.String()), "{") {
+		t.Fatalf("usage error should not be JSON: %q", stderr.String())
+	}
+}
+
+func TestJSONModeFileReadErrorIsNotJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	path := filepath.Join(t.TempDir(), "missing.vol")
+	if code := run([]string{"--json", "run", path}, &stdout, &stderr); code != 1 {
+		t.Fatalf("exit code = %d", code)
+	}
+	if strings.HasPrefix(strings.TrimSpace(stderr.String()), "{") {
+		t.Fatalf("file read error should not be JSON: %q", stderr.String())
 	}
 }
 

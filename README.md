@@ -40,6 +40,7 @@ This README separates **what works today** from **long-term design targets**. Tr
 - integer, floating-point, Boolean, and string literals
 - inferred variable declarations with `:=`
 - variable assignment with `=`
+- opt-in immutable bindings with `const name := expression` (shallow; rebind blocked with `S030`/`R030`; indexed writes on array bindings still allowed)
 - arithmetic operators: `+`, `-`, `*`, `/` (integer overflow traps with `R028`)
 - comparison operators: `==`, `!=`, `<`, `<=`, `>`, `>=`
 - Boolean operators: `and`, `or`, `not`
@@ -61,7 +62,7 @@ This README separates **what works today** from **long-term design targets**. Tr
 - functions declared with `fn`, parameters, calls, and `return` (missing return is `nothing`; using it as a value is `R029`)
 - module export lists that may appear before or after definitions
 - line comments beginning with `//`
-- source-located parser and runtime diagnostics
+- source-located parser and runtime diagnostics with human and JSON output (`vol --json run <file.vol>`)
 - table-driven lexer, parser, resolver, interpreter, diagnostic, CLI, and executable-example tests
 - fuzz seed coverage ensuring arbitrary parser input does not panic
 - continuous integration with formatting, vet, race-detection, and coverage checks
@@ -69,10 +70,8 @@ This README separates **what works today** from **long-term design targets**. Tr
 ### What Is Missing
 
 - static type checking
-- opt-in `const` bindings (default is already mutable; see `SPEC.md` §5.2)
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter
-- JSON diagnostic output from the CLI (diagnostics are already structured)
 - a published compatibility policy and versioned conformance corpus
 - LLM generation and repair benchmarks
 - initial language-server support

@@ -17,7 +17,7 @@ type lexer struct {
 var keywords = map[string]TokenKind{
 	"true": TokenTrue, "false": TokenFalse, "if": TokenIf, "elif": TokenElif, "else": TokenElse,
 	"repeat": TokenRepeat, "while": TokenWhile, "print": TokenPrint,
-	"fn": TokenFn, "return": TokenReturn, "export": TokenExport,
+	"fn": TokenFn, "return": TokenReturn, "export": TokenExport, "const": TokenConst,
 	"and": TokenAnd, "or": TokenOr, "not": TokenNot,
 }
 

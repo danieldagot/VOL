@@ -82,6 +82,7 @@ do not claim identical implementation.
 | `else` | Final alternate `if` block | `else` | Supported |
 | `elif` | Extra `if` branch | `else if` / `elif` | Supported |
 | `false` | Boolean false | `false` | Supported |
+| `const` | Opt-in immutable binding (shallow) | `const` / immutable `let` | Supported |
 | `fn` | Function declaration | `func` / `fn` | Supported |
 | `export` | Make names public | export list / `pub` | Supported |
 | `if` | Conditional statement | `if` | Supported |
@@ -105,6 +106,7 @@ do not claim identical implementation.
 | `assert(cond)` / `assert(cond, msg)` | Fail when false | assertion | Supported |
 | `string(value)` | Display string | `toString` | Supported |
 | `args` | CLI args after source file | `argv` | Supported |
+| `const name := value` | Declare immutable binding (shallow) | `const` / immutable `let` | Supported |
 | `name := value` | Declare mutable binding | `var` / mutable `let` | Supported |
 | `name = value` | Assign to existing binding | assignment | Supported |
 | `cond ? a : b` | Expression conditional | JS ternary | Supported |
@@ -506,12 +508,13 @@ name = expression
 - `=` assigns to an existing variable or array index.
 - **Mutability model (decided):** bindings are mutable by default. Programmers do
   not mark ordinary variables as mutable. There is no `mut` keyword.
-- **Opt-in immutability (Planned, not accepted today):** `const name := expression`
-  will declare a binding that cannot be reassigned with `=`. Semantics are
-  **shallow**: rebinding is forbidden; mutating an array value through that
-  binding (for example `a[0] = 9`) still follows §3.3 until deeper freeze or
-  ownership rules exist. Full grammar and diagnostics live in [`IDEAS.md`](IDEAS.md)
-  until implemented and tested.
+- **Opt-in immutability:** `const name := expression` declares a binding that
+  cannot be reassigned with `=` (`S030` from resolver, `R030` at runtime).
+  Semantics are **shallow**: rebinding is forbidden; mutating an array value
+  through that binding (for example `a[0] = 9`) still follows §3.3. `const`
+  applies only at declaration; there is no `const` on a bare `=`.
+  Shadowing follows the same scope rules as mutable bindings. Function
+  parameters stay mutable (no const parameter syntax yet).
 - Binding mutability (can this name be reassigned?) is separate from value
   mutability (strings are immutable values; arrays share identity on assignment—
   see §3.3).
@@ -707,6 +710,17 @@ Pipeline:
 
 There is no `try` / `catch` and no error values yet.
 
+The CLI emits diagnostics as human-readable text by default. Pass `--json`
+anywhere in the command to receive a single JSON object on stderr instead:
+
+```
+vol --json run <file.vol>
+vol run --json <file.vol>
+```
+
+JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…,"Line":…,"Column":…},"fix":"…"}`.
+`fix` is omitted when absent. I/O failures (file not found) remain plain text.
+
 ### 8.1 Lexical codes
 
 | Code | Meaning |
@@ -828,7 +842,7 @@ print square(6) // 36
 Do not treat these as specified just because vision docs mention them:
 
 - static types and typed signatures
-- `const` bindings (designed in [`IDEAS.md`](IDEAS.md); not implemented)
+- `const` parameter syntax (function parameters stay mutable; Planned)
 - ownership, borrowing, lifetimes
 - structs, enums, methods
 - generics
@@ -850,8 +864,8 @@ Track progress in [`IDEAS.md`](IDEAS.md).
 #### Decided
 
 - **Mutability default (§5.2):** bindings are **mutable by default**. Opt-in
-  immutability will use `const name := expression` with shallow semantics
-  (Planned in [`IDEAS.md`](IDEAS.md); not accepted until implemented).
+  immutability uses `const name := expression` with shallow semantics
+  (implemented; `S030`/`R030` on reassignment).
 - **Array assignment (§3.3):** assignment and argument passing **share** the
   array reference. Explicit clone is Planned; move/ownership are not implied.
 - **Integer overflow (§4.3):** overflow **traps** (`R028` with a `fix`

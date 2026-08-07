@@ -48,11 +48,11 @@ Immediate documentation and design work:
 - [x] Integer, floating-point, Boolean, and string literals.
 - [x] Variables with inferred types.
 - [x] Mutability default: bindings are mutable (`:=` / `=`). See `SPEC.md` §5.2.
-- [ ] Opt-in immutable bindings with `const name := expression` (shallow).
+- [x] Opt-in immutable bindings with `const name := expression` (shallow). See `SPEC.md` §5.2.
 - [x] Arithmetic, comparison, and Boolean operators.
 - [x] Integer overflow traps by default (`R028`). See `SPEC.md` §4.3.
 - [ ] Wrapping integer arithmetic and/or overflow build modes.
-- [ ] JSON diagnostic output from the `vol` CLI (struct already JSON-tagged).
+- [x] JSON diagnostic output from the `vol` CLI (`vol --json run <file.vol>` or `vol run --json <file.vol>`).
 - [x] Blocks using braces.
 - [x] `if` / `elif` / `else` statements.
 - [x] Conditional operator `? :` (expression form; `if` stays a statement).
@@ -128,9 +128,8 @@ Planned escapes (not accepted today):
 - explicit wrapping operations, and/or
 - build modes such as debug-trap (default today) vs release-wrap
 
-Also Planned: CLI flag or formatter output that emits diagnostics as JSON
-(the `Diagnostic` struct is already JSON-tagged; `vol` currently prints human
-form only).
+JSON diagnostic output is now implemented: `vol --json run <file.vol>` emits a
+single JSON object on stderr. The human form is still the default.
 
 ### Explicit array clone
 
@@ -152,31 +151,26 @@ Design notes when implementing:
 - Decide shallow vs deep clone for nested arrays before shipping.
 - Do not treat clone as move semantics or ownership.
 
-### Opt-in `const` bindings
+### Opt-in `const` bindings ✓ implemented
 
-Decided language rule (default already in `SPEC.md` §5.2): bindings are mutable
-by default. Freeze is opt-in:
+Language rule (§5.2): bindings are mutable by default; `const` is opt-in:
 
 ```vol
 count := 1
 count = 2          // OK
 
 const limit := 10
-limit = 11         // error: cannot assign to const binding
+limit = 11         // S030 / R030: Cannot assign to const binding
 
 const a := [1, 2]
-a = [3]            // error: cannot rebind
-a[0] = 9           // OK for now (shallow const); array rules still apply
+a = [3]            // S030 / R030: Cannot rebind
+a[0] = 9           // OK (shallow const); array rules still apply
 ```
 
-Design notes when implementing:
+Remaining open items:
 
-- Spelling is `const name := expression` (not `$=`, not a `mut` keyword).
-- `const` applies only at declaration; there is no `const` on bare `=`.
-- Shadowing follows the same scope rules as mutable bindings.
-- Function parameters stay mutable until a separate parameter rule is designed.
-- Add stable diagnostic codes and tests for reassignment, redeclare, and indexed
-  write through a `const` array binding.
+- `const` function parameters — Planned; parameters stay mutable for now.
+- Deeper freeze / ownership of array elements — deferred to ownership design.
 
 ### Parallel intent
 
@@ -395,8 +389,8 @@ revisions across a fixed task suite. Document protocol and results in
 
 ## Open Design Questions
 
-- ~~What is VOL's exact mutability model?~~ **Decided:** mutable by default;
-  opt-in `const name := expr` (shallow; not implemented). See `SPEC.md` §5.2.
+- ~~What is VOL's exact mutability model?~~ **Decided and implemented:** mutable by default;
+  opt-in `const name := expr` (shallow; `S030`/`R030`). See `SPEC.md` §5.2.
 - ~~Array assignment: shared, copy, or move?~~ **Decided:** shared references;
   explicit clone Planned. See `SPEC.md` §3.3.
 - ~~Is `if` an expression, a statement, or both?~~ **Decided:** statement with

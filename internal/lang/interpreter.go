@@ -15,12 +15,26 @@ const nothingFix = "Return a value from the function, or call it as a statement 
 type environment struct {
 	parent *environment
 	values map[string]any
+	consts map[string]bool
 }
 
 func newEnvironment(parent *environment) *environment {
-	return &environment{parent: parent, values: map[string]any{}}
+	return &environment{parent: parent, values: map[string]any{}, consts: map[string]bool{}}
 }
 func (e *environment) define(name string, value any) { e.values[name] = value }
+func (e *environment) defineConst(name string, value any) {
+	e.values[name] = value
+	e.consts[name] = true
+}
+func (e *environment) isConst(name string) bool {
+	if e.consts[name] {
+		return true
+	}
+	if e.parent != nil {
+		return e.parent.isConst(name)
+	}
+	return false
+}
 func (e *environment) get(name string) (any, bool) {
 	if value, ok := e.values[name]; ok {
 		return value, true
@@ -120,7 +134,11 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 		if _, exists := i.env.values[node.Name.Lexeme]; exists {
 			return i.runtime(node.Name.Pos, "R001", "Variable `"+node.Name.Lexeme+"` is already declared in this scope.")
 		}
-		i.env.define(node.Name.Lexeme, value)
+		if node.Const {
+			i.env.defineConst(node.Name.Lexeme, value)
+		} else {
+			i.env.define(node.Name.Lexeme, value)
+		}
 	case *Assignment:
 		value, d := i.evaluate(node.Value)
 		if d != nil {
@@ -131,6 +149,15 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 		}
 		switch target := node.Target.(type) {
 		case *Variable:
+			if i.env.isConst(target.Name.Lexeme) {
+				return &Diagnostic{
+					Code:    "R030",
+					Message: "Cannot assign to const binding `" + target.Name.Lexeme + "`.",
+					File:    i.file,
+					Pos:     target.Position(),
+					Fix:     "Declare a new binding instead, or remove `const` from the declaration.",
+				}
+			}
 			if !i.env.assign(target.Name.Lexeme, value) {
 				return i.runtime(target.Position(), "R002", "Unknown variable `"+target.Name.Lexeme+"`.")
 			}
@@ -350,6 +377,20 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 				}
 			}
 			return sum, nil
+		}
+		if node.Name.Lexeme == "copy" {
+			array, ok := object.([]any)
+			if !ok {
+				return nil, i.runtime(node.Position(), "R031", "`.copy` requires an array.")
+			}
+			return shallowCopyArray(array), nil
+		}
+		if node.Name.Lexeme == "deep_copy" {
+			array, ok := object.([]any)
+			if !ok {
+				return nil, i.runtime(node.Position(), "R032", "`.deep_copy` requires an array.")
+			}
+			return deepCopyArray(array), nil
 		}
 		return nil, i.runtime(node.Position(), "R007", "Unknown property `"+node.Name.Lexeme+"`.")
 	case *Unary:
@@ -780,6 +821,27 @@ func typeName(value any) string {
 		return "function"
 	}
 	return "value"
+}
+
+func shallowCopyArray(array []any) []any {
+	result := make([]any, len(array))
+	copy(result, array)
+	return result
+}
+
+func deepCopyArray(array []any) []any {
+	result := make([]any, len(array))
+	for idx, item := range array {
+		result[idx] = deepCopyValue(item)
+	}
+	return result
+}
+
+func deepCopyValue(value any) any {
+	if array, ok := value.([]any); ok {
+		return deepCopyArray(array)
+	}
+	return value
 }
 
 func (i *interpreter) installBuiltins(arguments []string) {

@@ -31,8 +31,10 @@ func (*BlockStatement) statement()           {}
 func (n *BlockStatement) Position() Position { return n.Body.Position() }
 
 type Declaration struct {
-	Name  Token
-	Value Expression
+	Keyword Token
+	Name    Token
+	Value   Expression
+	Const   bool
 }
 
 func (*Declaration) statement()           {}

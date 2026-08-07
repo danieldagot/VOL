@@ -39,7 +39,7 @@ every document.
 
 Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 
-- bindings are **mutable by default**; opt-in `const` is Planned
+- bindings are **mutable by default**; opt-in `const name := expression` is Supported (shallow; `S030`/`R030` on reassignment)
 - array assignment **shares** references; explicit clone is Planned
 - integer overflow **traps** (`R028`) with a `fix` suggestion; wrapping modes are Planned
 - `.where` predicates are **pure**; side effects belong in `.each`
@@ -146,9 +146,10 @@ Goals:
 - machine-readable compiler output
 - falsifiable LLM generation and repair benchmarks
 
-Errors should have both human and JSON formats. Diagnostics already carry
-`code`, `message`, `file`, `position`, and optional `fix`. The CLI prints the
-human form today; JSON emission from `vol` is Planned (see [`IDEAS.md`](IDEAS.md)).
+Errors have both human and JSON formats. Diagnostics carry `code`, `message`,
+`file`, `position`, and optional `fix`. The CLI prints the human form by default;
+pass `--json` anywhere in the command (`vol --json run <file.vol>` or
+`vol run --json <file.vol>`) to receive a single JSON object on stderr instead.
 
 Use examples that match **decided** language rules. Do not imply
 immutable-by-default bindings or silent integer wrapping.
@@ -169,7 +170,7 @@ Suggestion:
 Use smaller values, switch to floating-point, or wait for planned wrapping arithmetic / build modes.
 ```
 
-Machine (`Diagnostic` JSON shape; CLI flag Planned):
+Machine (`Diagnostic` JSON shape; `vol --json`):
 
 ```json
 {

@@ -117,6 +117,24 @@ func TestResolverKeepsLocalDeclarationsOrderSensitive(t *testing.T) {
 	}
 }
 
+func TestResolverRejectsConstReassignment(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{name: "module const rebind", source: "const limit := 10\nlimit = 11"},
+		{name: "local const rebind", source: "fn work() { const n := 1\nn = 2\nreturn n }"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, diagnostic := run(t, test.source)
+			if diagnostic == nil || diagnostic.Code != "S030" || diagnostic.Fix == "" {
+				t.Fatalf("diagnostic = %#v", diagnostic)
+			}
+		})
+	}
+}
+
 func TestResolverAllowsRecursiveAndMutuallyRecursiveModuleFunctions(t *testing.T) {
 	source := `fn even(n) { if n == 0 { return true } return odd(n - 1) }
 fn odd(n) { if n == 0 { return false } return even(n - 1) }

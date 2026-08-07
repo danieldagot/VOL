@@ -7,7 +7,7 @@ import (
 )
 
 func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
-	source := `name _value true false if elif else repeat while print fn return export and or not 42 3.5 "text" := : ? = == != < <= > >= + - * / { } [ ] ( ) , .`
+	source := `name _value true false if elif else repeat while print fn return export const and or not 42 3.5 "text" := : ? = == != < <= > >= + - * / { } [ ] ( ) , .`
 	tokens, diagnostic := lex("tokens.vol", source)
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
@@ -16,7 +16,7 @@ func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
 	want := []TokenKind{
 		TokenIdentifier, TokenIdentifier,
 		TokenTrue, TokenFalse, TokenIf, TokenElif, TokenElse, TokenRepeat, TokenWhile,
-		TokenPrint, TokenFn, TokenReturn, TokenExport, TokenAnd, TokenOr, TokenNot,
+		TokenPrint, TokenFn, TokenReturn, TokenExport, TokenConst, TokenAnd, TokenOr, TokenNot,
 		TokenInteger, TokenFloat, TokenString,
 		TokenColonEqual, TokenColon, TokenQuestion, TokenEqual, TokenEqualEqual, TokenBangEqual,
 		TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual,
@@ -31,7 +31,7 @@ func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("token kinds\n got: %#v\nwant: %#v", got, want)
 	}
-	if tokens[0].Lexeme != "name" || tokens[16].Lexeme != "42" || tokens[18].Lexeme != "text" {
+	if tokens[0].Lexeme != "name" || tokens[17].Lexeme != "42" || tokens[19].Lexeme != "text" {
 		t.Fatalf("unexpected lexemes: %#v", tokens)
 	}
 }

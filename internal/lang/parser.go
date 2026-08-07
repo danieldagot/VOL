@@ -102,6 +102,22 @@ func (p *parser) statement() (Statement, *Diagnostic) {
 		return p.whileStatement(p.previous())
 	}
 
+	if p.match(TokenConst) {
+		keyword := p.previous()
+		if !p.check(TokenIdentifier) {
+			return nil, p.error(p.peek(), "E120", "Expected a name after `const`.")
+		}
+		name := p.advance()
+		if !p.match(TokenColonEqual) {
+			return nil, p.error(p.peek(), "E121", "Expected `:=` after const name.")
+		}
+		value, d := p.expression()
+		if d != nil {
+			return nil, d
+		}
+		return &Declaration{Keyword: keyword, Name: name, Value: value, Const: true}, nil
+	}
+
 	if p.check(TokenIdentifier) && p.peekNext().Kind == TokenColonEqual {
 		name := p.advance()
 		p.advance()

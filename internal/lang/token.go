@@ -22,6 +22,7 @@ const (
 	TokenFn
 	TokenReturn
 	TokenExport
+	TokenConst
 	TokenAnd
 	TokenOr
 	TokenNot

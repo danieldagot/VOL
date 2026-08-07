@@ -313,6 +313,9 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "assert message", source: "assert(false, 1)", code: "R026", message: "message must be a string"},
 		{name: "assert default", source: "assert(false)", code: "R027", message: "Assertion failed"},
 		{name: "assert custom", source: `assert(false, "custom")`, code: "R027", message: "custom"},
+		{name: "const rebind", source: "const limit := 10\nlimit = 11", code: "S030", message: "Cannot assign to const"},
+		{name: "copy non-array", source: `print "x".copy`, code: "R031", message: "requires an array"},
+		{name: "deep_copy non-array", source: `print "x".deep_copy`, code: "R032", message: "requires an array"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -420,6 +423,84 @@ func TestTypeNamesCoverRuntimeValues(t *testing.T) {
 		if got := typeName(test.value); got != test.want {
 			t.Errorf("typeName(%T) = %q, want %q", test.value, got, test.want)
 		}
+	}
+}
+
+func TestArrayCopyAndDeepCopy(t *testing.T) {
+	// .copy isolates the top-level array from the original
+	source := "a := [1, 2, 3]\nb := a.copy\nb[0] = 9\nprint a\nprint b"
+	output, diagnostic := run(t, source)
+	if diagnostic != nil || output != "[1, 2, 3]\n[9, 2, 3]\n" {
+		t.Fatalf(".copy isolation: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// .copy is shallow: nested arrays still share identity
+	source = "inner := [1, 2]\nouter := [inner]\ncopy := outer.copy\ncopy[0][0] = 9\nprint inner"
+	output, diagnostic = run(t, source)
+	if diagnostic != nil || output != "[9, 2]\n" {
+		t.Fatalf(".copy shallow (nested shares): output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// .deep_copy isolates nested arrays too
+	source = "inner := [1, 2]\nouter := [inner]\ndc := outer.deep_copy\ndc[0][0] = 9\nprint inner"
+	output, diagnostic = run(t, source)
+	if diagnostic != nil || output != "[1, 2]\n" {
+		t.Fatalf(".deep_copy nested isolation: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// .deep_copy on a flat array behaves like .copy
+	source = "a := [10, 20]\nb := a.deep_copy\nb[1] = 99\nprint a\nprint b"
+	output, diagnostic = run(t, source)
+	if diagnostic != nil || output != "[10, 20]\n[10, 99]\n" {
+		t.Fatalf(".deep_copy flat: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// original rebind does not affect copy
+	source = "a := [1, 2]\nb := a.copy\na = [9]\nprint b"
+	output, diagnostic = run(t, source)
+	if diagnostic != nil || output != "[1, 2]\n" {
+		t.Fatalf(".copy rebind independence: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// .copy on empty array
+	output, diagnostic = run(t, "a := []\nb := a.copy\nprint b.len")
+	if diagnostic != nil || output != "0\n" {
+		t.Fatalf(".copy empty: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+}
+
+func TestConstBindings(t *testing.T) {
+	// const value is readable and printable
+	output, diagnostic := run(t, "const limit := 42\nprint limit")
+	if diagnostic != nil || output != "42\n" {
+		t.Fatalf("output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// shallow const: rebinding the name is rejected; indexed write on the array is still allowed
+	output, diagnostic = run(t, "const a := [1, 2]\na[0] = 9\nprint a")
+	if diagnostic != nil || output != "[9, 2]\n" {
+		t.Fatalf("shallow const indexed write: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// const rebind is caught (S030 from resolver)
+	_, diagnostic = run(t, "const x := 1\nx = 2")
+	if diagnostic == nil || diagnostic.Code != "S030" {
+		t.Fatalf("expected S030, got = %#v", diagnostic)
+	}
+	if diagnostic.Fix == "" {
+		t.Fatal("S030 has no fix suggestion")
+	}
+
+	// mutable binding declared after const can be assigned
+	output, diagnostic = run(t, "const max := 100\ncount := 1\ncount = 2\nprint count")
+	if diagnostic != nil || output != "2\n" {
+		t.Fatalf("output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// const in function scope
+	output, diagnostic = run(t, "fn work() {\n  const n := 5\n  return n\n}\nprint work()")
+	if diagnostic != nil || output != "5\n" {
+		t.Fatalf("function const: output = %q, diagnostic = %#v", output, diagnostic)
 	}
 }
 
