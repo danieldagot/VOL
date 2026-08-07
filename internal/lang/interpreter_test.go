@@ -532,6 +532,65 @@ func TestConstBindings(t *testing.T) {
 	if diagnostic != nil || output != "5\n" {
 		t.Fatalf("function const: output = %q, diagnostic = %#v", output, diagnostic)
 	}
+
+	// mutable shadow of a const in an inner scope: assignment to the inner binding must succeed
+	// (isConst must stop at the scope that owns the name, not walk past it to the outer const)
+	output, diagnostic = run(t, "const x := 1\n{\n  x := 10\n  x = 20\n  print x\n}\nprint x")
+	if diagnostic != nil || output != "20\n1\n" {
+		t.Fatalf("mutable shadow of const: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// nested functions: const in outer function, mutable shadow inside inner function
+	output, diagnostic = run(t, "fn outer() {\n  const limit := 5\n  fn inner() {\n    limit := 99\n    limit = 100\n    return limit\n  }\n  return inner()\n}\nprint outer()")
+	if diagnostic != nil || output != "100\n" {
+		t.Fatalf("const shadow in nested fn: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// deeply nested scope: assignment to a mutable shadow from a scope that is two levels
+	// below the const — isConst must still stop at the middle scope that owns the mutable name
+	output, diagnostic = run(t, "const x := 1\n{\n  x := 10\n  {\n    x = 20\n    print x\n  }\n  print x\n}\nprint x")
+	if diagnostic != nil || output != "20\n20\n1\n" {
+		t.Fatalf("deep mutable shadow: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+
+	// const shadow of an outer mutable: the const wins inside its block
+	_, diagnostic = run(t, "x := 1\n{\n  const x := 2\n  x = 3\n}")
+	if diagnostic == nil || (diagnostic.Code != "S030" && diagnostic.Code != "R030") {
+		t.Fatalf("const shadow of mutable outer: expected S030/R030, got = %#v", diagnostic)
+	}
+}
+
+func TestEnvironmentIsConstRespectsOwningScope(t *testing.T) {
+	// A direct unit test for isConst, mirroring TestEnvironmentAssignmentWalksParents.
+	parent := newEnvironment(nil)
+	parent.defineConst("frozen", int64(1)) // const in parent
+	parent.define("mutable", int64(2))     // mutable in parent
+
+	child := newEnvironment(parent)
+
+	// Names not in child: walk up to parent and report parent's const status.
+	if !child.isConst("frozen") {
+		t.Error("child.isConst(frozen): want true (const in parent)")
+	}
+	if child.isConst("mutable") {
+		t.Error("child.isConst(mutable): want false (mutable in parent)")
+	}
+
+	// Name not found anywhere: false.
+	if child.isConst("missing") {
+		t.Error("child.isConst(missing): want false (unknown)")
+	}
+
+	// Child shadows parent's const with a mutable binding:
+	// isConst must stop at the child's own scope and return false.
+	child.define("frozen", int64(99))
+	if child.isConst("frozen") {
+		t.Error("child.isConst(frozen) after mutable shadow: want false (child owns it, not const)")
+	}
+	// Parent should be unaffected.
+	if !parent.isConst("frozen") {
+		t.Error("parent.isConst(frozen) after child shadows: want true (still const in parent)")
+	}
 }
 
 func TestEnvironmentAssignmentWalksParents(t *testing.T) {

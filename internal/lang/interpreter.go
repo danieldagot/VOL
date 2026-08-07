@@ -27,8 +27,8 @@ func (e *environment) defineConst(name string, value any) {
 	e.consts[name] = true
 }
 func (e *environment) isConst(name string) bool {
-	if e.consts[name] {
-		return true
+	if _, ok := e.values[name]; ok {
+		return e.consts[name]
 	}
 	if e.parent != nil {
 		return e.parent.isConst(name)
