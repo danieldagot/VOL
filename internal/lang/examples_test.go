@@ -19,7 +19,7 @@ func TestExamplesRemainExecutable(t *testing.T) {
 		{file: "hello.vol", output: "Hello from VOL\nPrototype version 1\n"},
 		{file: "conditions.vol", output: "Good weather for a walk.\n"},
 		{file: "loops.vol", output: "Countdown\n3\n2\n1\nGo!\nGo!\n"},
-		{file: "arrays.vol", output: "[72, 95, 81, 64]\nStudents: 4\nHigh score: 95\nHigh score: 81\n"},
+		{file: "arrays.vol", output: "[72, 95, 81, 64]\nStudents: 4\nHigh score: 95\nHigh score: 81\n[9, 2, 3]\n[1, 2, 3]\n[10, 20]\n"},
 		{file: "collections.vol", output: "[7, 9, 12]\nSum: 28\n"},
 		{file: "functions.vol", output: "Hello, friend\nSix squared is 36\n"},
 		{file: "scope.vol", output: "inside\noutside\n"},

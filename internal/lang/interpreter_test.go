@@ -316,6 +316,7 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "const rebind", source: "const limit := 10\nlimit = 11", code: "S030", message: "Cannot assign to const"},
 		{name: "copy non-array", source: `print "x".copy`, code: "R031", message: "requires an array"},
 		{name: "deep_copy non-array", source: `print "x".deep_copy`, code: "R032", message: "requires an array"},
+		{name: "byte_len non-string", source: "print [1].byte_len", code: "R033", message: "requires a string"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -423,6 +424,35 @@ func TestTypeNamesCoverRuntimeValues(t *testing.T) {
 		if got := typeName(test.value); got != test.want {
 			t.Errorf("typeName(%T) = %q, want %q", test.value, got, test.want)
 		}
+	}
+}
+
+func TestStringByteLenProperty(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		want   string
+	}{
+		// ASCII: byte count equals scalar count
+		{name: "ascii", source: `print "hello".byte_len`, want: "5\n"},
+		{name: "empty", source: `print "".byte_len`, want: "0\n"},
+		// Multi-byte UTF-8: emoji is 4 bytes, 1 scalar
+		{name: "emoji bytes", source: `print "🙂".byte_len`, want: "4\n"},
+		{name: "emoji scalars", source: `print "🙂".len`, want: "1\n"},
+		// Two-byte UTF-8: é = 2 bytes, 1 scalar
+		{name: "e accent bytes", source: `print "é".byte_len`, want: "2\n"},
+		{name: "e accent scalars", source: `print "é".len`, want: "1\n"},
+		// Mixed
+		{name: "mixed bytes", source: `print "aé🙂".byte_len`, want: "7\n"},
+		{name: "mixed scalars", source: `print "aé🙂".len`, want: "3\n"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			output, diagnostic := run(t, test.source)
+			if diagnostic != nil || output != test.want {
+				t.Fatalf("output = %q, diagnostic = %#v", output, diagnostic)
+			}
+		})
 	}
 }
 

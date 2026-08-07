@@ -60,7 +60,7 @@ Immediate documentation and design work:
 - [x] Conditional loops with `while` (Supported; no alternate spellings).
 - [x] Arrays, indexing, and bounds checking.
 - [x] Array assignment shares references (see `SPEC.md` §3.3).
-- [ ] Explicit array clone (`a.copy` or `copy(a)`; spelling undecided).
+- [x] Explicit array clone: `a.copy` (shallow) and `a.deep_copy` (recursive). See `SPEC.md` §3.3.
 - [x] Collection iteration with `.each`.
 - [x] Filtering with `.where` and aggregation with `.sum`.
 - [x] `.where` predicates are pure by rule; side effects use `.each` (`SPEC.md` §4.4).
@@ -71,26 +71,21 @@ Immediate documentation and design work:
 - [x] Comments.
 - [x] Basic built-ins for printing, input, `.len`, assertions, conversion, and arguments.
 - [x] `.len` is canonical (Unicode scalars for strings); `.length` rejected with fix hint.
-- [ ] String byte-count property (e.g. `.byte_len`) for systems I/O.
+- [x] String byte-count property `.byte_len` for systems I/O. See `SPEC.md` §3.2.
 
 ## Planned Syntax (Not Accepted Today)
 
 These forms must not be documented as Supported or Provisional until implemented.
 
-### String byte length
+### String byte length ✓ implemented
 
-Decided language rule (already in `SPEC.md` §3.2 / §4.4): `.len` counts Unicode
-scalar values for strings and element count for arrays. Spelling is `.len`, not
-`.length`.
-
-Planned for systems I/O (not accepted today):
+Language rule (§3.2): `.len` counts Unicode scalar values; `.byte_len` counts
+UTF-8 bytes. Grapheme-cluster counting is out of scope.
 
 ```vol
-print "🙂".len       // 1  (scalar)
-print "🙂".byte_len  // 4  (UTF-8 bytes) — spelling may be `.byte_len` or `.bytes`
+print "🙂".len       // 1  (Unicode scalar)
+print "🙂".byte_len  // 4  (UTF-8 bytes)
 ```
-
-Do not treat grapheme-cluster counting as `.len`.
 
 ### Typed void vs valued functions
 
@@ -131,25 +126,24 @@ Planned escapes (not accepted today):
 JSON diagnostic output is now implemented: `vol --json run <file.vol>` emits a
 single JSON object on stderr. The human form is still the default.
 
-### Explicit array clone
+### Explicit array clone ✓ implemented
 
-Decided language rule (already in `SPEC.md` §3.3): `:=` / `=` and argument
-passing share array identity. Isolation requires an explicit clone later:
+Language rule (§3.3): `:=` / `=` and argument passing share array identity.
+Use `.copy` for a shallow clone or `.deep_copy` for a recursive clone:
 
 ```vol
 a := [1, 2]
-b := a.copy      // or copy(a) — pick one spelling when implementing
+b := a.copy
 b[0] = 9
 print a          // [1, 2]
 print b          // [9, 2]
+
+inner := [1, 2]
+outer := [inner]
+dc := outer.deep_copy
+dc[0][0] = 99
+print inner      // [1, 2] — not affected
 ```
-
-Design notes when implementing:
-
-- Prefer one canonical form (`a.copy` fits `.len` / `.where`, or `copy(a)` as
-  a builtin). Document the choice in `SPEC.md` only after it works and is tested.
-- Decide shallow vs deep clone for nested arrays before shipping.
-- Do not treat clone as move semantics or ownership.
 
 ### Opt-in `const` bindings ✓ implemented
 
@@ -391,8 +385,8 @@ revisions across a fixed task suite. Document protocol and results in
 
 - ~~What is VOL's exact mutability model?~~ **Decided and implemented:** mutable by default;
   opt-in `const name := expr` (shallow; `S030`/`R030`). See `SPEC.md` §5.2.
-- ~~Array assignment: shared, copy, or move?~~ **Decided:** shared references;
-  explicit clone Planned. See `SPEC.md` §3.3.
+- ~~Array assignment: shared, copy, or move?~~ **Decided and implemented:** shared references;
+  `.copy` (shallow) and `.deep_copy` (recursive) are available. See `SPEC.md` §3.3.
 - ~~Is `if` an expression, a statement, or both?~~ **Decided:** statement with
   `elif`/`else`; use `? :` for expression values. See `SPEC.md` §5.3 / §4.2.1.
 - ~~What syntax should replace or represent a conventional `while` loop?~~
@@ -401,7 +395,7 @@ revisions across a fixed task suite. Document protocol and results in
   **Decided:** trap by default (`R028` + `fix`); wrapping/modes Planned.
   See `SPEC.md` §4.3.
 - ~~Should string `.length` remain Unicode scalars, become bytes, or offer both?~~
-  **Decided:** `.len` = Unicode scalars; byte-count property Planned.
+  **Decided and implemented:** `.len` = Unicode scalars; `.byte_len` = UTF-8 bytes.
   See `SPEC.md` §3.2.
 - ~~Which side effects are allowed inside `.where` predicates in a future compiler?~~
   **Decided:** none relied upon — pure filter; `.each` for effects; checks Planned.

@@ -100,6 +100,9 @@ do not claim identical implementation.
 | --- | --- | --- | --- |
 | `items.each item { ... }` | Per-element block, in order | `for item in items` | Supported |
 | `value.len` | Array length or string Unicode scalars | `len(value)` | Supported |
+| `string.byte_len` | UTF-8 byte count of a string | `len(s)` in Go | Supported |
+| `array.copy` | Shallow copy of an array | `clone` / `[...arr]` | Supported |
+| `array.deep_copy` | Recursive deep clone of an array | deep clone | Supported |
 | `items.where(condition)` | Eager filter; `_` is current item | eager `filter` | Supported |
 | `items.sum` | Left-fold `+` from integer `0` | `sum` / `reduce` | Supported |
 | `input()` / `input(prompt)` | Read one line | stdin / `readLine` | Supported |
@@ -258,8 +261,10 @@ There is no static type checker yet. Type mistakes are usually runtime errors
 - **String `.len` (decided):** counts Unicode scalar values (same idea as Go
   runes), not UTF-8 bytes and not grapheme clusters. The short spelling `.len`
   is canonical; `.length` is rejected with `R007` and a `fix` suggesting `.len`.
-- A separate byte-count property (for example `.byte_len`) is **Planned** for
-  systems I/O—see [`IDEAS.md`](IDEAS.md).
+- **`.byte_len`** returns the UTF-8 byte count of a string as an integer. For
+  ASCII strings this equals `.len`; for multi-byte Unicode it is larger.
+  Useful for systems I/O that measures bytes, not characters.
+  Requires a string receiver; non-string → `R033`.
 
 ### 3.3 Arrays
 
@@ -278,9 +283,15 @@ There is no static type checker yet. Type mistakes are usually runtime errors
   binding; other names that still reference the previous array are unchanged.
 - `.where` always returns a **new** array. Mutating the result does not mutate
   the source.
-- Explicit cloning is **Planned** (for example `a.copy` or `copy(a)`); spelling
-  is not accepted until implemented—see [`IDEAS.md`](IDEAS.md). Move semantics
-  and ownership are out of scope until designed separately.
+- **`.copy`** returns a shallow copy of the array: a new top-level `[]any` with
+  the same elements. Mutations to the copy's indices do not affect the original,
+  but nested arrays within the copy still share identity with the originals.
+- **`.deep_copy`** returns a recursive clone: all nested arrays are also cloned.
+  Non-array values (integers, booleans, strings, functions) are copied by value
+  semantics and are not affected by either clone operation.
+- Both properties require an array receiver; non-array → `R031` (`.copy`) or
+  `R032` (`.deep_copy`).
+- Move semantics and ownership are out of scope until designed separately.
 
 Example of shared mutation:
 
@@ -867,7 +878,8 @@ Track progress in [`IDEAS.md`](IDEAS.md).
   immutability uses `const name := expression` with shallow semantics
   (implemented; `S030`/`R030` on reassignment).
 - **Array assignment (§3.3):** assignment and argument passing **share** the
-  array reference. Explicit clone is Planned; move/ownership are not implied.
+  array reference. Use `.copy` for a shallow clone or `.deep_copy` for a
+  recursive clone. Move/ownership are not implied.
 - **Integer overflow (§4.3):** overflow **traps** (`R028` with a `fix`
   suggestion). Wrapping ops / build modes are Planned.
 - **`.where` purity (§4.4):** predicates are **pure filtering**; side effects
@@ -875,7 +887,7 @@ Track progress in [`IDEAS.md`](IDEAS.md).
 - **Missing return (§5.8):** fall-off yields `nothing`; discarding in a call
   statement is OK; assigning or using `nothing` as a value is `R029`.
 - **String / array `.len` (§3.2, §4.4):** canonical short property; string `.len`
-  is Unicode scalars; byte count is Planned.
+  is Unicode scalars; byte count is `.byte_len` (Supported, `R033` on non-string).
 - **`while` (§5.5):** permanent Supported vocabulary; no alternate spellings.
 - **`if` (§5.3):** statement only, with `elif` / `else`. Value choice uses
   `? :` (§4.2.1). Expression-`if` is not part of the language.

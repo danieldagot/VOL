@@ -392,6 +392,12 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 			}
 			return deepCopyArray(array), nil
 		}
+		if node.Name.Lexeme == "byte_len" {
+			if text, ok := object.(string); ok {
+				return int64(len(text)), nil
+			}
+			return nil, i.runtime(node.Position(), "R033", "`.byte_len` requires a string.")
+		}
 		return nil, i.runtime(node.Position(), "R007", "Unknown property `"+node.Name.Lexeme+"`.")
 	case *Unary:
 		right, d := i.evaluate(node.Right)

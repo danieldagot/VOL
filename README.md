@@ -50,8 +50,8 @@ This README separates **what works today** from **long-term design targets**. Tr
 - `repeat` loops
 - `while` loops
 - arrays and array indexing
-- indexed array assignment (assignment and arguments share array identity)
-- array `.len` and string `.len` (Unicode scalar values; byte length Planned)
+- indexed array assignment (assignment and arguments share array identity; use `.copy` for a shallow clone or `.deep_copy` for a recursive clone)
+- array `.len` and string `.len` (Unicode scalar values) and string `.byte_len` (UTF-8 byte count)
 - array iteration with `.each` (imperative / side effects)
 - collection filtering with `.where(...)` (eager new array; pure predicates) and numeric aggregation with `.sum`
 - `print`
