@@ -198,18 +198,35 @@ func (p *parser) ifStatement(keyword Token) (Statement, *Diagnostic) {
 	if d != nil {
 		return nil, d
 	}
+	var elseIfs []ElseIfClause
 	var otherwise *Block
-	checkpoint := p.current
-	p.skipNewlines()
-	if p.match(TokenElse) {
-		otherwise, d = p.block()
-		if d != nil {
-			return nil, d
+	for {
+		checkpoint := p.current
+		p.skipNewlines()
+		if p.match(TokenElif) {
+			elifKeyword := p.previous()
+			elifCondition, d := p.expression()
+			if d != nil {
+				return nil, d
+			}
+			elifThen, d := p.block()
+			if d != nil {
+				return nil, d
+			}
+			elseIfs = append(elseIfs, ElseIfClause{Keyword: elifKeyword, Condition: elifCondition, Then: elifThen})
+			continue
 		}
-	} else {
+		if p.match(TokenElse) {
+			otherwise, d = p.block()
+			if d != nil {
+				return nil, d
+			}
+			break
+		}
 		p.current = checkpoint
+		break
 	}
-	return &IfStatement{Keyword: keyword, Condition: condition, Then: then, Else: otherwise}, nil
+	return &IfStatement{Keyword: keyword, Condition: condition, Then: then, ElseIfs: elseIfs, Else: otherwise}, nil
 }
 
 func (p *parser) repeatStatement(keyword Token) (Statement, *Diagnostic) {
@@ -261,9 +278,34 @@ func (p *parser) blockAfterOpen(open Token) (*Block, *Diagnostic) {
 	return block, nil
 }
 
-func (p *parser) expression() (Expression, *Diagnostic) { return p.or() }
-func (p *parser) or() (Expression, *Diagnostic)         { return p.binary(p.and, TokenOr) }
-func (p *parser) and() (Expression, *Diagnostic)        { return p.binary(p.equality, TokenAnd) }
+func (p *parser) expression() (Expression, *Diagnostic) { return p.ternary() }
+
+func (p *parser) ternary() (Expression, *Diagnostic) {
+	condition, d := p.or()
+	if d != nil {
+		return nil, d
+	}
+	if !p.match(TokenQuestion) {
+		return condition, nil
+	}
+	question := p.previous()
+	thenExpr, d := p.ternary()
+	if d != nil {
+		return nil, d
+	}
+	if !p.match(TokenColon) {
+		return nil, p.error(p.peek(), "E001", "Expected `:` after the true branch of `?`.")
+	}
+	colon := p.previous()
+	elseExpr, d := p.ternary()
+	if d != nil {
+		return nil, d
+	}
+	return &Conditional{Condition: condition, Question: question, Then: thenExpr, Colon: colon, Else: elseExpr}, nil
+}
+
+func (p *parser) or() (Expression, *Diagnostic)  { return p.binary(p.and, TokenOr) }
+func (p *parser) and() (Expression, *Diagnostic) { return p.binary(p.equality, TokenAnd) }
 func (p *parser) equality() (Expression, *Diagnostic) {
 	return p.binary(p.comparison, TokenEqualEqual, TokenBangEqual)
 }

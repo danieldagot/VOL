@@ -7,7 +7,7 @@ import (
 )
 
 func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
-	source := `name _value true false if else repeat while print fn return export and or not 42 3.5 "text" := = == != < <= > >= + - * / { } [ ] ( ) , .`
+	source := `name _value true false if elif else repeat while print fn return export and or not 42 3.5 "text" := : ? = == != < <= > >= + - * / { } [ ] ( ) , .`
 	tokens, diagnostic := lex("tokens.vol", source)
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
@@ -15,10 +15,10 @@ func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
 
 	want := []TokenKind{
 		TokenIdentifier, TokenIdentifier,
-		TokenTrue, TokenFalse, TokenIf, TokenElse, TokenRepeat, TokenWhile,
+		TokenTrue, TokenFalse, TokenIf, TokenElif, TokenElse, TokenRepeat, TokenWhile,
 		TokenPrint, TokenFn, TokenReturn, TokenExport, TokenAnd, TokenOr, TokenNot,
 		TokenInteger, TokenFloat, TokenString,
-		TokenColonEqual, TokenEqual, TokenEqualEqual, TokenBangEqual,
+		TokenColonEqual, TokenColon, TokenQuestion, TokenEqual, TokenEqualEqual, TokenBangEqual,
 		TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual,
 		TokenPlus, TokenMinus, TokenStar, TokenSlash,
 		TokenLeftBrace, TokenRightBrace, TokenLeftBracket, TokenRightBracket,
@@ -31,7 +31,7 @@ func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("token kinds\n got: %#v\nwant: %#v", got, want)
 	}
-	if tokens[0].Lexeme != "name" || tokens[15].Lexeme != "42" || tokens[17].Lexeme != "text" {
+	if tokens[0].Lexeme != "name" || tokens[16].Lexeme != "42" || tokens[18].Lexeme != "text" {
 		t.Fatalf("unexpected lexemes: %#v", tokens)
 	}
 }
@@ -80,7 +80,6 @@ func TestLexerDiagnostics(t *testing.T) {
 		line   int
 		column int
 	}{
-		{name: "colon without equals", source: ":", code: "E001", line: 1, column: 1},
 		{name: "bang without equals", source: "!", code: "E002", line: 1, column: 1},
 		{name: "unexpected character", source: "\n  @", code: "E003", line: 2, column: 3},
 		{name: "string ends at newline", source: "\"open\n", code: "E004", line: 1, column: 1},

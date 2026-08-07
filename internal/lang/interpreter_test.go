@@ -99,7 +99,7 @@ print count`
 func TestCollectionsCoverEmptyNestedUnicodeAndMutation(t *testing.T) {
 	source := `empty := []
 print empty
-print empty.length
+print empty.len
 print empty.sum
 print empty.where(_ > 0)
 items := [[1], [2, 3]]
@@ -108,11 +108,105 @@ print items
 alias := items[1]
 alias[0] = 8
 print items
-print "🙂é".length
+print "🙂é".len
 total := [1, 2.5, 3].sum
 print total
-items.each item { print item.length }`
+items.each item { print item.len }`
 	want := "[]\n0\n0\n[]\n[[9], [2, 3]]\n[[9], [8, 3]]\n2\n6.5\n1\n2\n"
+	output, diagnostic := run(t, source)
+	if diagnostic != nil || output != want {
+		t.Fatalf("output = %q, diagnostic = %#v", output, diagnostic)
+	}
+}
+
+func TestIntegerOverflowDiagnosticIncludesFix(t *testing.T) {
+	_, diagnostic := run(t, "print 9223372036854775807 + 1")
+	if diagnostic == nil || diagnostic.Code != "R028" {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+	if diagnostic.Fix == "" || !strings.Contains(diagnostic.Human("print 9223372036854775807 + 1"), "Suggestion:") {
+		t.Fatalf("expected LLM-friendly fix suggestion, got %#v", diagnostic)
+	}
+}
+
+func TestElifChainsSelectMatchingBranch(t *testing.T) {
+	output, diagnostic := run(t, `n := 2
+if n == 1 {
+    print "one"
+} elif n == 2 {
+    print "two"
+} elif n == 3 {
+    print "three"
+} else {
+    print "other"
+}`)
+	if diagnostic != nil || output != "two\n" {
+		t.Fatalf("output = %q, diagnostic = %#v", output, diagnostic)
+	}
+}
+
+func TestTernarySelectsBranchAndAssociatesRight(t *testing.T) {
+	output, diagnostic := run(t, `print true ? 1 : 2
+print false ? 1 : 2
+print false ? 1 : true ? 3 : 4
+ready := true
+value := ready ? "yes" : "no"
+print value`)
+	if diagnostic != nil || output != "1\n2\n3\nyes\n" {
+		t.Fatalf("output = %q, diagnostic = %#v", output, diagnostic)
+	}
+}
+
+func TestTernaryRequiresColon(t *testing.T) {
+	_, diagnostic := Parse("bad.vol", "print true ? 1")
+	if diagnostic == nil || diagnostic.Code != "E001" {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+}
+
+func TestLengthPropertySuggestsLen(t *testing.T) {
+	_, diagnostic := run(t, "print [1].length")
+	if diagnostic == nil || diagnostic.Code != "R007" || !strings.Contains(diagnostic.Fix, ".len") {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+}
+
+func TestMissingReturnNothingMayBeDiscardedButNotAssigned(t *testing.T) {
+	output, diagnostic := run(t, `fn work() {
+    print "ok"
+}
+work()`)
+	if diagnostic != nil || output != "ok\n" {
+		t.Fatalf("discard nothing: output = %q, diagnostic = %#v", output, diagnostic)
+	}
+	_, diagnostic = run(t, `fn work() {
+    print "ok"
+}
+value := work()`)
+	if diagnostic == nil || diagnostic.Code != "R029" || diagnostic.Fix == "" {
+		t.Fatalf("assign nothing: diagnostic = %#v", diagnostic)
+	}
+}
+
+func TestArrayAssignmentSharesReferenceAndRebindIsolates(t *testing.T) {
+	source := `a := [1, 2]
+b := a
+b[0] = 9
+print a
+print b
+b = [7]
+print a
+print b
+filtered := a.where(_ > 0)
+filtered[0] = 3
+print a
+print filtered
+fn bump(items) {
+    items[1] = 4
+}
+bump(a)
+print a`
+	want := "[9, 2]\n[9, 2]\n[9, 2]\n[7]\n[9, 2]\n[3, 2]\n[9, 4]\n"
 	output, diagnostic := run(t, source)
 	if diagnostic != nil || output != want {
 		t.Fatalf("output = %q, diagnostic = %#v", output, diagnostic)
@@ -185,7 +279,8 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "float repeat", source: "repeat 1.0 {}", code: "R005", message: "non-negative integer"},
 		{name: "each non-array", source: `"x".each item {}`, code: "R006", message: "requires an array"},
 		{name: "unknown property", source: "print [1].missing", code: "R007", message: "Unknown property"},
-		{name: "length wrong type", source: "print 1.length", code: "R007", message: "Unknown property"},
+		{name: "len wrong type", source: "print 1.len", code: "R007", message: "Unknown property"},
+		{name: "length renamed", source: "print [1].length", code: "R007", message: "Unknown property `length`"},
 		{name: "not wrong type", source: "print not 1", code: "R008", message: "Boolean"},
 		{name: "negative wrong type", source: `print -"x"`, code: "R009", message: "number"},
 		{name: "and left wrong type", source: "print 1 and true", code: "R010", message: "Boolean"},
@@ -196,6 +291,15 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "sum item type", source: `print [1, "x"].sum`, code: "R013", message: "integer and string"},
 		{name: "integer division zero", source: "print 1 / 0", code: "R014", message: "Division by zero"},
 		{name: "float division zero", source: "print 1.0 / 0.0", code: "R014", message: "Division by zero"},
+		{name: "integer add overflow", source: "print 9223372036854775807 + 1", code: "R028", message: "Integer overflow"},
+		{name: "integer add min overflow", source: "min := 0 - 9223372036854775807 - 1\nprint min + min", code: "R028", message: "Integer overflow"},
+		{name: "integer sub overflow", source: "min := 0 - 9223372036854775807 - 1\nprint min - 1", code: "R028", message: "Integer overflow"},
+		{name: "integer mul overflow", source: "print 4611686018427387904 * 2", code: "R028", message: "Integer overflow"},
+		{name: "integer div overflow", source: "min := 0 - 9223372036854775807 - 1\nprint min / -1", code: "R028", message: "Integer overflow"},
+		{name: "integer neg overflow", source: "min := 0 - 9223372036854775807 - 1\nprint -min", code: "R028", message: "Integer overflow"},
+		{name: "nothing assigned", source: "fn f() {}\nx := f()", code: "R029", message: "Expected a value, got `nothing`"},
+		{name: "nothing printed", source: "fn f() {}\nprint f()", code: "R029", message: "Expected a value, got `nothing`"},
+		{name: "nothing in expression", source: "fn f() {}\nprint 1 + f()", code: "R029", message: "Expected a value, got `nothing`"},
 		{name: "index float", source: "print [1][0.0]", code: "R015", message: "integer"},
 		{name: "index negative", source: "print [1][-1]", code: "R016", message: "outside length 1"},
 		{name: "index at length", source: "print [1][1]", code: "R016", message: "outside length 1"},

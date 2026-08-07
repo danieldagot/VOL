@@ -1,4 +1,4 @@
-print "Argument count: " + string(args.length)
+print "Argument count: " + string(args.len)
 
 args.each argument {
     print "Received: " + argument

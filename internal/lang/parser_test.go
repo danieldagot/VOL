@@ -5,7 +5,7 @@ import "testing"
 func TestParserBuildsStandaloneBlocksAndPostfixChains(t *testing.T) {
 	program, diagnostic := Parse("shape.vol", `{ value := [[1, 2]]
 print value[0][1]
-print value.where(_ == value[0]).length }`)
+print value.where(_ == value[0]).len }`)
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
 	}
@@ -25,7 +25,7 @@ print value.where(_ == value[0]).length }`)
 		t.Fatalf("nested index collection = %T", outerIndex.Collection)
 	}
 	property := block.Body.Statements[2].(*PrintStatement).Value.(*Property)
-	if property.Name.Lexeme != "length" {
+	if property.Name.Lexeme != "len" {
 		t.Fatalf("property name = %q", property.Name.Lexeme)
 	}
 	if _, ok := property.Object.(*Call); !ok {

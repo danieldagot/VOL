@@ -15,7 +15,7 @@ type lexer struct {
 }
 
 var keywords = map[string]TokenKind{
-	"true": TokenTrue, "false": TokenFalse, "if": TokenIf, "else": TokenElse,
+	"true": TokenTrue, "false": TokenFalse, "if": TokenIf, "elif": TokenElif, "else": TokenElse,
 	"repeat": TokenRepeat, "while": TokenWhile, "print": TokenPrint,
 	"fn": TokenFn, "return": TokenReturn, "export": TokenExport,
 	"and": TokenAnd, "or": TokenOr, "not": TokenNot,
@@ -57,10 +57,14 @@ func lex(file, source string) ([]Token, *Diagnostic) {
 			tokens = append(tokens, token)
 		case ':':
 			l.advance()
-			if !l.match('=') {
-				return nil, l.errorAt(pos, "E001", "Expected `=` after `:`.")
+			if l.match('=') {
+				tokens = append(tokens, Token{Kind: TokenColonEqual, Lexeme: ":=", Pos: pos})
+			} else {
+				tokens = append(tokens, Token{Kind: TokenColon, Lexeme: ":", Pos: pos})
 			}
-			tokens = append(tokens, Token{Kind: TokenColonEqual, Lexeme: ":=", Pos: pos})
+		case '?':
+			l.advance()
+			tokens = append(tokens, Token{Kind: TokenQuestion, Lexeme: "?", Pos: pos})
 		case '=':
 			l.advance()
 			kind, text := TokenEqual, "="

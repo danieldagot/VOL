@@ -1,5 +1,5 @@
 name := input("What is your name? ")
-assert(name.length > 0, "Name cannot be empty.")
+assert(name.len > 0, "Name cannot be empty.")
 
 print "Hello, " + name
-print "You passed " + string(args.length) + " command arguments."
+print "You passed " + string(args.len) + " command arguments."

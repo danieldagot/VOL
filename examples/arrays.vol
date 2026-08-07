@@ -1,7 +1,7 @@
 scores := [72, 95, 81, 64]
 
 print scores
-print "Students: " + string(scores.length)
+print "Students: " + string(scores.len)
 
 scores[3] = 70
 

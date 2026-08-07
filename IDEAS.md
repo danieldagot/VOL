@@ -2,7 +2,31 @@
 
 This document collects ideas that may shape VOL in the future.
 
-Items here are exploratory, not promises. Accepted language behavior belongs in `SYNTAX.md` and, eventually, the formal specification.
+Items here are exploratory, not promises. Implemented language behavior belongs in
+`SPEC.md`. Long-term vision without executable semantics stays here until it is
+specified and tested.
+
+## Near-Term Priority: Precise Core Before New Features
+
+Stop expanding the language surface until the current core is boringly precise:
+
+- values, variables, functions
+- `if` / `elif` / `else`, `repeat`, `while`, `? :`
+- arrays, `.each`, `.where`, `.sum`
+- built-ins already accepted by the interpreter
+
+Immediate documentation and design work:
+
+- [x] Write `SPEC.md` covering lexical grammar, expression grammar, types/values,
+      scopes, evaluation order, numeric behavior, arrays/strings, mutation,
+      functions, control flow, and failure behavior for the implemented core.
+- [ ] Keep `SPEC.md` synchronized whenever interpreter behavior changes.
+- [ ] Resolve the open decisions listed in `SPEC.md` section 11 one at a time,
+      with tests, before adding major new syntax.
+- [ ] Write `LLM_BENCHMARK.md` with a small falsifiable task suite and metrics
+      based on task success relative to total generation, diagnostic, and repair
+      tokens—not source token count alone.
+- [ ] Keep Planned syntax out of `SPEC.md`; only Supported and Provisional forms belong there.
 
 ## Near-Term Foundation
 
@@ -23,17 +47,163 @@ Items here are exploratory, not promises. Accepted language behavior belongs in 
 
 - [x] Integer, floating-point, Boolean, and string literals.
 - [x] Variables with inferred types.
-- [ ] Explicit mutability rules.
+- [x] Mutability default: bindings are mutable (`:=` / `=`). See `SPEC.md` §5.2.
+- [ ] Opt-in immutable bindings with `const name := expression` (shallow).
 - [x] Arithmetic, comparison, and Boolean operators.
+- [x] Integer overflow traps by default (`R028`). See `SPEC.md` §4.3.
+- [ ] Wrapping integer arithmetic and/or overflow build modes.
+- [ ] JSON diagnostic output from the `vol` CLI (struct already JSON-tagged).
 - [x] Blocks using braces.
-- [x] `if` and `else` statements.
+- [x] `if` / `elif` / `else` statements.
+- [x] Conditional operator `? :` (expression form; `if` stays a statement).
 - [x] `repeat` loops.
-- [x] Conditional loops (provisional `while`).
+- [x] Conditional loops with `while` (Supported; no alternate spellings).
 - [x] Arrays, indexing, and bounds checking.
+- [x] Array assignment shares references (see `SPEC.md` §3.3).
+- [ ] Explicit array clone (`a.copy` or `copy(a)`; spelling undecided).
 - [x] Collection iteration with `.each`.
+- [x] Filtering with `.where` and aggregation with `.sum`.
+- [x] `.where` predicates are pure by rule; side effects use `.each` (`SPEC.md` §4.4).
+- [ ] Purity diagnostics / checks for `.where` predicates.
 - [x] Functions, parameters, calls, and return values.
+- [x] Missing return yields `nothing`; using it as a value is `R029` (`SPEC.md` §5.8).
+- [ ] Typed void vs valued functions (require `return` on all paths when typed).
 - [x] Comments.
-- [x] Basic built-ins for printing, input, length, assertions, conversion, and arguments.
+- [x] Basic built-ins for printing, input, `.len`, assertions, conversion, and arguments.
+- [x] `.len` is canonical (Unicode scalars for strings); `.length` rejected with fix hint.
+- [ ] String byte-count property (e.g. `.byte_len`) for systems I/O.
+
+## Planned Syntax (Not Accepted Today)
+
+These forms must not be documented as Supported or Provisional until implemented.
+
+### String byte length
+
+Decided language rule (already in `SPEC.md` §3.2 / §4.4): `.len` counts Unicode
+scalar values for strings and element count for arrays. Spelling is `.len`, not
+`.length`.
+
+Planned for systems I/O (not accepted today):
+
+```vol
+print "🙂".len       // 1  (scalar)
+print "🙂".byte_len  // 4  (UTF-8 bytes) — spelling may be `.byte_len` or `.bytes`
+```
+
+Do not treat grapheme-cluster counting as `.len`.
+
+### Typed void vs valued functions
+
+Decided runtime rule (already in `SPEC.md` §5.8): falling off a function yields
+`nothing`; call statements may discard it; `:=` / `=` / other value contexts
+reject `nothing` with `R029`.
+
+When static types exist, Planned refinements:
+
+- valued functions must `return` on every path
+- void / procedure functions may omit `return`
+- better diagnostics naming the callee that produced `nothing`
+
+### `.where` purity checks
+
+Decided language rule (already in `SPEC.md` §4.4): `.where` predicates are pure
+filters; use `.each` for side effects. The prototype still evaluates predicate
+expressions eagerly and does not yet reject impurity.
+
+Planned:
+
+- diagnostics when a `.where` predicate clearly has side effects (or cannot be
+  proven pure), with a `fix` suggesting `.each` when appropriate
+- allow clearly pure helper calls such as Boolean predicates over `_`
+- treat purity as a prerequisite for any future fusion or parallel `.where`
+
+### Wrapping integer arithmetic / overflow modes
+
+Decided language rule (already in `SPEC.md` §4.3): integer overflow **traps** by
+default (`R028`) with a human message and machine-readable `fix` field so LLMs
+can help repair programs.
+
+Planned escapes (not accepted today):
+
+- explicit wrapping operations, and/or
+- build modes such as debug-trap (default today) vs release-wrap
+
+Also Planned: CLI flag or formatter output that emits diagnostics as JSON
+(the `Diagnostic` struct is already JSON-tagged; `vol` currently prints human
+form only).
+
+### Explicit array clone
+
+Decided language rule (already in `SPEC.md` §3.3): `:=` / `=` and argument
+passing share array identity. Isolation requires an explicit clone later:
+
+```vol
+a := [1, 2]
+b := a.copy      // or copy(a) — pick one spelling when implementing
+b[0] = 9
+print a          // [1, 2]
+print b          // [9, 2]
+```
+
+Design notes when implementing:
+
+- Prefer one canonical form (`a.copy` fits `.len` / `.where`, or `copy(a)` as
+  a builtin). Document the choice in `SPEC.md` only after it works and is tested.
+- Decide shallow vs deep clone for nested arrays before shipping.
+- Do not treat clone as move semantics or ownership.
+
+### Opt-in `const` bindings
+
+Decided language rule (default already in `SPEC.md` §5.2): bindings are mutable
+by default. Freeze is opt-in:
+
+```vol
+count := 1
+count = 2          // OK
+
+const limit := 10
+limit = 11         // error: cannot assign to const binding
+
+const a := [1, 2]
+a = [3]            // error: cannot rebind
+a[0] = 9           // OK for now (shallow const); array rules still apply
+```
+
+Design notes when implementing:
+
+- Spelling is `const name := expression` (not `$=`, not a `mut` keyword).
+- `const` applies only at declaration; there is no `const` on bare `=`.
+- Shadowing follows the same scope rules as mutable bindings.
+- Function parameters stay mutable until a separate parameter rule is designed.
+- Add stable diagnostic codes and tests for reassignment, redeclare, and indexed
+  write through a `const` array binding.
+
+### Parallel intent
+
+```vol
+parallel {
+    process(requests)
+}
+```
+
+Automatic parallelization must preserve correctness and predictable resource use.
+Exact semantics, scheduling, allocation, and failure behavior are undecided.
+
+### Modules and imports
+
+VOL may use folders as module boundaries, with project-root-relative imports or
+aliases from `vol.config.json`:
+
+```vol
+import "services/users"
+import "@db/models"
+```
+
+Symbol-selection syntax and the module resolver are not implemented.
+
+### Block comments
+
+Block-comment spelling has not been decided.
 
 ## Formatter
 
@@ -55,7 +225,8 @@ vol fmt --check .
 
 Formatting must only change presentation, never program structure. A separate
 future simplifier may recognize explicit algorithms and suggest equivalent VOL
-semantic operations, while preserving both source styles as valid language forms.
+semantic operations, while preserving both source styles as valid language forms
+when they express different or equivalent intents under proven rules.
 
 Possible workflow:
 
@@ -111,7 +282,7 @@ Initial features:
 Future VOL-specific features:
 
 - [ ] Display inferred types.
-- [ ] Display ownership and lifetime decisions.
+- [ ] Display ownership and lifetime decisions once those semantics exist.
 - [ ] Show stack and heap allocation decisions.
 - [ ] Warn about expensive or unbounded allocation.
 - [ ] Explain compiler optimizations.
@@ -142,7 +313,19 @@ Planned execution stages:
 
 ## Safety and Memory
 
-- [ ] Infer ownership, borrowing, and lifetimes.
+Ownership, borrowing, and lifetimes are research goals, not current language
+semantics. Before claiming inference, the specification must answer at least:
+
+- Who owns returned memory?
+- Can references escape a scope?
+- Can two mutable aliases exist?
+- What happens when inference is ambiguous?
+- When is a value copied, moved, or reference-counted?
+- How does foreign-function memory work?
+
+Checklist:
+
+- [ ] Define ownership and aliasing rules before inference claims.
 - [ ] Prefer stack allocation when values do not escape.
 - [ ] Avoid a mandatory garbage collector.
 - [ ] Avoid hidden unbounded allocation.
@@ -150,7 +333,7 @@ Planned execution stages:
 - [ ] Make inferred allocation and ownership inspectable.
 - [ ] Define selectable safety and optimization build modes.
 
-Guiding rule:
+Guiding rule once semantics exist:
 
 > Infer by default. Expose control when necessary.
 
@@ -159,7 +342,7 @@ Guiding rule:
 - [ ] Compile-time specialization.
 - [ ] Whole-program dead-code elimination.
 - [ ] Escape analysis.
-- [ ] Automatic vectorization.
+- [ ] Automatic vectorization of bulk operations with defined semantics.
 - [ ] Safe automatic parallelization.
 - [ ] Data-oriented memory-layout optimization.
 - [ ] Profile-guided optimization.
@@ -184,26 +367,53 @@ Priority areas:
 - [ ] C interoperability.
 - [ ] Cross-compilation.
 
-## Compiler Metrics
+## Compiler Metrics and LLM Evaluation
 
-Every build may report:
+Every future build may report:
 
 - compile time
 - binary size
 - estimated memory use
 - optimization level
-- source token count
+- source token count for a documented tokenizer
 - semantic density score
 - Meaning per Token (MPT)
 
-The definitions of semantic density and MPT must be objective, reproducible, and difficult to game.
+MPT is not defined yet. A useful definition must be objective, reproducible,
+tokenizer-aware, and hard to game. Raw source token count is insufficient because
+tokenizers differ across models and shorter source can increase repair cost.
+
+Preferred experimental metric direction:
+
+```text
+task success / total tokens consumed
+```
+
+including generated code, compiler or runtime diagnostics, repair prompts, and
+revisions across a fixed task suite. Document protocol and results in
+`LLM_BENCHMARK.md` when that work begins.
 
 ## Open Design Questions
 
-- What is VOL's exact mutability model?
-- Is `if` an expression, a statement, or both?
-- What syntax should replace or represent a conventional `while` loop?
-- Are functions declared with a keyword or inferred from their form?
+- ~~What is VOL's exact mutability model?~~ **Decided:** mutable by default;
+  opt-in `const name := expr` (shallow; not implemented). See `SPEC.md` §5.2.
+- ~~Array assignment: shared, copy, or move?~~ **Decided:** shared references;
+  explicit clone Planned. See `SPEC.md` §3.3.
+- ~~Is `if` an expression, a statement, or both?~~ **Decided:** statement with
+  `elif`/`else`; use `? :` for expression values. See `SPEC.md` §5.3 / §4.2.1.
+- ~~What syntax should replace or represent a conventional `while` loop?~~
+  **Decided:** keep `while` as Supported. See `SPEC.md` §5.5.
+- ~~Should integer overflow trap, wrap, or use another rule outside the prototype?~~
+  **Decided:** trap by default (`R028` + `fix`); wrapping/modes Planned.
+  See `SPEC.md` §4.3.
+- ~~Should string `.length` remain Unicode scalars, become bytes, or offer both?~~
+  **Decided:** `.len` = Unicode scalars; byte-count property Planned.
+  See `SPEC.md` §3.2.
+- ~~Which side effects are allowed inside `.where` predicates in a future compiler?~~
+  **Decided:** none relied upon — pure filter; `.each` for effects; checks Planned.
+  See `SPEC.md` §4.4.
+- ~~Missing return value?~~ **Decided:** `nothing` if unused as a statement
+  result; `R029` if assigned or used as a value. See `SPEC.md` §5.8.
 - How are fallible operations and errors represented?
 - How are nullable or optional values represented?
 - How are structs, enums, and tagged unions declared?
@@ -212,3 +422,4 @@ The definitions of semantic density and MPT must be objective, reproducible, and
 - How does a programmer constrain inferred allocation?
 - What guarantees does automatic parallelization provide?
 - Which build modes control bounds and overflow checking?
+- Which ownership questions can be inferred locally, and which need API contracts?

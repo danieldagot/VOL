@@ -17,7 +17,7 @@ func TestResolverValidatesEveryExpressionShape(t *testing.T) {
 		{name: "array element", source: "print [missing]", want: "missing"},
 		{name: "index collection", source: "print missing[0]", want: "missing"},
 		{name: "index expression", source: "items := [1]\nprint items[missing]", want: "missing"},
-		{name: "property object", source: "print missing.length", want: "missing"},
+		{name: "property object", source: "print missing.len", want: "missing"},
 		{name: "call argument", source: "print string(missing)", want: "missing"},
 		{name: "where object", source: "print missing.where(_ > 0)", want: "missing"},
 		{name: "where condition", source: "items := [1]\nprint items.where(_ > missing)", want: "missing"},

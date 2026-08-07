@@ -9,6 +9,9 @@ import (
 	"strings"
 )
 
+const overflowFix = "Use smaller values, switch to floating-point, or wait for planned wrapping arithmetic / build modes."
+const nothingFix = "Return a value from the function, or call it as a statement without assigning or using the result."
+
 type environment struct {
 	parent *environment
 	values map[string]any
@@ -111,6 +114,9 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 		if d != nil {
 			return d
 		}
+		if d := i.requireValue(value, node.Value.Position()); d != nil {
+			return d
+		}
 		if _, exists := i.env.values[node.Name.Lexeme]; exists {
 			return i.runtime(node.Name.Pos, "R001", "Variable `"+node.Name.Lexeme+"` is already declared in this scope.")
 		}
@@ -118,6 +124,9 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 	case *Assignment:
 		value, d := i.evaluate(node.Value)
 		if d != nil {
+			return d
+		}
+		if d := i.requireValue(value, node.Value.Position()); d != nil {
 			return d
 		}
 		switch target := node.Target.(type) {
@@ -128,6 +137,9 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 		case *Index:
 			collection, d := i.evaluate(target.Collection)
 			if d != nil {
+				return d
+			}
+			if d := i.requireValue(collection, target.Collection.Position()); d != nil {
 				return d
 			}
 			array, ok := collection.([]any)
@@ -145,13 +157,20 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 		if d != nil {
 			return d
 		}
+		if d := i.requireValue(value, node.Value.Position()); d != nil {
+			return d
+		}
 		fmt.Fprintln(i.output, display(value))
 	case *ExpressionStatement:
+		// Discarding a call result is allowed, including `nothing` from a missing return.
 		_, d := i.evaluate(node.Value)
 		return d
 	case *IfStatement:
 		condition, d := i.evaluate(node.Condition)
 		if d != nil {
+			return d
+		}
+		if d := i.requireValue(condition, node.Condition.Position()); d != nil {
 			return d
 		}
 		truth, ok := condition.(bool)
@@ -161,12 +180,31 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 		if truth {
 			return i.executeBlock(node.Then, newEnvironment(i.env))
 		}
+		for _, clause := range node.ElseIfs {
+			condition, d := i.evaluate(clause.Condition)
+			if d != nil {
+				return d
+			}
+			if d := i.requireValue(condition, clause.Condition.Position()); d != nil {
+				return d
+			}
+			truth, ok := condition.(bool)
+			if !ok {
+				return i.runtime(clause.Condition.Position(), "R004", "Condition must be Boolean.")
+			}
+			if truth {
+				return i.executeBlock(clause.Then, newEnvironment(i.env))
+			}
+		}
 		if node.Else != nil {
 			return i.executeBlock(node.Else, newEnvironment(i.env))
 		}
 	case *RepeatStatement:
 		count, d := i.evaluate(node.Count)
 		if d != nil {
+			return d
+		}
+		if d := i.requireValue(count, node.Count.Position()); d != nil {
 			return d
 		}
 		times, ok := count.(int64)
@@ -184,6 +222,9 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 			if d != nil {
 				return d
 			}
+			if d := i.requireValue(condition, node.Condition.Position()); d != nil {
+				return d
+			}
 			truth, ok := condition.(bool)
 			if !ok {
 				return i.runtime(node.Condition.Position(), "R004", "Condition must be Boolean.")
@@ -198,6 +239,9 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 	case *EachStatement:
 		collection, d := i.evaluate(node.Collection)
 		if d != nil {
+			return d
+		}
+		if d := i.requireValue(collection, node.Collection.Position()); d != nil {
 			return d
 		}
 		array, ok := collection.([]any)
@@ -244,12 +288,18 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 			if d != nil {
 				return nil, d
 			}
+			if d := i.requireValue(value, element.Position()); d != nil {
+				return nil, d
+			}
 			values = append(values, value)
 		}
 		return values, nil
 	case *Index:
 		collection, d := i.evaluate(node.Collection)
 		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(collection, node.Collection.Position()); d != nil {
 			return nil, d
 		}
 		array, ok := collection.([]any)
@@ -266,12 +316,24 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if d != nil {
 			return nil, d
 		}
-		if node.Name.Lexeme == "length" {
+		if d := i.requireValue(object, node.Object.Position()); d != nil {
+			return nil, d
+		}
+		if node.Name.Lexeme == "len" {
 			if array, ok := object.([]any); ok {
 				return int64(len(array)), nil
 			}
 			if text, ok := object.(string); ok {
 				return int64(len([]rune(text))), nil
+			}
+		}
+		if node.Name.Lexeme == "length" {
+			return nil, &Diagnostic{
+				Code:    "R007",
+				Message: "Unknown property `length`.",
+				File:    i.file,
+				Pos:     node.Name.Pos,
+				Fix:     "Use `.len` for array element count or string Unicode scalar count.",
 			}
 		}
 		if node.Name.Lexeme == "sum" {
@@ -295,6 +357,9 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if d != nil {
 			return nil, d
 		}
+		if d := i.requireValue(right, node.Right.Position()); d != nil {
+			return nil, d
+		}
 		if node.Operator.Kind == TokenNot {
 			value, ok := right.(bool)
 			if !ok {
@@ -303,6 +368,9 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 			return !value, nil
 		}
 		if value, ok := right.(int64); ok {
+			if value == math.MinInt64 {
+				return nil, i.integerOverflow(node.Operator.Pos, "-")
+			}
 			return -value, nil
 		}
 		if value, ok := right.(float64); ok {
@@ -311,6 +379,36 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		return nil, i.runtime(node.Position(), "R009", "Unary `-` requires a number.")
 	case *Binary:
 		return i.evaluateBinary(node)
+	case *Conditional:
+		condition, d := i.evaluate(node.Condition)
+		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(condition, node.Condition.Position()); d != nil {
+			return nil, d
+		}
+		truth, ok := condition.(bool)
+		if !ok {
+			return nil, i.runtime(node.Condition.Position(), "R004", "Condition must be Boolean.")
+		}
+		if truth {
+			value, d := i.evaluate(node.Then)
+			if d != nil {
+				return nil, d
+			}
+			if d := i.requireValue(value, node.Then.Position()); d != nil {
+				return nil, d
+			}
+			return value, nil
+		}
+		value, d := i.evaluate(node.Else)
+		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(value, node.Else.Position()); d != nil {
+			return nil, d
+		}
+		return value, nil
 	case *Call:
 		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "where" {
 			return i.evaluateWhere(property, node.Arguments)
@@ -319,11 +417,17 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if d != nil {
 			return nil, d
 		}
+		if d := i.requireValue(callee, node.Callee.Position()); d != nil {
+			return nil, d
+		}
 		if builtin, ok := callee.(*builtinFunction); ok {
 			arguments := make([]any, len(node.Arguments))
 			for index, argument := range node.Arguments {
 				arguments[index], d = i.evaluate(argument)
 				if d != nil {
+					return nil, d
+				}
+				if d := i.requireValue(arguments[index], argument.Position()); d != nil {
 					return nil, d
 				}
 			}
@@ -342,6 +446,9 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 			if d != nil {
 				return nil, d
 			}
+			if d := i.requireValue(arguments[index], argument.Position()); d != nil {
+				return nil, d
+			}
 		}
 		return i.call(fn, arguments)
 	}
@@ -354,6 +461,9 @@ func (i *interpreter) evaluateWhere(property *Property, arguments []Expression) 
 	}
 	value, d := i.evaluate(property.Object)
 	if d != nil {
+		return nil, d
+	}
+	if d := i.requireValue(value, property.Object.Position()); d != nil {
 		return nil, d
 	}
 	array, ok := value.([]any)
@@ -369,6 +479,9 @@ func (i *interpreter) evaluateWhere(property *Property, arguments []Expression) 
 		condition, diagnostic := i.evaluate(arguments[0])
 		i.env = previous
 		if diagnostic != nil {
+			return nil, diagnostic
+		}
+		if diagnostic := i.requireValue(condition, arguments[0].Position()); diagnostic != nil {
 			return nil, diagnostic
 		}
 		matches, ok := condition.(bool)
@@ -411,6 +524,9 @@ func (i *interpreter) evaluateBinary(node *Binary) (any, *Diagnostic) {
 	if d != nil {
 		return nil, d
 	}
+	if d := i.requireValue(left, node.Left.Position()); d != nil {
+		return nil, d
+	}
 	if node.Operator.Kind == TokenAnd {
 		value, ok := left.(bool)
 		if !ok {
@@ -431,6 +547,9 @@ func (i *interpreter) evaluateBinary(node *Binary) (any, *Diagnostic) {
 	}
 	right, d := i.evaluate(node.Right)
 	if d != nil {
+		return nil, d
+	}
+	if d := i.requireValue(right, node.Right.Position()); d != nil {
 		return nil, d
 	}
 	return i.evaluateBinaryValues(node.Operator, left, right)
@@ -477,14 +596,36 @@ func (i *interpreter) evaluateBinaryValues(operator Token, left, right any) (any
 func (i *interpreter) integerBinary(operator Token, a, b int64) (any, *Diagnostic) {
 	switch operator.Kind {
 	case TokenPlus:
-		return a + b, nil
+		sum := a + b
+		// Two negatives never sum to zero mathematically; MinInt64+MinInt64 wraps to 0.
+		if (a > 0 && b > 0 && sum < 0) || (a < 0 && b < 0 && sum >= 0) {
+			return nil, i.integerOverflow(operator.Pos, "+")
+		}
+		return sum, nil
 	case TokenMinus:
-		return a - b, nil
+		diff := a - b
+		if (b > 0 && a < math.MinInt64+b) || (b < 0 && a > math.MaxInt64+b) {
+			return nil, i.integerOverflow(operator.Pos, "-")
+		}
+		return diff, nil
 	case TokenStar:
-		return a * b, nil
+		if a == 0 || b == 0 {
+			return int64(0), nil
+		}
+		if (a == math.MinInt64 && b == -1) || (b == math.MinInt64 && a == -1) {
+			return nil, i.integerOverflow(operator.Pos, "*")
+		}
+		product := a * b
+		if product/a != b {
+			return nil, i.integerOverflow(operator.Pos, "*")
+		}
+		return product, nil
 	case TokenSlash:
 		if b == 0 {
 			return nil, i.runtime(operator.Pos, "R014", "Division by zero.")
+		}
+		if a == math.MinInt64 && b == -1 {
+			return nil, i.integerOverflow(operator.Pos, "/")
 		}
 		return a / b, nil
 	case TokenLess:
@@ -566,6 +707,9 @@ func (i *interpreter) arrayIndex(expr Expression, length int) (int, *Diagnostic)
 	if d != nil {
 		return 0, d
 	}
+	if d := i.requireValue(value, expr.Position()); d != nil {
+		return 0, d
+	}
 	index, ok := value.(int64)
 	if !ok {
 		return 0, i.runtime(expr.Position(), "R015", "Array index must be an integer.")
@@ -578,7 +722,33 @@ func (i *interpreter) arrayIndex(expr Expression, length int) (int, *Diagnostic)
 func (i *interpreter) runtime(pos Position, code, message string) *Diagnostic {
 	return &Diagnostic{Code: code, Message: message, File: i.file, Pos: pos}
 }
+
+func (i *interpreter) integerOverflow(pos Position, op string) *Diagnostic {
+	return &Diagnostic{
+		Code:    "R028",
+		Message: fmt.Sprintf("Integer overflow in `%s`.", op),
+		File:    i.file,
+		Pos:     pos,
+		Fix:     overflowFix,
+	}
+}
+
+func (i *interpreter) requireValue(value any, pos Position) *Diagnostic {
+	if value != nil {
+		return nil
+	}
+	return &Diagnostic{
+		Code:    "R029",
+		Message: "Expected a value, got `nothing`.",
+		File:    i.file,
+		Pos:     pos,
+		Fix:     nothingFix,
+	}
+}
 func display(value any) string {
+	if value == nil {
+		return "nothing"
+	}
 	if array, ok := value.([]any); ok {
 		result := "["
 		for index, item := range array {

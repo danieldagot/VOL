@@ -64,7 +64,7 @@ func TestArrayIndexAndLength(t *testing.T) {
 	output, diagnostic := run(t, `items := [1, 2, 3]
 items[1] = 8
 print items
-print items.length`)
+print items.len`)
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
 	}
@@ -219,7 +219,7 @@ func TestInputStringAssertAndArgs(t *testing.T) {
 assert(name == "Ada", "unexpected name")
 print "Hello, " + name
 print string(42)
-print args.length
+print args.len
 print args[0]`
 	output, diagnostic := runWith(t, source, "Ada\n", "first", "second")
 	if diagnostic != nil {

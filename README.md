@@ -1,7 +1,6 @@
 # VOL
 
-> **Vector-Oriented Language**  
-> Also known as the **Vibe-Oriented Language**.
+> **Vocabulary Optimized Language**
 
 VOL is an experimental systems and backend programming language designed for humans and Large Language Models.
 
@@ -15,53 +14,51 @@ VOL asks what a systems programming language should look like when LLMs are firs
 
 Its primary goal is to maximize **semantic density**: express more intent with fewer tokens while preserving deterministic structure, readability, safety, and native performance. The language should be efficient for an LLM to generate, understand, review, modify, and debug.
 
-Compiler inference supports that goal. The programmer or agent describes **what** should happen, and the compiler handles implementation details that do not need to consume source tokens. When correctness, performance, memory layout, or interoperability requires control, those decisions remain inspectable and constrainable.
+That goal is a research direction, not a measured property of the current prototype. Token counts also depend on each model's tokenizer, so “fewer tokens” alone is not a success metric. The intended long-term measure is task success relative to total tokens consumed across generation, diagnostics, and repair. See [`IDEAS.md`](IDEAS.md).
 
-VOL is designed around:
+## Project Status
 
-- semantic density: fewer tokens with more meaning
-- syntax designed for reliable LLM generation and comprehension
+**VOL is currently a very early tree-walking interpreter prototype.**
+There is no native compiler, no static type system, no ownership or borrow checker, no standard library, and no backend. What exists is a minimal interpreter that can execute small programs written in a provisional syntax.
+
+This README separates **what works today** from **long-term design targets**. Treat vision language as a target, not a shipped reality.
+
+### Design Targets (Not Implemented)
+
+- semantic density with measurable LLM workflow metrics
 - deterministic structure that is easy for tools and agents to transform
 - structured human-readable and machine-readable diagnostics
 - memory safety without a mandatory garbage collector
 - native, predictable performance
-- compiler-inferred ownership, lifetimes, allocation, and optimization
+- compiler-assisted ownership, allocation, and optimization where semantics can be specified
 - batteries-included systems and backend capabilities
 - deterministic formatting and compiler output
 - explicit control when correctness, performance, or interoperability requires it
-
-VOL is not intended to be another spelling of Rust, Go, or C. It is an AI-native language experiment targeting the same systems and backend problem space.
-
-## Project Status
-
-**VOL is currently a very early tree-walking interpreter prototype.**  
-Most of the language described above does not exist yet. There is no compiler, no ownership checker, no borrow checker, no type system, no backend, and no standard library. What exists is a minimal interpreter that can execute small programs written in a provisional syntax.
-
-This README describes both the current prototype and the long-term direction. Treat the vision as a design target, not a shipped reality.
 
 ### What Actually Works
 
 - integer, floating-point, Boolean, and string literals
 - inferred variable declarations with `:=`
 - variable assignment with `=`
-- arithmetic operators: `+`, `-`, `*`, `/`
+- arithmetic operators: `+`, `-`, `*`, `/` (integer overflow traps with `R028`)
 - comparison operators: `==`, `!=`, `<`, `<=`, `>`, `>=`
 - Boolean operators: `and`, `or`, `not`
 - brace-delimited lexical scopes
-- `if` and `else`
+- `if` / `elif` / `else` statements
+- conditional operator `cond ? a : b`
 - `repeat` loops
-- provisional `while` loops
+- `while` loops
 - arrays and array indexing
-- indexed array assignment
-- array and string `.length`
-- array iteration with `.each`
-- collection filtering with `.where(...)` and numeric aggregation with `.sum`
+- indexed array assignment (assignment and arguments share array identity)
+- array `.len` and string `.len` (Unicode scalar values; byte length Planned)
+- array iteration with `.each` (imperative / side effects)
+- collection filtering with `.where(...)` (eager new array; pure predicates) and numeric aggregation with `.sum`
 - `print`
 - interactive text input with `input()` or `input(prompt)`
 - runtime checks with `assert(condition)` or `assert(condition, message)`
 - value-to-string conversion with `string(value)`
 - command-line arguments through the built-in `args` array
-- functions declared with `fn`, parameters, calls, and `return`
+- functions declared with `fn`, parameters, calls, and `return` (missing return is `nothing`; using it as a value is `R029`)
 - module export lists that may appear before or after definitions
 - line comments beginning with `//`
 - source-located parser and runtime diagnostics
@@ -72,18 +69,19 @@ This README describes both the current prototype and the long-term direction. Tr
 ### What Is Missing
 
 - static type checking
-- explicit mutability rules
-- improved diagnostic suggestions
+- opt-in `const` bindings (default is already mutable; see `SPEC.md` §5.2)
+- richer diagnostic suggestions across more error codes
 - canonical VOL formatter
-- JSON compiler diagnostics
+- JSON diagnostic output from the CLI (diagnostics are already structured)
 - a published compatibility policy and versioned conformance corpus
+- LLM generation and repair benchmarks
 - initial language-server support
 
 ### What Is Still an Open Experiment
 
 - typed function signatures
 - explicit type syntax
-- ownership and borrowing syntax
+- ownership and borrowing semantics (local inference vs API contracts)
 - error propagation
 - optional and nullable values
 - structs, methods, enums, and tagged unions
@@ -94,10 +92,15 @@ This README describes both the current prototype and the long-term direction. Tr
 - allocator and memory-layout constraints
 - compile-time evaluation
 - concurrency and automatic parallelization semantics
-- bounds-checking and overflow behavior across build modes
+- overflow wrapping ops / build modes (default is already trap; see `SPEC.md` §4.3)
+- bounds-checking behavior across build modes
 - C and LLVM backend details
 
-See [`VOCABULARY.md`](VOCABULARY.md) for a quick guide to VOL words and symbols, [`SYNTAX.md`](SYNTAX.md) for the current syntax direction, and [`IDEAS.md`](IDEAS.md) for future work and open design questions.
+Near-term priority is to freeze the current surface and make its semantics precise before adding new language features. See [`IDEAS.md`](IDEAS.md).
+
+See [`SPEC.md`](SPEC.md) for vocabulary, syntax, and formal behavior of the
+current interpreter, and [`IDEAS.md`](IDEAS.md) for future work and open design
+questions.
 
 ## Supported Examples
 
@@ -127,11 +130,16 @@ print total
 ```vol
 score := 75
 
-if score >= 50 {
+if score >= 90 {
+    print "great"
+} elif score >= 50 {
     print "pass"
 } else {
     print "fail"
 }
+
+label := score >= 50 ? "pass" : "fail"
+print label
 ```
 
 ### Repeat
@@ -161,7 +169,7 @@ numbers.each number {
 print total
 ```
 
-The same intent can be written in a concise semantic form:
+Filtering and summing are a different intent from imperative iteration:
 
 ```vol
 total := numbers.where(_ > 5).sum
@@ -175,7 +183,7 @@ items := [1, 2, 3]
 items[1] = 8
 
 print items
-print items.length
+print items.len
 ```
 
 ### Boolean Logic

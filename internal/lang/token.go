@@ -14,6 +14,7 @@ const (
 	TokenTrue
 	TokenFalse
 	TokenIf
+	TokenElif
 	TokenElse
 	TokenRepeat
 	TokenWhile
@@ -25,6 +26,8 @@ const (
 	TokenOr
 	TokenNot
 	TokenColonEqual
+	TokenColon
+	TokenQuestion
 	TokenEqual
 	TokenEqualEqual
 	TokenBangEqual

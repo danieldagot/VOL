@@ -87,15 +87,33 @@ type ExpressionStatement struct{ Value Expression }
 func (*ExpressionStatement) statement()           {}
 func (n *ExpressionStatement) Position() Position { return n.Value.Position() }
 
+type ElseIfClause struct {
+	Keyword   Token
+	Condition Expression
+	Then      *Block
+}
+
 type IfStatement struct {
 	Keyword   Token
 	Condition Expression
 	Then      *Block
+	ElseIfs   []ElseIfClause
 	Else      *Block
 }
 
 func (*IfStatement) statement()           {}
 func (n *IfStatement) Position() Position { return n.Keyword.Pos }
+
+type Conditional struct {
+	Condition Expression
+	Question  Token
+	Then      Expression
+	Colon     Token
+	Else      Expression
+}
+
+func (*Conditional) expression()          {}
+func (n *Conditional) Position() Position { return n.Question.Pos }
 
 type RepeatStatement struct {
 	Keyword Token

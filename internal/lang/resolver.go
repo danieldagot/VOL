@@ -98,6 +98,14 @@ func (r *resolver) statement(statement Statement) *Diagnostic {
 		if d := r.block(node.Then); d != nil {
 			return d
 		}
+		for _, clause := range node.ElseIfs {
+			if d := r.expression(clause.Condition); d != nil {
+				return d
+			}
+			if d := r.block(clause.Then); d != nil {
+				return d
+			}
+		}
 		if node.Else != nil {
 			return r.block(node.Else)
 		}
@@ -142,6 +150,14 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 			return d
 		}
 		return r.expression(node.Right)
+	case *Conditional:
+		if d := r.expression(node.Condition); d != nil {
+			return d
+		}
+		if d := r.expression(node.Then); d != nil {
+			return d
+		}
+		return r.expression(node.Else)
 	case *ArrayLiteral:
 		for _, item := range node.Elements {
 			if d := r.expression(item); d != nil {
