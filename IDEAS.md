@@ -381,6 +381,12 @@ including generated code, compiler or runtime diagnostics, repair prompts, and
 revisions across a fixed task suite. Document protocol and results in
 `LLM_BENCHMARK.md` when that work begins.
 
+**Static source token density** (step 1 — implemented) is measured in
+[`bench/`](bench/README.md): hand-written equivalent programs in VOL, Go, Rust,
+and Zig are compared by token count under named OpenAI tokenizers
+(`cl100k_base`, `o200k_base`). That benchmark measures source density only —
+not LLM task-success efficiency.
+
 ## Open Design Questions
 
 - ~~What is VOL's exact mutability model?~~ **Decided and implemented:** mutable by default;

@@ -73,7 +73,7 @@ This README separates **what works today** from **long-term design targets**. Tr
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter
 - a published compatibility policy and versioned conformance corpus
-- LLM generation and repair benchmarks
+- LLM generation and repair benchmarks (source token density is measured in `bench/`; generate/repair task-success metrics are not)
 - initial language-server support
 
 ### What Is Still an Open Experiment
@@ -202,6 +202,29 @@ if ready and not failed {
 cmd/vol          command-line entry point
 internal/lang    lexer, parser, AST, diagnostics, and interpreter
 examples         example VOL programs
+bench            source token density benchmark (VOL vs Go/Rust/Zig)
+```
+
+## Source Token Density Benchmark
+
+On 13 equivalent small programs, VOL currently uses about:
+
+- **~36% fewer tokens than Go**
+- **~25% fewer tokens than Rust**
+- **~53% fewer tokens than Zig**
+
+(median across the suite; nearly the same under both `cl100k_base` and
+`o200k_base`)
+
+That is source size only — hand-written programs that print the same output. It
+does **not** measure whether an LLM generates correct VOL more easily, or how
+many tokens generate/repair workflows consume.
+
+Full per-task numbers: [`bench/results/density.md`](bench/results/density.md).
+How to run / regenerate: [`bench/README.md`](bench/README.md).
+
+```text
+cd bench && uv sync && uv run python harness/count_tokens.py
 ```
 
 ## Requirements

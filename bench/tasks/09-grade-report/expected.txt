@@ -1,0 +1,5 @@
+Class average: 76
+A grades: 2
+B grades: 2
+Passing: 9
+Failing: 1

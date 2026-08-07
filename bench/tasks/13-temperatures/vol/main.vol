@@ -1,0 +1,12 @@
+temps := [22, 18, 25, 31, 29, 17, 24, 28, 20, 26]
+
+hot := temps.where(_ >= 28)
+mild := temps.where(_ >= 20).where(_ < 28)
+cold := temps.where(_ < 20)
+avg := temps.sum / temps.len
+
+print "Days measured: " + string(temps.len)
+print "Average: " + string(avg)
+print "Hot days (28+): " + string(hot.len)
+print "Mild days: " + string(mild.len)
+print "Cold days (<20): " + string(cold.len)

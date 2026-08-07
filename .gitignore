@@ -21,3 +21,9 @@ go.work.sum
 *~
 .DS_Store
 Thumbs.db
+
+# bench/ — Python tooling artifacts (Go toolchain ignores .py files naturally)
+bench/.venv/
+bench/**/__pycache__/
+bench/**/*.pyc
+bench/.python-version

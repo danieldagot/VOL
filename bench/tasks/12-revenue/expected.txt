@@ -1,0 +1,4 @@
+Total revenue: 1636
+Premium orders (200+): 3
+Premium revenue: 754
+Budget orders: 5

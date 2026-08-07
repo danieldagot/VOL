@@ -1,0 +1,5 @@
+Days measured: 10
+Average: 24
+Hot days (28+): 3
+Mild days: 5
+Cold days (<20): 2
