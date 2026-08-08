@@ -76,7 +76,7 @@ card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
 - Option values with `some(value)` / `none`; unwrap with if-let and `??` (`match` rejected)
 - Result values with `ok(value)` / `err(value)`; unwrap with if-let and postfix `?` in functions (bugs still trap)
 - product `struct` types, named and positional construction, and field get/set
-- `import "path"` / project-local aliases via nearest `vol.config.json`; live `export` across modules (root `@std` / `@compiler` are example aliases, not a shipped stdlib)
+- `import "path"` / project-local aliases via nearest `vol.config.json`; live `export` across modules (see `examples/features/modules/aliases/` for `@lib`; future `@std` spelling is vision-only in [`IDEAS.md`](IDEAS.md), not a shipped stdlib)
 - `print`
 - interactive text input with `input()` or `input(prompt)`
 - runtime checks with `assert(condition)` or `assert(condition, message)`

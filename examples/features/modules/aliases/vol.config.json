@@ -1,0 +1,7 @@
+{
+  "name": "alias-demo",
+  "root": ".",
+  "paths": {
+    "@lib": "lib"
+  }
+}

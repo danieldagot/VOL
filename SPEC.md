@@ -991,7 +991,8 @@ import "examples/features/modules/math"
 export add
 ```
 
-Aliases are project-local via `vol.config.json` `paths` (illustrative):
+Aliases are project-local via `vol.config.json` `paths` (see
+`examples/features/modules/aliases/`):
 
 ```vol
 import "@lib/math"   // expands only if the project defines "@lib" → some dir

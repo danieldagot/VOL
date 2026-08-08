@@ -35,6 +35,7 @@ func TestExamplesRemainExecutable(t *testing.T) {
 		{file: filepath.Join("features", "const_struct.vol"), output: "1\n"},
 		{file: filepath.Join("features", "modules", "main.vol"), output: "42\n"},
 		{file: filepath.Join("features", "modules", "import_struct.vol"), output: "Hello, Grace\n40\n"},
+		{file: filepath.Join("features", "modules", "aliases", "main.vol"), output: "42\n"},
 		{file: filepath.Join("projects", "gradebook", "main.vol"), output: "Roster: [Ada, Grace, Alan, Katherine]\nAverage: 82\nPassing: 3\nHonor roll: [Ada, Katherine]\n"},
 		{file: filepath.Join("projects", "contacts", "main.vol"), output: "Ada <ada@example.com>\nno contact named Alan\n"},
 		{file: filepath.Join("projects", "shop", "main.vol"), output: "Subtotal: 39\ncharged 39\nempty cart\n"},

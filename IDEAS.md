@@ -332,12 +332,13 @@ entry rule, sorted export-list formatter.
 `print`, `input`, `assert`, `string`, `args`, and collection methods in SPEC.
 Everything else requires an **explicit import** when those libraries exist.
 
-**Aliases ≠ stdlib:** `vol.config.json` `paths` (including example spellings like
-`@std` or `@compiler` in this repo’s root config) are **project-local** alias
-demos for the import feature. They are not a reserved standard-library root and
-do not ship a product `std/` tree. A richer std behind imports remains Planned;
-candidate first modules (when implemented): math helpers, strings, filesystem,
-then net/serialization — always via explicit `import`, never ambient growth.
+**Aliases ≠ stdlib:** `vol.config.json` `paths` are **project-local**. A working
+demo uses `@lib` under `examples/features/modules/aliases/`. Spellings like
+`@std` / `@compiler` below are **vision only** for agents and docs — not present
+in the repo root config and not a reserved standard-library root. A richer std
+behind imports remains Planned; candidate first modules (when implemented): math
+helpers, strings, filesystem, then net/serialization — always via explicit
+`import`, never ambient growth.
 
 ### Block comments
 
@@ -401,7 +402,8 @@ Checklist:
 - [x] Detect import cycles and report their complete path deterministically.
 - [ ] Collect exports written anywhere in a module and format one sorted export list at the top.
 
-Proposed configuration (illustrative aliases only — not a shipped stdlib layout):
+Vision configuration (not loaded by the runner — keep out of repo-root
+`vol.config.json` until real `std/` / `compiler/` trees exist):
 
 ```json
 {
@@ -413,6 +415,8 @@ Proposed configuration (illustrative aliases only — not a shipped stdlib layou
   }
 }
 ```
+
+Working alias demo today: `examples/features/modules/aliases/` maps `@lib` → `lib`.
 
 ## Language Server
 

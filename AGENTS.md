@@ -60,7 +60,8 @@ Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 - anonymous `fn(params) { ... }` and expression-body `fn(params) expr` are Supported (`=>` is not)
 - product `struct` with named and positional literals and `.` field access is Supported
 - `import "path"` + `vol.config.json` discovery/aliases; `export` is live across
-  modules (root `@std` / `@compiler` entries are illustrative aliases, not a
+  modules (`examples/features/modules/aliases/` demos `@lib`; `@std` /
+  `@compiler` spellings in [`IDEAS.md`](IDEAS.md) are vision-only, not a
   shipped stdlib)
 - `.len` is the length property (string: Unicode scalars); `.length` is rejected
 - `while` is permanent Supported vocabulary (with `repeat` and `.each` for other intents)
