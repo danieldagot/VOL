@@ -67,6 +67,28 @@ type function struct {
 	closure     *environment
 }
 
+// optionValue is Option: some(x) when present, none when !present.
+type optionValue struct {
+	present bool
+	value   any
+}
+
+// resultValue is Result: ok(x) when ok, err(x) when !ok.
+type resultValue struct {
+	ok    bool
+	value any
+}
+
+type structType struct {
+	name   string
+	fields []string
+}
+
+type structValue struct {
+	typ    *structType
+	fields map[string]any
+}
+
 type returnValue struct{ value any }
 
 type ExecuteOptions struct {
@@ -84,33 +106,67 @@ func Execute(program *Program, output io.Writer) *Diagnostic {
 }
 
 func ExecuteWithOptions(program *Program, output io.Writer, options ExecuteOptions) *Diagnostic {
+	for _, statement := range program.Statements {
+		if _, ok := statement.(*ImportStatement); ok {
+			return &Diagnostic{
+				Code:    "S031",
+				Message: "Programs with `import` must be run via the file loader.",
+				File:    program.File,
+				Fix:     "Use `vol run <file.vol>` so imports can be resolved.",
+			}
+		}
+	}
 	if d := Resolve(program); d != nil {
 		return d
 	}
+	_, d := executeModule(program, output, options, nil)
+	return d
+}
+
+func executeModule(program *Program, output io.Writer, options ExecuteOptions, imported map[string]any) (*environment, *Diagnostic) {
 	if options.Input == nil {
 		options.Input = strings.NewReader("")
 	}
 	i := &interpreter{output: output, input: bufio.NewReader(options.Input), env: newEnvironment(nil), file: program.File}
 	i.installBuiltins(options.Args)
+	for name, value := range imported {
+		if _, exists := i.env.values[name]; exists {
+			return nil, &Diagnostic{
+				Code:    "S034",
+				Message: "Imported name `" + name + "` collides with a built-in.",
+				File:    program.File,
+			}
+		}
+		i.env.define(name, value)
+	}
 	for _, statement := range program.Statements {
-		if fn, ok := statement.(*FunctionDeclaration); ok {
-			i.env.define(fn.Name.Lexeme, &function{declaration: fn, closure: i.env})
+		switch node := statement.(type) {
+		case *FunctionDeclaration:
+			i.env.define(node.Name.Lexeme, &function{declaration: node, closure: i.env})
+		case *StructDeclaration:
+			fields := make([]string, len(node.Fields))
+			for idx, field := range node.Fields {
+				fields[idx] = field.Lexeme
+			}
+			i.env.define(node.Name.Lexeme, &structType{name: node.Name.Lexeme, fields: fields})
 		}
 	}
 	for _, statement := range program.Statements {
 		if d := i.execute(statement); d != nil {
-			return d
+			return nil, d
 		}
 	}
-	return nil
+	return i.env, nil
 }
 
 func (i *interpreter) execute(statement Statement) *Diagnostic {
 	switch node := statement.(type) {
 	case *BlockStatement:
 		return i.executeBlock(node.Body, newEnvironment(i.env))
-	case *ExportStatement:
-		// Export declarations are module metadata and have no runtime behavior.
+	case *ExportStatement, *ImportStatement:
+		// Module metadata — imports are installed by the loader; exports collected after run.
+	case *StructDeclaration:
+		// Struct types are installed before execution (module scope).
 	case *FunctionDeclaration:
 		// Module functions are installed before execution so forward calls are valid.
 		// A nested function is installed when execution reaches its declaration.
@@ -138,6 +194,50 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 			i.env.defineConst(node.Name.Lexeme, value)
 		} else {
 			i.env.define(node.Name.Lexeme, value)
+		}
+	case *MultiDeclaration:
+		values := make([]any, len(node.Values))
+		for idx, expr := range node.Values {
+			value, d := i.evaluate(expr)
+			if d != nil {
+				return d
+			}
+			if d := i.requireValue(value, expr.Position()); d != nil {
+				return d
+			}
+			values[idx] = value
+		}
+		for idx, name := range node.Names {
+			if _, exists := i.env.values[name.Lexeme]; exists {
+				return i.runtime(name.Pos, "R001", "Variable `"+name.Lexeme+"` is already declared in this scope.")
+			}
+			if node.Const {
+				i.env.defineConst(name.Lexeme, values[idx])
+			} else {
+				i.env.define(name.Lexeme, values[idx])
+			}
+		}
+	case *MultiAssignment:
+		values := make([]any, len(node.Values))
+		for idx, expr := range node.Values {
+			value, d := i.evaluate(expr)
+			if d != nil {
+				return d
+			}
+			if d := i.requireValue(value, expr.Position()); d != nil {
+				return d
+			}
+			values[idx] = value
+		}
+		for idx, name := range node.Names {
+			if i.env.isConst(name.Lexeme) {
+				return i.runtimeWithFix(name.Pos, "R030",
+					"Cannot assign to const binding `"+name.Lexeme+"`.",
+					"Declare a new binding instead, or remove `const` from the declaration.")
+			}
+			if !i.env.assign(name.Lexeme, values[idx]) {
+				return i.runtime(name.Pos, "R002", "Unknown variable `"+name.Lexeme+"`.")
+			}
 		}
 	case *Assignment:
 		value, d := i.evaluate(node.Value)
@@ -178,6 +278,22 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 				return d
 			}
 			array[index] = value
+		case *Property:
+			object, d := i.evaluate(target.Object)
+			if d != nil {
+				return d
+			}
+			if d := i.requireValue(object, target.Object.Position()); d != nil {
+				return d
+			}
+			instance, ok := object.(*structValue)
+			if !ok {
+				return i.runtime(target.Position(), "R035", "Only struct fields can be assigned through `.`.")
+			}
+			if _, exists := instance.fields[target.Name.Lexeme]; !exists {
+				return i.runtime(target.Name.Pos, "R036", "Struct `"+instance.typ.name+"` has no field `"+target.Name.Lexeme+"`.")
+			}
+			instance.fields[target.Name.Lexeme] = value
 		}
 	case *PrintStatement:
 		value, d := i.evaluate(node.Value)
@@ -192,6 +308,42 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 		// Discarding a call result is allowed, including `nothing` from a missing return.
 		_, d := i.evaluate(node.Value)
 		return d
+	case *IfLetStatement:
+		value, d := i.evaluate(node.Value)
+		if d != nil {
+			return d
+		}
+		if d := i.requireValue(value, node.Value.Position()); d != nil {
+			return d
+		}
+		if node.IsOption() {
+			option, ok := value.(optionValue)
+			if !ok {
+				return i.runtimeWithFix(node.Value.Position(), "R034",
+					"Option if-let requires an Option (`some`/`none`), got "+typeName(value)+".",
+					"Pass a `some(...)` / `none` value, or use a Boolean `if`.")
+			}
+			if option.present {
+				scope := newEnvironment(i.env)
+				scope.define(node.Name.Lexeme, option.value)
+				return i.executeBlock(node.Then, scope)
+			}
+			return i.executeBlock(node.Else, newEnvironment(i.env))
+		}
+		result, ok := value.(resultValue)
+		if !ok {
+			return i.runtimeWithFix(node.Value.Position(), "R037",
+				"Result if-let requires a Result (`ok`/`err`), got "+typeName(value)+".",
+				"Pass an `ok(...)` / `err(...)` value, or use a Boolean `if`.")
+		}
+		if result.ok {
+			scope := newEnvironment(i.env)
+			scope.define(node.Name.Lexeme, result.value)
+			return i.executeBlock(node.Then, scope)
+		}
+		scope := newEnvironment(i.env)
+		scope.define(node.ErrName.Lexeme, result.value)
+		return i.executeBlock(node.ErrBody, scope)
 	case *IfStatement:
 		condition, d := i.evaluate(node.Condition)
 		if d != nil {
@@ -302,6 +454,91 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 	switch node := expression.(type) {
 	case *Literal:
 		return node.Value, nil
+	case *SomeExpression:
+		inner, d := i.evaluate(node.Value)
+		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(inner, node.Value.Position()); d != nil {
+			return nil, d
+		}
+		return optionValue{present: true, value: inner}, nil
+	case *OkExpression:
+		inner, d := i.evaluate(node.Value)
+		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(inner, node.Value.Position()); d != nil {
+			return nil, d
+		}
+		return resultValue{ok: true, value: inner}, nil
+	case *ErrExpression:
+		inner, d := i.evaluate(node.Value)
+		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(inner, node.Value.Position()); d != nil {
+			return nil, d
+		}
+		return resultValue{ok: false, value: inner}, nil
+	case *StructLiteral:
+		typeValue, found := i.env.get(node.Type.Lexeme)
+		if !found {
+			return nil, i.runtime(node.Type.Pos, "R038", "Unknown struct type `"+node.Type.Lexeme+"`.")
+		}
+		typ, ok := typeValue.(*structType)
+		if !ok {
+			return nil, i.runtime(node.Type.Pos, "R038", "`"+node.Type.Lexeme+"` is not a struct type.")
+		}
+		values := map[string]any{}
+		if len(node.Positional) > 0 {
+			if len(node.Positional) != len(typ.fields) {
+				return nil, i.runtime(node.Open.Pos, "R043",
+					fmt.Sprintf("Struct `%s` expects %d positional fields, got %d.", typ.name, len(typ.fields), len(node.Positional)))
+			}
+			for idx, expr := range node.Positional {
+				value, d := i.evaluate(expr)
+				if d != nil {
+					return nil, d
+				}
+				if d := i.requireValue(value, expr.Position()); d != nil {
+					return nil, d
+				}
+				values[typ.fields[idx]] = value
+			}
+			return &structValue{typ: typ, fields: values}, nil
+		}
+		provided := map[string]Expression{}
+		for _, field := range node.Fields {
+			provided[field.Name.Lexeme] = field.Value
+		}
+		for _, name := range typ.fields {
+			expr, ok := provided[name]
+			if !ok {
+				return nil, i.runtime(node.Open.Pos, "R039", "Struct literal for `"+typ.name+"` missing field `"+name+"`.")
+			}
+			value, d := i.evaluate(expr)
+			if d != nil {
+				return nil, d
+			}
+			if d := i.requireValue(value, expr.Position()); d != nil {
+				return nil, d
+			}
+			values[name] = value
+			delete(provided, name)
+		}
+		for name, expr := range provided {
+			return nil, i.runtime(expr.Position(), "R040", "Struct `"+typ.name+"` has no field `"+name+"`.")
+		}
+		return &structValue{typ: typ, fields: values}, nil
+	case *FunctionExpression:
+		declaration := &FunctionDeclaration{
+			Keyword:    node.Keyword,
+			Name:       Token{Kind: TokenIdentifier, Lexeme: "fn", Pos: node.Keyword.Pos},
+			Parameters: node.Parameters,
+			Body:       node.Body,
+		}
+		return &function{declaration: declaration, closure: i.env}, nil
 	case *Variable:
 		value, ok := i.env.get(node.Name.Lexeme)
 		if !ok {
@@ -346,6 +583,13 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if d := i.requireValue(object, node.Object.Position()); d != nil {
 			return nil, d
 		}
+		if instance, ok := object.(*structValue); ok {
+			value, exists := instance.fields[node.Name.Lexeme]
+			if !exists {
+				return nil, i.runtime(node.Name.Pos, "R036", "Struct `"+instance.typ.name+"` has no field `"+node.Name.Lexeme+"`.")
+			}
+			return value, nil
+		}
 		if node.Name.Lexeme == "len" {
 			if array, ok := object.([]any); ok {
 				return int64(len(array)), nil
@@ -362,6 +606,14 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 				Pos:     node.Name.Pos,
 				Fix:     "Use `.len` for array element count or string Unicode scalar count.",
 			}
+		}
+		if node.Name.Lexeme == "each" {
+			return nil, i.runtimeWithFix(
+				node.Name.Pos,
+				"R007",
+				"Unknown property `each`.",
+				"Use statement form `items.each item { ... }`, not `.each(fn...)`.",
+			)
 		}
 		if node.Name.Lexeme == "byte_len" {
 			if text, ok := object.(string); ok {
@@ -397,6 +649,54 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		return nil, i.runtime(node.Position(), "R009", "Unary `-` requires a number.")
 	case *Binary:
 		return i.evaluateBinary(node)
+	case *Coalesce:
+		left, d := i.evaluate(node.Left)
+		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(left, node.Left.Position()); d != nil {
+			return nil, d
+		}
+		if _, isResult := left.(resultValue); isResult {
+			return nil, i.runtimeWithFix(node.Op.Pos, "R042",
+				"`??` does not apply to Result values.",
+				"Use `if ok x := res { ... } else err e { ... }` to handle errors explicitly.")
+		}
+		option, ok := left.(optionValue)
+		if !ok {
+			return nil, i.runtimeWithFix(node.Op.Pos, "R041",
+				"`??` requires an Option on the left, got "+typeName(left)+".",
+				"Wrap with `some(...)` / use `none`, or pick another expression.")
+		}
+		if option.present {
+			return option.value, nil
+		}
+		right, d := i.evaluate(node.Right)
+		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(right, node.Right.Position()); d != nil {
+			return nil, d
+		}
+		return right, nil
+	case *TryPropagate:
+		value, d := i.evaluate(node.Value)
+		if d != nil {
+			return nil, d
+		}
+		if d := i.requireValue(value, node.Value.Position()); d != nil {
+			return nil, d
+		}
+		result, ok := value.(resultValue)
+		if !ok {
+			return nil, i.runtimeWithFix(node.Op.Pos, "R044",
+				"`?` requires a Result on the left, got "+typeName(value)+".",
+				"Use `ok(...)` / `err(...)`, or Option `??` / if-let for Option values.")
+		}
+		if result.ok {
+			return result.value, nil
+		}
+		panic(returnValue{value: resultValue{ok: false, value: result.value}})
 	case *Conditional:
 		condition, d := i.evaluate(node.Condition)
 		if d != nil {
@@ -430,6 +730,12 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 	case *Call:
 		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "where" {
 			return i.evaluateWhere(property, node.Arguments)
+		}
+		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "map" {
+			return i.evaluateMap(property, node.Arguments)
+		}
+		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "count" {
+			return i.evaluateCount(property, node.Arguments)
 		}
 		if property, ok := node.Callee.(*Property); ok {
 			switch property.Name.Lexeme {
@@ -516,6 +822,85 @@ func (i *interpreter) evaluateArrayOperation(property *Property, arguments []Exp
 	}
 }
 
+func (i *interpreter) evaluateMap(property *Property, arguments []Expression) (any, *Diagnostic) {
+	value, d := i.evaluate(property.Object)
+	if d != nil {
+		return nil, d
+	}
+	if d := i.requireValue(value, property.Object.Position()); d != nil {
+		return nil, d
+	}
+	array, ok := value.([]any)
+	if !ok {
+		return nil, i.runtime(property.Position(), "R021", "`.map` requires an array.")
+	}
+	if len(arguments) != 1 {
+		return nil, i.runtime(property.Name.Pos, "R020", "`.map` expects exactly 1 argument.")
+	}
+	mapped := make([]any, 0, len(array))
+	for _, item := range array {
+		scope := newEnvironment(i.env)
+		scope.define("_", item)
+		previous := i.env
+		i.env = scope
+		element, diagnostic := i.evaluate(arguments[0])
+		i.env = previous
+		if diagnostic != nil {
+			return nil, diagnostic
+		}
+		if diagnostic := i.requireValue(element, arguments[0].Position()); diagnostic != nil {
+			return nil, diagnostic
+		}
+		mapped = append(mapped, element)
+	}
+	return mapped, nil
+}
+
+func (i *interpreter) evaluateCount(property *Property, arguments []Expression) (any, *Diagnostic) {
+	value, d := i.evaluate(property.Object)
+	if d != nil {
+		return nil, d
+	}
+	if d := i.requireValue(value, property.Object.Position()); d != nil {
+		return nil, d
+	}
+	array, ok := value.([]any)
+	if !ok {
+		return nil, i.runtime(property.Position(), "R021", "`.count` requires an array.")
+	}
+	if len(arguments) != 1 {
+		return nil, i.runtime(property.Name.Pos, "R020", "`.count` expects exactly 1 argument.")
+	}
+	var n int64
+	for _, item := range array {
+		scope := newEnvironment(i.env)
+		scope.define("_", item)
+		previous := i.env
+		i.env = scope
+		condition, diagnostic := i.evaluate(arguments[0])
+		i.env = previous
+		if diagnostic != nil {
+			return nil, diagnostic
+		}
+		if diagnostic := i.requireValue(condition, arguments[0].Position()); diagnostic != nil {
+			return nil, diagnostic
+		}
+		matches, ok := condition.(bool)
+		if !ok {
+			return nil, i.runtimeWithFix(
+				arguments[0].Position(),
+				"R022",
+				"`.count` condition must be Boolean.",
+				"Use a Boolean `_` expression, e.g. `.count(_ > 5)`, not a `fn` value.",
+			)
+		}
+		if matches {
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (i *interpreter) evaluateWhere(property *Property, arguments []Expression) (any, *Diagnostic) {
 	if len(arguments) != 1 {
 		return nil, i.runtime(property.Position(), "R020", "`.where` expects one condition.")
@@ -547,7 +932,12 @@ func (i *interpreter) evaluateWhere(property *Property, arguments []Expression) 
 		}
 		matches, ok := condition.(bool)
 		if !ok {
-			return nil, i.runtime(arguments[0].Position(), "R022", "`.where` condition must be Boolean.")
+			return nil, i.runtimeWithFix(
+				arguments[0].Position(),
+				"R022",
+				"`.where` condition must be Boolean.",
+				"Use a Boolean `_` expression, e.g. `.where(_ > 5)`, not a `fn` value.",
+			)
 		}
 		if matches {
 			filtered = append(filtered, item)
@@ -784,6 +1174,10 @@ func (i *interpreter) runtime(pos Position, code, message string) *Diagnostic {
 	return &Diagnostic{Code: code, Message: message, File: i.file, Pos: pos}
 }
 
+func (i *interpreter) runtimeWithFix(pos Position, code, message, fix string) *Diagnostic {
+	return &Diagnostic{Code: code, Message: message, File: i.file, Pos: pos, Fix: fix}
+}
+
 func (i *interpreter) integerOverflow(pos Position, op string) *Diagnostic {
 	return &Diagnostic{
 		Code:    "R028",
@@ -810,6 +1204,28 @@ func display(value any) string {
 	if value == nil {
 		return "nothing"
 	}
+	if option, ok := value.(optionValue); ok {
+		if !option.present {
+			return "none"
+		}
+		return "some(" + display(option.value) + ")"
+	}
+	if result, ok := value.(resultValue); ok {
+		if result.ok {
+			return "ok(" + display(result.value) + ")"
+		}
+		return "err(" + display(result.value) + ")"
+	}
+	if instance, ok := value.(*structValue); ok {
+		parts := make([]string, 0, len(instance.typ.fields))
+		for _, name := range instance.typ.fields {
+			parts = append(parts, name+": "+display(instance.fields[name]))
+		}
+		return instance.typ.name + " { " + strings.Join(parts, ", ") + " }"
+	}
+	if typ, ok := value.(*structType); ok {
+		return "struct " + typ.name
+	}
 	if array, ok := value.([]any); ok {
 		result := "["
 		for index, item := range array {
@@ -827,6 +1243,14 @@ func typeName(value any) string {
 	switch value.(type) {
 	case nil:
 		return "nothing"
+	case optionValue:
+		return "option"
+	case resultValue:
+		return "result"
+	case *structValue:
+		return "struct"
+	case *structType:
+		return "struct type"
 	case int64:
 		return "integer"
 	case float64:
@@ -860,6 +1284,22 @@ func deepCopyArray(array []any) []any {
 func deepCopyValue(value any) any {
 	if array, ok := value.([]any); ok {
 		return deepCopyArray(array)
+	}
+	if option, ok := value.(optionValue); ok {
+		if !option.present {
+			return optionValue{}
+		}
+		return optionValue{present: true, value: deepCopyValue(option.value)}
+	}
+	if result, ok := value.(resultValue); ok {
+		return resultValue{ok: result.ok, value: deepCopyValue(result.value)}
+	}
+	if instance, ok := value.(*structValue); ok {
+		fields := map[string]any{}
+		for name, field := range instance.fields {
+			fields[name] = deepCopyValue(field)
+		}
+		return &structValue{typ: instance.typ, fields: fields}
 	}
 	return value
 }

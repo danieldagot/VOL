@@ -1,0 +1,19 @@
+// Option: some(value) / none; unwrap with if-let or ??.
+
+found := some("VOL")
+print found
+if some name := found {
+    print "Hello, " + name
+} else {
+    print "missing"
+}
+print found ?? "missing"
+
+missing := none
+print missing
+if some name := missing {
+    print name
+} else {
+    print "not found"
+}
+print missing ?? "guest"

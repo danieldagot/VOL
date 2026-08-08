@@ -74,15 +74,15 @@ CORE_TASKS = [
     "13-temperatures",
 ]
 
-# Cards bound to Surface Freeze SF-0 (SPEC.md §0). Bump filenames with SF-1+.
+# Cards bound to product surface freezes (SPEC.md §0). Next VOL bump is SF-2+.
 # Default workflow baseline is Python (interpreted peer); Go remains optional.
 LANG_META = {
     "vol": {
-        "card": "vol_v0.md",
+        "card": "vol_v1.md",
         "label": "VOL",
         "ext": ".vol",
         "prompt_lang": "VOL",
-        "freeze": "SF-0",
+        "freeze": "SF-1",
     },
     "python": {
         "card": "python_v0.md",
@@ -732,11 +732,19 @@ def summarize(
         f"- Temperature: {temperature}",
         f"- Max repairs (K): {max_repairs}",
         f"- Dry-run: {dry_run}",
-        f"- Surface freeze: SF-0",
+        (
+            "- Surface freeze: "
+            + ", ".join(
+                f"{LANG_META[lang]['label']}={LANG_META[lang]['freeze']}"
+                for lang in languages
+            )
+        ),
         (
             "- Cards: "
-            + ", ".join(f"`{LANG_META[lang]['card']}`" for lang in languages)
-            + " (SF-0)"
+            + ", ".join(
+                f"`{LANG_META[lang]['card']}` ({LANG_META[lang]['freeze']})"
+                for lang in languages
+            )
         ),
         (
             f"- Card tokens (est. `{CARD_TOKENIZER}`): "

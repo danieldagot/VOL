@@ -35,10 +35,32 @@ type Declaration struct {
 	Name    Token
 	Value   Expression
 	Const   bool
+	Public  bool
 }
 
 func (*Declaration) statement()           {}
 func (n *Declaration) Position() Position { return n.Name.Pos }
+
+// MultiDeclaration is `a, b := x, y` (or const).
+type MultiDeclaration struct {
+	Keyword Token // optional const
+	Names   []Token
+	Values  []Expression
+	Const   bool
+}
+
+func (*MultiDeclaration) statement()           {}
+func (n *MultiDeclaration) Position() Position { return n.Names[0].Pos }
+
+// MultiAssignment is `a, b = x, y` (RHS fully evaluated before assigns).
+type MultiAssignment struct {
+	Names  []Token
+	Equal  Token
+	Values []Expression
+}
+
+func (*MultiAssignment) statement()           {}
+func (n *MultiAssignment) Position() Position { return n.Equal.Pos }
 
 type ExportStatement struct {
 	Keyword Token
@@ -47,6 +69,14 @@ type ExportStatement struct {
 
 func (*ExportStatement) statement()           {}
 func (n *ExportStatement) Position() Position { return n.Keyword.Pos }
+
+type ImportStatement struct {
+	Keyword Token
+	Path    Token // string literal
+}
+
+func (*ImportStatement) statement()           {}
+func (n *ImportStatement) Position() Position { return n.Keyword.Pos }
 
 type FunctionDeclaration struct {
 	Keyword    Token
@@ -58,6 +88,90 @@ type FunctionDeclaration struct {
 
 func (*FunctionDeclaration) statement()           {}
 func (n *FunctionDeclaration) Position() Position { return n.Keyword.Pos }
+
+// FunctionExpression is an anonymous function value: fn(params) { ... } or fn(params) expr.
+type FunctionExpression struct {
+	Keyword    Token
+	Parameters []Token
+	Body       *Block
+}
+
+func (*FunctionExpression) expression()          {}
+func (n *FunctionExpression) Position() Position { return n.Keyword.Pos }
+
+// SomeExpression wraps a present Option value: some(expr).
+type SomeExpression struct {
+	Keyword Token
+	Value   Expression
+}
+
+func (*SomeExpression) expression()          {}
+func (n *SomeExpression) Position() Position { return n.Keyword.Pos }
+
+// OkExpression wraps a successful Result value: ok(expr).
+type OkExpression struct {
+	Keyword Token
+	Value   Expression
+}
+
+func (*OkExpression) expression()          {}
+func (n *OkExpression) Position() Position { return n.Keyword.Pos }
+
+// ErrExpression wraps a failed Result value: err(expr).
+type ErrExpression struct {
+	Keyword Token
+	Value   Expression
+}
+
+func (*ErrExpression) expression()          {}
+func (n *ErrExpression) Position() Position { return n.Keyword.Pos }
+
+// IfLetStatement unwraps Option or Result.
+// Option: if some name := value { then } else { else }
+// Result: if ok name := value { then } else err errName { errBody }
+type IfLetStatement struct {
+	Keyword    Token // if
+	Tag        Token // some or ok
+	Name       Token
+	Value      Expression
+	Then       *Block
+	Else       *Block // Option none branch
+	ErrKeyword Token  // err (Result only)
+	ErrName    Token  // Result only
+	ErrBody    *Block
+}
+
+func (*IfLetStatement) statement()           {}
+func (n *IfLetStatement) Position() Position { return n.Keyword.Pos }
+
+func (n *IfLetStatement) IsOption() bool { return n.Tag.Kind == TokenSome }
+func (n *IfLetStatement) IsResult() bool { return n.Tag.Kind == TokenOk }
+
+type StructDeclaration struct {
+	Keyword Token
+	Name    Token
+	Fields  []Token
+	Public  bool
+}
+
+func (*StructDeclaration) statement()           {}
+func (n *StructDeclaration) Position() Position { return n.Keyword.Pos }
+
+type StructFieldInit struct {
+	Name  Token
+	Value Expression
+}
+
+// StructLiteral constructs a struct value: Type { field: expr, ... } or Type { expr, ... }.
+type StructLiteral struct {
+	Type       Token
+	Open       Token
+	Fields     []StructFieldInit // named form
+	Positional []Expression      // positional form (exclusive with Fields)
+}
+
+func (*StructLiteral) expression()          {}
+func (n *StructLiteral) Position() Position { return n.Type.Pos }
 
 type ReturnStatement struct {
 	Keyword Token
@@ -116,6 +230,25 @@ type Conditional struct {
 
 func (*Conditional) expression()          {}
 func (n *Conditional) Position() Position { return n.Question.Pos }
+
+// Coalesce is Option nullish coalesce: left ?? right.
+type Coalesce struct {
+	Left  Expression
+	Op    Token
+	Right Expression
+}
+
+func (*Coalesce) expression()          {}
+func (n *Coalesce) Position() Position { return n.Op.Pos }
+
+// TryPropagate unwraps Result: expr? → ok value or return err (inside functions).
+type TryPropagate struct {
+	Value Expression
+	Op    Token
+}
+
+func (*TryPropagate) expression()          {}
+func (n *TryPropagate) Position() Position { return n.Op.Pos }
 
 type RepeatStatement struct {
 	Keyword Token

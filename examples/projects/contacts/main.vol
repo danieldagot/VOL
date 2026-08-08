@@ -1,0 +1,20 @@
+// Contact book: Option lookup with if-let and ??.
+
+import "examples/projects/contacts/people"
+
+book := [Contact { name: "Ada", email: "ada@example.com" }, Contact { name: "Grace", email: "grace@example.com" }]
+
+if some c := find_by_name(book, "Ada") {
+    print display(c)
+} else {
+    print "not found"
+}
+
+maybe := find_by_name(book, "Alan")
+name := none
+if some c := maybe {
+    name = some(c.name)
+} else {
+    name = none
+}
+print name ?? "no contact named Alan"

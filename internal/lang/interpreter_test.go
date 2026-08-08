@@ -172,6 +172,29 @@ func TestLengthPropertySuggestsLen(t *testing.T) {
 	}
 }
 
+func TestEachCallFormSuggestsStatement(t *testing.T) {
+	_, diagnostic := run(t, `[1].each(fn(x) {
+    print x
+})`)
+	if diagnostic == nil || diagnostic.Code != "R007" || !strings.Contains(diagnostic.Fix, "each item") {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+}
+
+func TestWhereFnValueSuggestsUnderscore(t *testing.T) {
+	_, diagnostic := run(t, "print [1].where(fn(x) x > 0)")
+	if diagnostic == nil || diagnostic.Code != "R022" || !strings.Contains(diagnostic.Fix, "_") {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+}
+
+func TestCountFnValueSuggestsUnderscore(t *testing.T) {
+	_, diagnostic := run(t, "print [1].count(fn(x) x > 0)")
+	if diagnostic == nil || diagnostic.Code != "R022" || !strings.Contains(diagnostic.Fix, "_") {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+}
+
 func TestMissingReturnNothingMayBeDiscardedButNotAssigned(t *testing.T) {
 	output, diagnostic := run(t, `fn work() {
     print "ok"
@@ -420,6 +443,10 @@ func TestTypeNamesCoverRuntimeValues(t *testing.T) {
 		{value: true, want: "Boolean"},
 		{value: "text", want: "string"},
 		{value: []any{}, want: "array"},
+		{value: optionValue{}, want: "option"},
+		{value: resultValue{}, want: "result"},
+		{value: &structValue{typ: &structType{name: "User"}}, want: "struct"},
+		{value: &structType{name: "User"}, want: "struct type"},
 		{value: &function{}, want: "function"},
 		{value: &builtinFunction{}, want: "function"},
 		{value: i, want: "value"},

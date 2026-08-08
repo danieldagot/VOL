@@ -37,13 +37,17 @@ This README separates **what works today** from **long-term design targets**. Tr
 
 ### What Actually Works
 
-**Surface Freeze SF-0:** the Supported Prototype v0 syntax in [`SPEC.md`](SPEC.md)
-is frozen. New vocabulary (arrows, pipes, `.count`, etc.) waits for an SF-1 bump.
-LLM card: [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md).
+**Surface Freeze SF-1:** vision-aligned Supported syntax in [`SPEC.md`](SPEC.md)
+— Option/Result (if-let, `??`, postfix `?`; `match` removed), modules, product
+structs, anonymous and expression-body `fn`, multi-assign, `.map`/`.count`, and
+the rest of the Implemented core. Further vocabulary (`|>`, enums, dual-return
+sugar, …) waits for an SF-2 bump. LLM card:
+[`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md). SF-0 /
+[`vol_v0`](bench/llm/cards/vol_v0.md) remains for historical `core_v2` tables.
 
 - integer, floating-point, Boolean, and string literals
-- inferred variable declarations with `:=`
-- variable assignment with `=`
+- inferred variable declarations with `:=` (including multi-declare `a, b := …`)
+- variable assignment with `=` (including multi-assign `a, b = …`; RHS first)
 - opt-in immutable bindings with `const name := expression` (shallow; rebind blocked with `S030`/`R030`; indexed writes on array bindings still allowed)
 - arithmetic operators: `+`, `-`, `*`, `/` (integer overflow traps with `R028`)
 - comparison operators: `==`, `!=`, `<`, `<=`, `>`, `>=`
@@ -57,13 +61,17 @@ LLM card: [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md).
 - indexed array assignment (assignment and arguments share array identity; use `.copy()` for a shallow clone or `.deep_copy()` for a recursive clone)
 - array `.len` and string `.len` (Unicode scalar values) and string `.byte_len` (UTF-8 byte count)
 - array iteration with `.each` (imperative / side effects)
-- collection filtering with `.where(...)` (eager new array; pure predicates) and numeric aggregation with `.sum()`
+- collection filtering with `.where(...)`, mapping with `.map(...)`, counting with `.count(...)`, and numeric aggregation with `.sum()`
+- Option values with `some(value)` / `none`; unwrap with if-let and `??` (`match` rejected)
+- Result values with `ok(value)` / `err(value)`; unwrap with if-let and postfix `?` in functions (bugs still trap)
+- product `struct` types, named and positional construction, and field get/set
+- `import "path"` / aliases via nearest `vol.config.json`; live `export` across modules
 - `print`
 - interactive text input with `input()` or `input(prompt)`
 - runtime checks with `assert(condition)` or `assert(condition, message)`
 - value-to-string conversion with `string(value)`
 - command-line arguments through the built-in `args` array
-- functions declared with `fn`, parameters, calls, and `return` (missing return is `nothing`; using it as a value is `R029`)
+- named functions with `fn name(...)`, anonymous `fn(...)` expressions (block or expression body), parameters, calls, and `return` (missing return is `nothing`; using it as a value is `R029`)
 - module export lists that may appear before or after definitions
 - line comments beginning with `//`
 - source-located parser and runtime diagnostics with human and JSON output (`vol --json run <file.vol>`)
@@ -76,7 +84,7 @@ LLM card: [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md).
 - static type checking
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter
-- a published compatibility policy and versioned conformance corpus (SF-0 is the first surface pin)
+- a published compatibility policy and versioned conformance corpus (SF-0 / SF-1 pins)
 - broader LLM workflow results across more models and realistic backend tasks
 - initial language-server support
 
@@ -84,27 +92,34 @@ LLM card: [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md).
 
 - typed function signatures
 - explicit type syntax
-- ownership and borrowing semantics (local inference vs API contracts)
-- error propagation / Result values (direction: hybrid traps + Result, optional
-  dual-return sugar later — see [`IDEAS.md`](IDEAS.md); not implemented)
-- optional and nullable values
-- structs, methods, enums, and tagged unions
-- modules, packages, and imports
+- ownership and borrowing (direction: local escape first, API contracts later —
+  see [`IDEAS.md`](IDEAS.md); not implemented)
+- dual-return sugar over Result; Result-returning I/O APIs
+  (`input`/`assert` still trap — see [`IDEAS.md`](IDEAS.md))
+- enums / tagged unions / methods on structs (product `struct` is Supported)
+- symbol-selection imports; multi-file folder packages beyond `path.vol` /
+  `path/mod.vol`
 - generics
-- pattern matching
+- richer pattern matching / tagged-union match (binary unwrap uses if-let / `??` / `?`)
 - asynchronous I/O syntax
-- allocator and memory-layout constraints
+- allocator and memory-layout constraints (unspecified; do not claim inference)
 - compile-time evaluation
-- concurrency and automatic parallelization semantics
-- overflow wrapping ops / build modes (default is already trap; see `SPEC.md` §4.3)
-- bounds-checking behavior across build modes
+- concurrency / `parallel` (Planned; no guarantees until scheduling is specified)
+- overflow wrapping ops / build modes (default is already trap; modes + wrap ops
+  Planned — see `SPEC.md` §4.3 and [`IDEAS.md`](IDEAS.md))
+- bounds-checking behavior across build modes (same family as overflow modes)
+- `|>` pipeline sugar / `=>` arrows (anonymous `fn` is Supported; see [`IDEAS.md`](IDEAS.md))
+- optional `?T` sugar for Option (canonical form is `some`/`none`)
 - C and LLVM backend details
 
-Near-term priority is to freeze the current surface and make its semantics precise before adding new language features. See [`IDEAS.md`](IDEAS.md).
+Near-term priority is to keep SF-1 precise and finish foundations (formatter,
+richer std via imports) before an SF-2 feature bump. Remaining directions live
+in [`IDEAS.md`](IDEAS.md).
 
 See [`SPEC.md`](SPEC.md) for vocabulary, syntax, and formal behavior of the
 current interpreter, and [`IDEAS.md`](IDEAS.md) for future work and open design
-questions.
+questions. Token-efficiency notes (unwrap + density sugar in SF-1) are in
+[`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md).
 
 ## Supported Examples
 
@@ -201,12 +216,88 @@ if ready and not failed {
 }
 ```
 
+### Option if-let and `??`
+
+```vol
+found := some("VOL")
+if some name := found {
+    print "Hello, " + name
+} else {
+    print "missing"
+}
+print found ?? "missing"
+```
+
+### Anonymous functions
+
+```vol
+double := fn(x) {
+    return x * 2
+}
+print double(21)
+
+triple := fn(x) x * 3
+print triple(7)
+```
+
+### Result if-let and `?`
+
+```vol
+r := ok(7)
+if ok n := r {
+    print n
+} else err msg {
+    print msg
+}
+
+fn divide(a, b) {
+    if b == 0 {
+        return err("zero")
+    }
+    return ok(a / b)
+}
+n := divide(10, 2)?
+```
+
+### Multi-assign and collections
+
+```vol
+a, b := 0, 1
+a, b = b, a + b
+nums := [1, 2, 3, 4]
+print nums.map(_ * 2)
+print nums.count(_ > 2)
+```
+
+### Structs
+
+```vol
+struct User {
+    name
+    age
+}
+u := User { name: "Ada", age: 36 }
+v := User { "Ada", 36 }
+print u.name
+```
+
+### Imports
+
+```vol
+import "examples/features/modules/math"
+print add(21, 21)
+```
+
+Executable samples live under [`examples/`](examples/) — see
+[`examples/README.md`](examples/README.md) for the full index (`basics/`,
+`features/`, and multi-file `projects/` such as gradebook, contacts, and shop).
+
 ## Repository Layout
 
 ```text
 cmd/vol          command-line entry point
 internal/lang    lexer, parser, AST, diagnostics, and interpreter
-examples         example VOL programs
+examples         example VOL programs (basics, features, projects)
 bench            source token density benchmark (VOL vs Go/Rust/Zig)
 ```
 
@@ -238,30 +329,29 @@ The default workflow baseline is **Python** (interpreted peer for the current
 prototype). Go remains an optional compiled baseline (`--langs vol,go`).
 
 One protocol-v1.1 (`core_v2`) run is published for `gemini-3.5-flash-lite`,
-temperature 0, three replicates, and at most two repair rounds — **VOL vs
-Python**. The suite has five tasks covering generation, diagnostic-seeded
-repair, and modification. Summaries split prompt vs completion and report cold
-totals (card re-sent every request) plus warm totals (estimated language-card
-cost amortized away).
+temperature 0, three replicates, and at most two repair rounds — **VOL (SF-1 /
+`vol_v1`) vs Python**. The suite has five tasks covering generation,
+diagnostic-seeded repair, and modification. Summaries split prompt vs completion
+and report cold totals (card re-sent every request) plus warm totals (estimated
+language-card cost amortized away).
 
 | Language | First-try | Success @ K | Mean cold | Mean warm | Mean completion |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Python | 100% | 100% | 763.8 | 427.8 | 136.0 |
-| VOL | 100% | 100% | 839.9 | 406.9 | 112.0 |
+| Python | 100% | 100% | 762.9 | 426.9 | 135.1 |
+| VOL | 60% | 100% | 1395.3 | 803.1 | 191.9 |
 
-VOL used about 10.0% more **cold** workflow tokens and about 4.9% fewer **warm**
-tokens than Python. Completions were about 17.6% smaller; prompts were about
-15.9% larger (language-card teaching cost). Every replicate succeeded on the
-first try, including diagnostic repair (`R007` for VOL).
+VOL matched Python on **success @ K** but used about **82.9% more cold** and
+**88.1% more warm** workflow tokens (card teaching cost + repair rounds on
+leaderboard/temperatures). Completions were about 42.1% larger; prompts about
+91.7% larger. First-try was 60% (leaderboard and temperatures needed repairs;
+diagnostic repair `R007` still succeeded first-try). Card size is ~423 tokens
+(`vol_v1`) vs Python ~336.
 
-An earlier VOL-vs-Go `core_v2` run is kept for comparison. This small synthetic
-suite does not establish real-world superiority for any language and does not
-measure runtime performance. A second model on `core_v2` is still needed before
-treating results as stable.
+This small synthetic suite does not establish real-world superiority for any
+language and does not measure runtime performance. A second model on `core_v2`
+is still needed before treating results as stable.
 
-Full result (VOL vs Python): [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-022642.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-022642.md).
-Earlier VOL vs Go: [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-021122.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-021122.md).
-Historical non-diagnostic `core_v1`: [`bench/llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md`](bench/llm/results/core_v1_live_gemini_gemini-3.5-flash-lite_20260808-014539.md).
+Full result: [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.md).
 Protocol and limitations: [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md).
 
 ## Requirements
@@ -271,7 +361,7 @@ Protocol and limitations: [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md).
 ## Run the Example
 
 ```text
-go run ./cmd/vol run ./examples/first.vol
+go run ./cmd/vol run ./examples/basics/first.vol
 ```
 
 Expected output:
@@ -282,39 +372,38 @@ Expected output:
 
 ## Example Programs
 
-The `examples` folder contains small programs that can be run independently:
+Organized under [`examples/`](examples/) — full index in
+[`examples/README.md`](examples/README.md):
 
-| File | Demonstrates |
+| Path | Demonstrates |
 | --- | --- |
-| `hello.vol` | Values, strings, printing, and conversion |
-| `conditions.vol` | Comparisons and Boolean conditions |
-| `loops.vol` | `while`, `repeat`, and assignment |
-| `arrays.vol` | Arrays, indexing, length, and `.each` |
-| `collections.vol` | `.where`, `.sum()`, and `assert` |
-| `functions.vol` | Function declarations, calls, parameters, and returns |
-| `scope.vol` | Lexical scopes and shadowing |
-| `interaction.vol` | Interactive input and assertions |
-| `arguments.vol` | Command-line arguments |
+| `basics/` | Language tour: values, control flow, arrays, functions, I/O |
+| `features/` | Option, Result, structs, anonymous `fn`, modules |
+| `projects/gradebook/` | Class roster (structs + `.map` / `.count` / `.where`) |
+| `projects/contacts/` | Contact lookup (Option if-let / `??`) |
+| `projects/shop/` | Cart checkout (Result + postfix `?`) |
+| `projects/fibonacci/` | Multi-assign sequence |
 
 For example:
 
 ```text
-.\vol.exe run .\examples\functions.vol
-.\vol.exe run .\examples\arguments.vol -- apple banana
+go run ./cmd/vol run ./examples/basics/functions.vol
+go run ./cmd/vol run ./examples/basics/arguments.vol -- apple banana
+go run ./cmd/vol run ./examples/projects/gradebook/main.vol
 ```
 
 ## Build the CLI
 
 ```text
 go build ./cmd/vol
-./vol ./examples/first.vol
+./vol ./examples/basics/first.vol
 ```
 
 On Windows:
 
 ```text
 go build ./cmd/vol
-.\vol.exe run .\examples\first.vol
+.\vol.exe run .\examples\basics\first.vol
 ```
 
 The command-line interface uses `vol run <file.vol>`. Arguments following the

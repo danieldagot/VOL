@@ -9,7 +9,7 @@ A ratio < 1.0 means VOL is denser (fewer tokens) under that tokenizer.
 > tokenize differently. Numbers are reported per tokenizer.
 > **Suite size:** 13 tasks, using only currently-implemented VOL features.
 
-## Token density — tokenizer: `cl100k_base`
+## Token density â€” tokenizer: `cl100k_base`
 
 | Task | VOL | Go | Rust | Zig | VOL/Go | VOL/Rust | VOL/Zig |
 |------|-----|----|------|-----|--------|----------|---------|
@@ -22,13 +22,13 @@ A ratio < 1.0 means VOL is denser (fewer tokens) under that tokenizer.
 | 07-functions | 44 | 63 | 59 | 78 | 0.698 | 0.746 | 0.564 |
 | 08-strings-assert | 36 | 56 | 57 | 86 | 0.643 | 0.632 | 0.419 |
 | 09-grade-report | 149 | 232 | 198 | 296 | 0.642 | 0.753 | 0.503 |
-| 10-fibonacci | 51 | 53 | 59 | 89 | 0.962 | 0.864 | 0.573 |
+| 10-fibonacci | 45 | 53 | 59 | 89 | 0.849 | 0.763 | 0.506 |
 | 11-leaderboard | 175 | 277 | 218 | 337 | 0.632 | 0.803 | 0.519 |
 | 12-revenue | 97 | 169 | 150 | 222 | 0.574 | 0.647 | 0.437 |
-| 13-temperatures | 138 | 202 | 177 | 267 | 0.683 | 0.780 | 0.517 |
+| 13-temperatures | 169 | 228 | 177 | 267 | 0.741 | 0.955 | 0.633 |
 | **median** | | | | | **0.643** | **0.753** | **0.472** |
 
-## Token density — tokenizer: `o200k_base`
+## Token density â€” tokenizer: `o200k_base`
 
 | Task | VOL | Go | Rust | Zig | VOL/Go | VOL/Rust | VOL/Zig |
 |------|-----|----|------|-----|--------|----------|---------|
@@ -41,9 +41,9 @@ A ratio < 1.0 means VOL is denser (fewer tokens) under that tokenizer.
 | 07-functions | 44 | 63 | 59 | 78 | 0.698 | 0.746 | 0.564 |
 | 08-strings-assert | 36 | 56 | 58 | 86 | 0.643 | 0.621 | 0.419 |
 | 09-grade-report | 147 | 225 | 197 | 294 | 0.653 | 0.746 | 0.500 |
-| 10-fibonacci | 51 | 53 | 59 | 89 | 0.962 | 0.864 | 0.573 |
+| 10-fibonacci | 45 | 53 | 59 | 89 | 0.849 | 0.763 | 0.506 |
 | 11-leaderboard | 175 | 277 | 218 | 337 | 0.632 | 0.803 | 0.519 |
 | 12-revenue | 97 | 169 | 150 | 222 | 0.574 | 0.647 | 0.437 |
-| 13-temperatures | 138 | 202 | 177 | 267 | 0.683 | 0.780 | 0.517 |
+| 13-temperatures | 169 | 228 | 177 | 267 | 0.741 | 0.955 | 0.633 |
 | **median** | | | | | **0.653** | **0.746** | **0.472** |
 

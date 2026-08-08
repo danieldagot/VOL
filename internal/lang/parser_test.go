@@ -1,6 +1,9 @@
 package lang
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParserBuildsStandaloneBlocksAndPostfixChains(t *testing.T) {
 	program, diagnostic := Parse("shape.vol", `{ value := [[1, 2]]
@@ -103,8 +106,15 @@ func TestParserDiagnostics(t *testing.T) {
 		{name: "property name", source: "print [1].", code: "E107"},
 		{name: "group close", source: "print (1", code: "E108"},
 		{name: "array close", source: "print [1", code: "E109"},
-		{name: "function name", source: "fn () {}", code: "E110"},
+		{name: "anonymous fn parameters open", source: "fn {}", code: "E111"},
 		{name: "function parameters open", source: "fn work {}", code: "E111"},
+		{name: "match removed", source: "match none { some x { print x } none { print 1 } }", code: "E153"},
+		{name: "some needs paren", source: "print some", code: "E129"},
+		{name: "import path", source: "import", code: "E131"},
+		{name: "struct name", source: "struct {", code: "E132"},
+		{name: "option if-let needs else", source: "if some x := none { print x }", code: "E154"},
+		{name: "result if-let needs else err", source: "if ok x := ok(1) { print x }", code: "E155"},
+		{name: "result if-let else needs err", source: "if ok x := ok(1) { print x } else { print 0 }", code: "E156"},
 		{name: "parameter name", source: "fn work(a, ) {}", code: "E112"},
 		{name: "function parameters close", source: "fn work(a {}", code: "E113"},
 		{name: "call close", source: "work(1", code: "E114"},
@@ -125,6 +135,13 @@ func TestParserDiagnostics(t *testing.T) {
 				t.Fatalf("invalid diagnostic location: %#v", diagnostic)
 			}
 		})
+	}
+}
+
+func TestEachMissingItemSuggestsStatement(t *testing.T) {
+	_, diagnostic := Parse("bad.vol", "[1].each {}")
+	if diagnostic == nil || diagnostic.Code != "E103" || !strings.Contains(diagnostic.Fix, "each item") {
+		t.Fatalf("diagnostic = %#v", diagnostic)
 	}
 }
 

@@ -1,12 +1,13 @@
-# VOL Language Specification (Prototype v0)
+# VOL Language Specification (Prototype v0 / SF-1)
 
-> Status: **Surface Freeze SF-0** (Prototype v0 Supported surface is frozen)  
-> Audience: humans and LLMs  
+> Status: **Surface Freeze SF-1** (vision-aligned prototype; card `vol_v1`)
+> Audience: humans and LLMs
+
 > Source of truth for behavior: this file plus the tests in `internal/lang`
 
-This is VOL's first real language specification. It describes **only what the
-tree-walking interpreter does today**. If something is not written here, it is
-not part of the language yet—even if it appears in vision docs.
+This is VOL's language specification. It describes **only what the tree-walking
+interpreter does today**. If something is not written here, it is not part of
+the language yet—even if it appears in vision docs.
 
 You do not need prior language-design experience to maintain this file. When you
 change the lexer, parser, resolver, or interpreter, update the matching section
@@ -19,7 +20,9 @@ Related docs:
 | [`README.md`](README.md) | Project status and examples |
 | [`IDEAS.md`](IDEAS.md) | Planned features and open questions |
 | [`AGENTS.md`](AGENTS.md) | Project vision and contribution rules |
-| [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | Frozen LLM language card for SF-0 |
+| [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) | Token-efficiency notes (SF-1 unwrap + density sugar) |
+| [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | LLM language card for SF-1 (current) |
+| [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | LLM language card for SF-0 (historical `core_v2` tables) |
 
 This file is the single source for implemented syntax, vocabulary, and semantics.
 Planned words such as `parallel` belong only in [`IDEAS.md`](IDEAS.md).
@@ -57,26 +60,35 @@ Notation:
 **Supported** means implemented and covered by tests. **Provisional** means
 implemented and tested, but spelling or meaning may change.
 
-### Surface freeze SF-0
+### Surface freeze SF-1
 
-**SF-0** freezes the Supported / Provisional surface described in this document
-(Prototype v0) and in §11 Decided. The matching LLM card is
-[`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md).
+**SF-1** freezes the Supported / Provisional surface in this document and §11.
+It is the **vision-aligned** prototype pin: Option/Result (if-let, `??`, postfix
+`?`; `match` rejected), modules, product structs, anonymous and expression-body
+`fn`, multi-assign, `.map` / `.count`, and the rest of the Implemented core.
+The matching LLM card is [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md).
 
-| Allowed under SF-0 | Requires bumping to SF-1 (or later) |
+**Product freezes** (use these in status docs and LLM result tables; do not mix
+freeze IDs in one table):
+
+| Freeze | Card | Meaning |
+| --- | --- | --- |
+| SF-0 | `vol_v0.md` | First pin (historical `core_v2` results) |
+| SF-1 | `vol_v1.md` | Vision-aligned surface (current; published `core_v2`) |
+| SF-2+ | `vol_v2.md` (when shipped) | Next real expansion (`|>`, enums, dual-return, …) |
+
+Only keep cards for product freezes that have (or will have) published harness
+runs. Intermediate implementation drafts are not cards.
+
+| Allowed under SF-1 | Requires bumping to SF-2 (or later) |
 | --- | --- |
-| Bug fixes that restore documented behavior | New keywords or operators |
-| Clearer diagnostics / `fix` text for existing codes | New collection ops (e.g. `.count`, lazy views) |
-| Tests, examples, and doc sync for existing forms | Anonymous/`=>` functions, pipeline operators |
-| Card wording edits that do **not** add features | Any form that expands the Supported vocabulary |
-| Resolver/interpreter fixes for spec holes | Modules, types, ownership, stdlib APIs |
+| Bug fixes that restore documented behavior | New keywords or operators beyond SF-1 |
+| Clearer diagnostics / `fix` text for existing codes | `|>` pipelines, `=>`, dual-return sugar, lazy views |
+| Tests, examples, and doc sync for existing forms | Enums/tagged unions, ownership, parallel |
+| Card wording edits that do **not** add features | Any form that expands the Supported vocabulary further |
 
-During SF-0, do **not** implement Planned syntax from [`IDEAS.md`](IDEAS.md).
-Park ideas there; ship them only with a freeze bump, SPEC updates, tests, and a
-new card version (`vol_v1.md`, …).
-
-Published LLM tables must name the freeze and card (`SF-0` / `vol_v0`). Do not
-mix results that used different freeze IDs.
+During SF-1, do **not** implement further Planned syntax from [`IDEAS.md`](IDEAS.md)
+without a freeze bump, SPEC updates, tests, and a new card version.
 
 ### Syntax principles
 
@@ -88,8 +100,8 @@ mix results that used different freeze IDs.
 - Remove boilerplate without removing structural clarity.
 - Optimize syntax for humans, language models, formatters, and static analysis.
 
-`.each` (imperative iteration) and `.where` / `.sum()` (filter / reduce) are
-different intents. Both are valid.
+`.each` (imperative iteration) and `.where` / `.map` / `.count` / `.sum()`
+(filter / transform / count / reduce) are different intents. All are valid.
 
 ### Quick vocabulary
 
@@ -105,14 +117,21 @@ do not claim identical implementation.
 | `elif` | Extra `if` branch | `else if` / `elif` | Supported |
 | `false` | Boolean false | `false` | Supported |
 | `const` | Opt-in immutable binding (shallow) | `const` / immutable `let` | Supported |
-| `fn` | Function declaration | `func` / `fn` | Supported |
+| `err` | Failed Result value (`err(x)`) | `Err(x)` | Supported |
+| `fn` | Function declaration or anonymous function | `func` / `fn` | Supported |
 | `export` | Make names public | export list / `pub` | Supported |
 | `if` | Conditional statement | `if` | Supported |
+| `import` | Load another module’s exports | `import` / `use` | Supported |
+| `match` | Removed (SF-1); parse error `E153` | — | Rejected |
+| `none` | Absent Option value | `None` / `nil` absence | Supported |
 | `not` | Boolean negation | C `!`, Python `not` | Supported |
+| `ok` | Successful Result value (`ok(x)`) | `Ok(x)` | Supported |
 | `or` | Either Boolean side true | C logical or, Python `or` | Supported |
 | `print` | Write a value | `println` | Supported |
 | `repeat` | Run body N times | counting `for` | Supported |
 | `return` | Exit function with value | `return` | Supported |
+| `some` | Present Option value (`some(x)`) | `Some(x)` | Supported |
+| `struct` | Product type declaration | `struct` / class fields | Supported |
 | `true` | Boolean true | `true` | Supported |
 | `while` | Loop while condition | `while` | Supported |
 
@@ -126,16 +145,29 @@ do not claim identical implementation.
 | `array.copy()` | Shallow copy of an array | `clone` / `[...arr]` | Supported |
 | `array.deep_copy()` | Recursive deep clone of an array | deep clone | Supported |
 | `items.where(condition)` | Eager filter; `_` is current item | eager `filter` | Supported |
+| `items.map(transform)` | Eager map; `_` is current item | eager `map` | Supported |
+| `items.count(condition)` | Eager count of matches; `_` is item | filter + length | Supported |
 | `items.sum()` | Left-fold `+` from integer `0` | `sum` / `reduce` | Supported |
 | `input()` / `input(prompt)` | Read one line | stdin / `readLine` | Supported |
 | `assert(cond)` / `assert(cond, msg)` | Fail when false | assertion | Supported |
 | `string(value)` | Display string | `toString` | Supported |
 | `args` | CLI args after source file | `argv` | Supported |
 | `const name := value` | Declare immutable binding (shallow) | `const` / immutable `let` | Supported |
-| `name := value` | Declare mutable binding | `var` / mutable `let` | Supported |
-| `name = value` | Assign to existing binding | assignment | Supported |
+| `name := value` / `a, b := x, y` | Declare mutable binding(s) | `var` / multi-declare | Supported |
+| `name = value` / `a, b = x, y` | Assign binding(s) (RHS first) | assignment / swap | Supported |
 | `cond ? a : b` | Expression conditional | JS ternary | Supported |
-| `fn name(params) { ... }` | Private function by default | unexported fn | Supported |
+| `option ?? default` | Option coalesce (`some` → value) | nullish coalesce | Supported |
+| `result?` | Result propagate (inside functions) | Rust `?` | Supported |
+| `fn name(params) { ... }` | Named function (private by default) | unexported fn | Supported |
+| `fn(params) { ... }` / `fn(params) expr` | Anonymous function (block or expr body) | lambda / closure | Supported |
+| `some(value)` / `none` | Option present / absent | `Option` / `Some`/`None` | Supported |
+| `ok(value)` / `err(value)` | Result success / failure | `Result` / `Ok`/`Err` | Supported |
+| `if some x := opt { … } else { … }` | Option if-let unwrap | if-let | Supported |
+| `if ok x := res { … } else err e { … }` | Result if-let unwrap | if-let | Supported |
+| `struct Name { fields }` | Product type | struct | Supported |
+| `Name { field: expr, … }` | Named struct construction | struct literal | Supported |
+| `Name { expr, … }` | Positional struct construction | positional init | Supported |
+| `import "path"` | Import module exports | import | Supported |
 | `export name` | Public name | export list | Supported |
 | `{ ... }` | Block / scope | block | Supported |
 | `[a, b, c]` | Array literal | array | Supported |
@@ -186,9 +218,10 @@ identifier   = (letter | "_") (letter | digit | "_")*
 integer      = digit+
 float        = digit+ "." digit+
 string       = '"' string-char* '"'
-keyword      = "and" | "const" | "elif" | "else" | "export" | "false" | "fn" | "if"
-             | "not" | "or" | "print" | "repeat" | "return" | "true" | "while"
-operator     = ":=" | ":" | "?" | "=" | "==" | "!=" | "<" | "<=" | ">" | ">="
+keyword      = "and" | "const" | "elif" | "else" | "err" | "export" | "false" | "fn"
+             | "if" | "import" | "match" | "none" | "not" | "ok" | "or" | "print"
+             | "repeat" | "return" | "some" | "struct" | "true" | "while"
+operator     = ":=" | ":" | "??" | "?" | "=" | "==" | "!=" | "<" | "<=" | ">" | ">="
              | "+" | "-" | "*" | "/" | "." | ","
 delimiter    = "{" | "}" | "[" | "]" | "(" | ")"
 ```
@@ -196,10 +229,13 @@ delimiter    = "{" | "}" | "[" | "]" | "(" | ")"
 Notes:
 
 - Keywords are reserved; they are never identifiers.
+- `match` remains a reserved keyword but is **Rejected** at parse time (`E153`).
 - Identifiers are case-sensitive. `Double` and `double` are different names.
 - Capitalization has **no** visibility meaning.
 - `!` alone is illegal; use `not` for Boolean negation (`E002`).
 - `:` is a token used in `? :` and as part of `:=`.
+- `??` is Option coalesce; lone `?` is either ternary (`? :`) or Result postfix
+  propagate (see §4.1 / §4.2.2 / §5.10).
 - Unexpected characters are `E003`.
 
 ### 2.3 Numeric literals
@@ -259,8 +295,16 @@ The prototype is dynamically typed. Every runtime value has one of these kinds:
 | Boolean | `true`, `false` | Boolean |
 | string | `"hi"` | UTF-8 text |
 | array | `[1, true, "x"]` | ordered sequence of values |
-| function | `fn add(a, b) { ... }` | callable closure |
-| nothing | missing `return` result | absence of a value; not storable or usable as a normal value (see §5.8) |
+| function | `fn add(a, b) { ... }` or `fn(x) { ... }` | callable closure |
+| option | `some(1)`, `none` | present or absent value (see §3.4) |
+| result | `ok(1)`, `err("x")` | success or failure value (see §3.5) |
+| struct | `User { name: "Ada", age: 36 }` | product value (see §3.6) |
+| struct type | `struct User { … }` | constructible type name |
+| nothing | missing `return` result | absence of a return; not storable or usable as a normal value (see §5.8) |
+
+`nothing` is not an Option or Result. Option (`some`/`none`) is for optional data.
+Result (`ok`/`err`) is for operational success/failure values. Language bugs and
+invariants still **trap** (§8) — Result does not replace traps.
 
 There is no static type checker yet. Type mistakes are usually runtime errors
 (`Rxxx`), sometimes after resolver checks (`Sxxx`).
@@ -334,49 +378,139 @@ print a // [1, 2]
 print b // [9]
 ```
 
+### 3.4 Option values
+
+Option represents optional data: a value may be present or absent.
+
+```vol
+found := some("VOL")
+missing := none
+```
+
+Rules:
+
+- `some(expression)` wraps a usable value (not `nothing` — `R029` applies).
+- `none` is the absent Option.
+- Display: `some(…)` with recursive display of the inner value, or `none`.
+- Empty string / empty array are ordinary data, not `none`.
+- Option is distinct from `nothing` (missing return) and from Result
+  (operational failure).
+- Unwrap with if-let or `??` (§5.10 / §4.2.2). Using Option where a bare `T` is
+  required (e.g. arithmetic) fails with a type diagnostic as for other
+  mismatched kinds.
+
+Nested `some(some(x))` is allowed; there is no automatic flatten.
+
+### 3.5 Result values
+
+Result represents operational success or failure as a value.
+
+```vol
+r := ok(7)
+e := err("missing")
+```
+
+Rules:
+
+- `ok(expression)` / `err(expression)` wrap a usable value (not `nothing` — `R029`).
+- Display: `ok(…)` or `err(…)` with recursive display of the inner value.
+- Distinct from Option and from `nothing`.
+- Unwrap with if-let or postfix `?` inside functions (§5.10). Using Result where
+  a bare `T` is required fails with a type diagnostic as for other mismatched
+  kinds.
+- Dual-return sugar remains Planned ([`IDEAS.md`](IDEAS.md)).
+- Built-ins such as `input` and `assert` still trap; they do not return Result yet.
+
+### 3.6 Struct values
+
+```vol
+struct User {
+    name
+    age
+}
+u := User { name: "Ada", age: 36 }
+v := User { "Ada", 36 }
+print u.name
+u.age = 37
+```
+
+Rules:
+
+- `struct Name { field… }` declares a module-scoped product type (at least one field).
+- Construction (every field required):
+  - named: `Name { field: expression, … }` — unknown fields rejected (`R039`/`R040`)
+  - positional: `Name { expression, … }` in declaration field order — arity must
+    match (`R043`)
+- Field access and assignment use `.` (`R036` for unknown fields).
+- Struct instances share identity on assignment/arguments (like arrays).
+- `const u` is shallow: the binding cannot be reassigned (`S030`/`R030`), but
+  fields remain mutable.
+- Equality compares fields deeply (via the same structural rules as other values).
+- Display: `User { name: …, age: … }` in declaration field order.
+- No methods; enums / tagged unions / pattern match on user tags are Planned.
+- `export User` makes the type importable.
+
 ---
 
 ## 4. Expression grammar
 
 ```text
-expression  = conditional
-conditional = or ("?" conditional ":" conditional)?
-or          = and ("or" and)*
-and         = not ("and" not)*
-not         = "not" not | equality
-equality    = comparison (("==" | "!=") comparison)*
-comparison  = term (("<" | "<=" | ">" | ">=") term)*
-term        = factor (("+" | "-") factor)*
-factor      = unary (("*" | "/") unary)*
-unary       = "-" unary | postfix
-postfix     = primary (call | index | property)*
-call        = "(" args? ")"
-index       = "[" expression "]"
-property    = "." identifier
-args        = expression ("," expression)*
-primary     = literal | identifier | array | "(" expression ")"
-array       = "[" args? "]"
-literal     = integer | float | string | "true" | "false"
+expression   = conditional
+conditional  = coalesce (("?" conditional ":" conditional) | "?")?
+coalesce     = or ("??" coalesce)?
+or           = and ("or" and)*
+and          = not ("and" not)*
+not          = "not" not | equality
+equality     = comparison (("==" | "!=") comparison)*
+comparison   = term (("<" | "<=" | ">" | ">=") term)*
+term         = factor (("+" | "-") factor)*
+factor       = unary (("*" | "/") unary)*
+unary        = "-" unary | postfix
+postfix      = primary (call | index | property)*
+call         = "(" args? ")"
+index        = "[" expression "]"
+property     = "." identifier
+args         = expression ("," expression)*
+primary      = literal | identifier | array | "(" expression ")"
+             | "some" "(" expression ")" | "none"
+             | "ok" "(" expression ")" | "err" "(" expression ")"
+             | function-expr | struct-literal
+array        = "[" args? "]"
+literal      = integer | float | string | "true" | "false"
+function-expr = "fn" "(" params? ")" (block | expression)
+struct-literal = identifier "{" struct-fields? "}"
+struct-fields  = named-fields | positional-fields
+named-fields   = identifier ":" expression ("," identifier ":" expression)*
+positional-fields = expression ("," expression)*
 ```
+
+Struct literals are recognized when `{` is followed by `field:`, a value expression,
+or similar (so `if cond {` remains a block). Bare `{ }` is never a struct literal.
+
+A trailing `?` after a coalesce expression is Result postfix propagate when it is
+not the start of `? :` (see §5.10). `??` is Option coalesce (§4.2.2).
 
 ### 4.1 Precedence
 
 Lowest to highest:
 
-1. `? :` (right-associative)
-2. `or`
-3. `and`
-4. `not`
-5. `==` `!=`
-6. `<` `<=` `>` `>=`
-7. `+` `-`
-8. `*` `/`
-9. unary `-`
-10. call, index, `.property`
+1. `? :` and postfix Result `?` (disambiguated: `?` then `:` is ternary;
+   otherwise postfix when allowed — §5.10)
+2. `??` (right-associative)
+3. `or`
+4. `and`
+5. `not`
+6. `==` `!=`
+7. `<` `<=` `>` `>=`
+8. `+` `-`
+9. `*` `/`
+10. unary `-`
+11. call, index, `.property`
 
 Binary operators at the same level associate left-to-right.
 Unary operators associate right-to-left.
 `? :` associates right-to-left: `a ? b : c ? d : e` means `a ? b : (c ? d : e)`.
+`??` associates right-to-left: `a ?? b ?? c` means `a ?? (b ?? c)`.
 
 Examples:
 
@@ -386,6 +520,7 @@ Examples:
 | `not a == b` | `not (a == b)` |
 | `true or false and x` | `true or (false and x)` |
 | `a ? b : c ? d : e` | `a ? b : (c ? d : e)` |
+| `a ?? b ?? c` | `a ?? (b ?? c)` |
 
 ### 4.2 Boolean operators
 
@@ -406,9 +541,22 @@ ready ? "yes" : "no"
 - The condition must be Boolean (`R004`).
 - Only the selected branch is evaluated (short-circuit).
 - Both branches must produce a usable value (`R029` rejects `nothing`).
-- A `?` without a following `:` is `E001`.
 - This is the **expression** form for choosing a value. `if` remains a
   statement (see §5.3). Expression-`if` (`x := if ...`) is not accepted.
+- A `?` that starts a ternary requires `:`; missing `:` is `E001` when the `?`
+  is not Result postfix propagate (§5.10).
+
+### 4.2.2 Option coalesce `??`
+
+```vol
+print maybe ?? "missing"
+```
+
+- Left operand must be an Option (`R041` otherwise).
+- Result values are rejected (`R042`) — use if-let or postfix `?` for Result.
+- If left is `some(x)`, yield `x` and do **not** evaluate the right operand.
+- If left is `none`, evaluate and yield the right operand.
+- Both sides must produce a usable value (`R029` rejects `nothing`).
 
 ### 4.3 Arithmetic
 
@@ -436,9 +584,13 @@ Known properties:
 | `array.deep_copy()` | recursive deep clone of the array (`R032` on non-array) |
 | `array.sum()` | left fold of `+` starting from integer `0` |
 | `array.where(condition)` | eager filter; see below |
+| `array.map(transform)` | eager map; see below |
+| `array.count(condition)` | eager count of matches; see below |
 
 Unknown properties are `R007`. Using `.length` instead of `.len` is `R007` with
-a `fix` pointing at `.len`.
+a `fix` pointing at `.len`. Using `.each` as a property or call (for example
+`.each(fn...)`) is `R007` with a `fix` pointing at statement form
+`items.each item { ... }`.
 
 #### `.where`
 
@@ -453,7 +605,8 @@ Semantics:
 3. For each element in order:
    - bind `_` to that element in a fresh scope
    - evaluate the condition
-   - condition must be Boolean (`R022`)
+   - condition must be Boolean (`R022`); a `fn` value is not Boolean — `R022`
+     includes a `fix` suggesting a `_` expression such as `.where(_ > 5)`
    - if true, append the original element to a new result array
 4. Return the new array.
 
@@ -485,8 +638,43 @@ Semantics:
 4. Empty array yields `0`.
 5. Non-numeric items fail with `R013`.
 
-`.where` / `.sum()` are not parallel and not lazy in this prototype. Future
-fusion or parallelization of `.where` depends on the purity rule above.
+#### `.map`
+
+```vol
+items.map(_ * 2)
+```
+
+Semantics:
+
+1. Evaluate `items`; it must be an array (`R021`).
+2. Require exactly one argument (`R020`).
+3. For each element in order:
+   - bind `_` to that element in a fresh scope
+   - evaluate the transform expression
+   - append the result to a new array
+4. Return the new array.
+
+#### `.count`
+
+```vol
+items.count(_ > 2)
+```
+
+Semantics:
+
+1. Evaluate `items`; it must be an array (`R021`).
+2. Require exactly one argument (`R020`).
+3. For each element in order:
+   - bind `_` to that element in a fresh scope
+   - evaluate the condition (must be Boolean — `R022`, with the same `_`
+     expression `fix` as `.where` when the value is not Boolean)
+   - if true, increment a counter
+4. Return the count as an integer.
+
+`.where` / `.map` / `.count` / `.sum()` are not parallel and not lazy in this
+prototype. Future fusion or parallelization of pure collection pipelines depends
+on the purity rule above (treat `.map` transforms and `.count` predicates like
+`.where` for conformance).
 
 ---
 
@@ -496,31 +684,45 @@ fusion or parallelization of `.where` depends on the purity rule above.
 program     = statement*
 statement   = block-stmt
             | export-stmt
+            | import-stmt
+            | struct-decl
             | function-decl
             | return-stmt
             | print-stmt
             | if-stmt
+            | if-let-stmt
             | repeat-stmt
             | while-stmt
             | declaration
+            | multi-declaration
             | assignment
+            | multi-assignment
             | each-stmt
             | expression-stmt
 
 block       = "{" statement* "}"
 block-stmt  = block
 declaration = "const"? identifier ":=" expression
-assignment  = (identifier | index-expr) "=" expression
+multi-declaration = "const"? identifier ("," identifier)+ ":=" expression ("," expression)+
+assignment  = (identifier | index-expr | property-expr) "=" expression
+multi-assignment = identifier ("," identifier)+ "=" expression ("," expression)+
 each-stmt   = expression ".each" identifier block
 if-stmt     = "if" expression block ("elif" expression block)* ("else" block)?
+if-let-stmt = option-if-let | result-if-let
+option-if-let = "if" "some" identifier ":=" expression block "else" block
+result-if-let = "if" "ok" identifier ":=" expression block "else" "err" identifier block
+struct-decl = "struct" identifier "{" identifier+ "}"
+import-stmt = "import" string
 repeat-stmt = "repeat" expression block
 while-stmt  = "while" expression block
 print-stmt  = "print" expression
 return-stmt = "return" expression
-function-decl = "fn" identifier "(" params? ")" block
+function-decl = "fn" identifier "(" params? ")" (block | expression)
 export-stmt = "export" identifier ("," identifier)*
 params      = identifier ("," identifier)*
 ```
+
+`match` is not a statement. Writing `match …` is parse error `E153`.
 
 Statement separation:
 
@@ -542,11 +744,18 @@ Statement separation:
 name := expression
 const name := expression
 name = expression
+a, b := 0, 1
+a, b = b, a + b
 ```
 
 - `:=` declares a new **mutable** binding in the current scope.
+- Multi-declare: `a, b := x, y` (also `const a, b := …`) — name count must equal
+  value count (`E158`).
 - Redeclaring the same name in the same scope is an error (`S001` / `R001`).
 - `=` assigns to an existing variable or array index.
+- Multi-assign: `a, b = x, y` — name count must equal value count (`E159`). All
+  RHS expressions are fully evaluated (left to right) before any assignment, so
+  swap forms such as `a, b = b, a` work.
 - **Mutability model (decided):** bindings are mutable by default. Programmers do
   not mark ordinary variables as mutable. There is no `mut` keyword.
 - **Opt-in immutability:** `const name := expression` declares a binding that
@@ -618,6 +827,10 @@ items.each item {
 - Visits elements in order.
 - Binds `item` in a fresh scope for each iteration.
 - Intended for imperative per-item work, including mutation and `print`.
+- The form is a **statement**: `expression ".each" identifier block`. After
+  `.each`, an item name is required (`E103` with a `fix` suggesting
+  `items.each item { ... }`). Writing `.each(...)` as a call is not this
+  statement; it fails as unknown property `each` (`R007` with the same `fix`).
 
 `.each` and `.where` express different intents. Both are valid: use `.where` for
 pure filters (and `.sum()` for reduction); use `.each` when the body has side
@@ -635,6 +848,9 @@ Display rules:
 
 - integers, floats, Booleans, strings: ordinary text
 - arrays: `[a, b, c]` with recursive display
+- options: `some(…)` or `none`
+- results: `ok(…)` or `err(…)`
+- structs: `Type { field: …, … }` in field-declaration order
 - no quotes are added around strings in display
 
 ### 5.8 Functions
@@ -643,16 +859,26 @@ Display rules:
 fn add(a, b) {
     return a + b
 }
+
+double := fn(x) {
+    return x * 2
+}
+
+triple := fn(x) x * 3
 ```
 
 Rules:
 
-- Functions are declared with `fn`.
+- Named functions are declared with `fn name(params) { ... }` or
+  `fn name(params) expression` (expression body = implicit `return`).
+- Anonymous functions are expressions: `fn(params) { ... }` or `fn(params) expr`
+  (same keyword; no name). They may be bound, passed, or called immediately:
+  `fn(x) { return x }(1)`.
 - Parameters are local names in the function body.
-- Module-level functions are visible throughout the module, including before their
-  declaration text.
-- Nested functions are installed when execution reaches their declaration.
-- Functions capture their enclosing environment (closures).
+- Module-level named functions are visible throughout the module, including before
+  their declaration text.
+- Nested named functions are installed when execution reaches their declaration.
+- Functions (named and anonymous) capture their enclosing environment (closures).
 - `return expression` exits the current function with a value.
 - `return` is only legal inside a function (`E115`).
 - **Missing return (decided):** If execution falls off the end without `return`,
@@ -668,6 +894,7 @@ Rules:
 - Only functions/builtins are callable (`R017`).
 - Typed void-vs-value functions (requiring `return` on all paths for valued
   functions) are Planned—see [`IDEAS.md`](IDEAS.md).
+- JS-style `=>` is not Supported; prefer anonymous `fn`.
 
 Visibility:
 
@@ -694,6 +921,93 @@ fn add(a, b) {
 | `string` | `string(value)` | convert value to display string |
 | `args` | value | array of CLI arguments after the source file |
 
+### 5.10 Option / Result unwrap (if-let, `??`, `?`)
+
+`match` was removed in SF-1 (`E153`). Unwrap with if-let, Option `??`, or Result
+postfix `?`.
+
+#### Option if-let
+
+```vol
+if some name := maybe {
+    print name
+} else {
+    print "missing"
+}
+```
+
+Rules:
+
+- Scrutinee must be an Option (`R034`).
+- `else` block is required (`E154`).
+- `some` branch binds `name` in a fresh scope when present.
+- `else` runs when the value is `none`.
+
+#### Result if-let
+
+```vol
+if ok value := result {
+    print value
+} else err message {
+    print message
+}
+```
+
+Rules:
+
+- Scrutinee must be a Result (`R037`).
+- `else err <name>` is required (`E155` / `E156` / `E157`).
+- Plain `else { … }` without `err` binding is rejected.
+- `ok` / `err` branches each bind their payload in a fresh scope.
+
+#### Option coalesce
+
+See §4.2.2 (`??`).
+
+#### Result postfix `?`
+
+```vol
+fn twice(a, b) {
+    n := divide(a, b)?
+    return ok(n * 2)
+}
+```
+
+Rules:
+
+- Operand must be a Result (`R044`).
+- Legal only **inside a function** (`S041` at top level).
+- If `ok(x)`, the expression yields `x`.
+- If `err(e)`, the enclosing function returns `err(e)` immediately (propagate).
+- Does not apply to Option — use `??` or if-let.
+
+### 5.11 Modules and `import`
+
+```vol
+import "examples/features/modules/math"
+import "@std/demo"
+export add
+```
+
+Rules:
+
+- `vol run <entry.vol>` discovers the nearest `vol.config.json` by walking from
+  the entry file’s directory toward the filesystem root.
+- Config fields used: `root` (project root relative to the config file directory;
+  default `.`) and `paths` (alias prefix → subdirectory under the project root).
+- Missing config: project root is the entry file’s directory; no aliases.
+- After alias expansion, `import "P"` resolves to `{root}/P.vol` if that file
+  exists, else `{root}/P/mod.vol`. Otherwise `S031`.
+- Paths must not escape the project root (`S032`); `..` segments are rejected.
+- Import cycles report `S033` with a deterministic path list.
+- Only names listed in `export` are visible to importers (functions, bindings,
+  and struct types). Flat import installs those names into the importer’s module
+  scope; collisions are `S034`.
+- Dependency modules execute (top-level side effects) in topological order before
+  the entry module.
+- Ambient tiny core is unchanged; there is no automatic stdlib. `@std/...` only
+  works when it resolves to a real `.vol` file under the project.
+
 Built-in names cannot be redeclared at module scope.
 
 ---
@@ -708,16 +1022,18 @@ Static errors:
 | --- | --- |
 | `S001` | duplicate declaration in the same scope |
 | `S002` | use of an undefined name |
-| `S003` | wrong argument count for a known function/builtin/`.where` |
+| `S003` | wrong argument count for a known function/builtin/`.where`/`.map`/`.count` |
 | `S030` | assignment to a `const` binding |
+| `S041` | Result postfix `?` outside a function |
 
 Additional resolution rules:
 
 - Module functions are declared before body checking so forward calls work.
 - Ordinary locals are order-sensitive: use after declare in that scope.
-- `.where` conditions see `_` as a declared name.
+- `.where` / `.map` / `.count` expressions see `_` as a declared name.
 - `.each` item names belong to the loop scope.
 - Function parameters belong to the function scope.
+- If-let bindings belong to their branch scopes.
 
 ---
 
@@ -730,7 +1046,8 @@ Unless an operator short-circuits:
 3. For arrays: evaluate elements left to right.
 4. For statements: execute in source order.
 
-Short-circuiting applies to `and`, `or`, and `? :` (only the taken branch runs).
+Short-circuiting applies to `and`, `or`, `? :` (only the taken branch runs), and
+`??` (right side skipped when left is `some`).
 
 ---
 
@@ -750,10 +1067,10 @@ Pipeline:
 3. Resolve errors abort before execute.
 4. Runtime errors abort program execution immediately.
 
-There is no `try` / `catch` and no error values yet. **Future direction**
-(Planned only — see [`IDEAS.md`](IDEAS.md) “Error / result model”): hybrid
-traps for programmer/invariant failures plus Result values for expected
-operational failure; optional dual-return sugar later. Not part of SF-0.
+There is no `try` / `catch`. **Hybrid failure model (Supported):** traps for
+programmer/invariant failures (`Rxxx`), plus Result values (`ok` / `err`) for
+expected operational failure data, unwrapped with if-let or postfix `?`.
+Dual-return sugar remains Planned — see [`IDEAS.md`](IDEAS.md).
 
 The CLI emits diagnostics as human-readable text by default. Pass `--json`
 anywhere in the command to receive a single JSON object on stderr instead:
@@ -783,7 +1100,7 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | --- | --- |
 | `E101` | expected expression |
 | `E102` | invalid assignment target |
-| `E103` | missing `.each` item name |
+| `E103` | missing `.each` item name (`fix`: use `items.each item { ... }`) |
 | `E104` | missing `{` |
 | `E105` | missing `}` |
 | `E106` | missing `]` after index |
@@ -800,8 +1117,39 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `E117` | duplicate export |
 | `E118` | export of unknown name |
 | `E119` | missing statement separator newline |
-| `E120` | expected a name after `const` |
-| `E121` | expected `:=` after const name |
+| `E120` | expected a name after `const` / in a name list |
+| `E121` | expected `:=` after const name (or `:=`/`=` after names) |
+| `E129` | expected `(` after `some` |
+| `E130` | expected `)` after `some` value |
+| `E131` | expected string path after `import` |
+| `E132` | expected type name after `struct` |
+| `E133` | expected `{` after struct name |
+| `E134` | expected field name in `struct` |
+| `E135` | duplicate struct field |
+| `E136` | expected `}` to close `struct` |
+| `E137` | struct with no fields |
+| `E144`–`E148` | struct literal punctuation / fields |
+| `E149`–`E152` | `ok` / `err` call punctuation |
+| `E153` | `match` removed — use if-let / `??` / Result `?` |
+| `E154` | Option if-let missing `else` |
+| `E155` | Result if-let missing `else err` |
+| `E156` | Result if-let `else` without `err` binding |
+| `E157` | expected binding name after `err` |
+| `E158` | multi-declare name/value count mismatch |
+| `E159` | multi-assign name/value count mismatch |
+
+### 8.2.1 Module / resolve codes (loader)
+
+| Code | Meaning |
+| --- | --- |
+| `S031` | module not found / unreadable / imports without loader |
+| `S032` | import escapes project root or contains `..` |
+| `S033` | import cycle |
+| `S034` | imported name collides |
+| `S035` | invalid / unreadable `vol.config.json` or unknown alias |
+| `S036` | export missing at link time |
+| `S037` | nested `struct` declaration |
+| `S038` | construct non-struct type |
 
 ### 8.3 Runtime codes
 
@@ -813,7 +1161,7 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `R004` | non-Boolean condition |
 | `R005` | invalid `repeat` count |
 | `R006` | `.each` on non-array |
-| `R007` | unknown property |
+| `R007` | unknown property (`.length` / call-form `.each` include `fix`) |
 | `R008` | `not` on non-Boolean |
 | `R009` | unary `-` on non-number |
 | `R010` | `and` left operand not Boolean |
@@ -826,9 +1174,9 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `R017` | call of non-function |
 | `R018` | wrong function argument count |
 | `R019` | `.sum()` on non-array |
-| `R020` | `.where` wrong arity |
-| `R021` | `.where` on non-array |
-| `R022` | `.where` condition not Boolean |
+| `R020` | `.where` / `.map` / `.count` wrong arity |
+| `R021` | `.where` / `.map` / `.count` on non-array |
+| `R022` | `.where` / `.count` condition not Boolean (`fix`: use `_` expression) |
 | `R023` | `input` prompt not string |
 | `R024` | input read failure |
 | `R025` | `assert` condition not Boolean |
@@ -840,6 +1188,17 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `R031` | `.copy()` on non-array |
 | `R032` | `.deep_copy()` on non-array |
 | `R033` | `.byte_len` on non-string |
+| `R034` | Option if-let scrutinee is not an Option |
+| `R035` | assign through `.` on non-struct |
+| `R036` | unknown struct field |
+| `R037` | Result if-let scrutinee is not a Result |
+| `R038` | unknown / non-struct type in struct literal |
+| `R039` | struct literal missing field |
+| `R040` | struct literal unknown field |
+| `R041` | `??` left operand is not an Option |
+| `R042` | `??` applied to a Result |
+| `R043` | positional struct literal arity mismatch |
+| `R044` | postfix `?` operand is not a Result |
 | `R999` | internal unsupported expression |
 
 ---
@@ -874,6 +1233,8 @@ numbers := [4, 7, 2, 9, 12]
 large := numbers.where(_ > 5)
 print large // [7, 9, 12]
 print large.sum() // 28
+print numbers.map(_ * 2) // [8, 14, 4, 18, 24]
+print numbers.count(_ > 5) // 3
 ```
 
 ### 9.4 Functions
@@ -884,6 +1245,78 @@ fn square(n) {
 }
 
 print square(6) // 36
+
+double := fn(x) {
+    return x * 2
+}
+print double(21) // 42
+
+triple := fn(x) x * 3
+print triple(7) // 21
+```
+
+### 9.5 Option if-let and `??`
+
+```vol
+maybe := some(7)
+if some n := maybe {
+    print n // 7
+} else {
+    print "missing"
+}
+print maybe ?? 0 // 7
+print none // none
+```
+
+### 9.6 Result if-let and `?`
+
+```vol
+r := ok(7)
+if ok n := r {
+    print n // 7
+} else err msg {
+    print msg
+}
+
+fn divide(a, b) {
+    if b == 0 {
+        return err("zero")
+    }
+    return ok(a / b)
+}
+fn twice(a, b) {
+    n := divide(a, b)?
+    return ok(n * 2)
+}
+```
+
+### 9.7 Structs
+
+```vol
+struct User {
+    name
+    age
+}
+u := User { name: "Ada", age: 36 }
+v := User { "Ada", 36 }
+print u.name // Ada
+print v.age // 36
+```
+
+### 9.8 Multi-assign
+
+```vol
+a, b := 0, 1
+a, b = b, a + b
+print a // 1
+print b // 1
+```
+
+### 9.9 Imports
+
+```vol
+import "examples/features/modules/math"
+print add(21, 21) // 42
 ```
 
 ---
@@ -894,14 +1327,23 @@ Do not treat these as specified just because vision docs mention them:
 
 - static types and typed signatures
 - `const` parameter syntax (function parameters stay mutable; Planned)
-- ownership, borrowing, lifetimes
-- structs, enums, methods
+- ownership, borrowing, lifetimes (direction: local escape first, API contracts
+  later — [`IDEAS.md`](IDEAS.md); not implemented)
+- allocation inference / explicit allocators (unspecified; do not claim inference)
+- enums, tagged unions, methods on structs (product `struct` is Supported; tags
+  Planned — [`IDEAS.md`](IDEAS.md))
 - generics
-- packages/imports beyond local `export` metadata
-- `parallel`, async, channels
-- wrapping integer arithmetic and overflow build modes (default is trap; see §4.3)
-- Result / recoverable error values and dual-return sugar (direction in
-  [`IDEAS.md`](IDEAS.md); today all failures abort — §8)
+- symbol-selection imports (`import { x } from …`); multi-file folder packages
+  beyond `path.vol` / `path/mod.vol`
+- ambient growth of the prelude beyond today’s tiny built-ins
+- `parallel`, async, channels (no parallelization guarantees until specified)
+- wrapping integer arithmetic and overflow/bounds build modes (default is trap;
+  see §4.3; modes + wrap ops Planned in [`IDEAS.md`](IDEAS.md))
+- dual-return sugar over Result; converting `input`/`assert` to Result
+  (Result values + if-let / `?` are Supported; traps remain for bugs — §8)
+- `=>` arrow functions and `|>` pipeline sugar (directions in [`IDEAS.md`](IDEAS.md);
+  anonymous / expression-body `fn` and method chains are Supported)
+- richer pattern matching / `match` (removed in SF-1 surface; if-let is the Supported unwrap)
 - native memory layout / allocators
 - C or LLVM backends
 
@@ -932,10 +1374,30 @@ and Planned work in [`IDEAS.md`](IDEAS.md).
 - **`while` (§5.5):** permanent Supported vocabulary; no alternate spellings.
 - **`if` (§5.3):** statement only, with `elif` / `else`. Value choice uses
   `? :` (§4.2.1). Expression-`if` is not part of the language.
-- **Error model direction (§8, Planned):** hybrid traps for bugs/invariants;
-  Result for expected operational failure; no exception-primary model;
-  optional dual-return sugar later. **Not implemented** — SF-0 still aborts
-  on every failure. Details in [`IDEAS.md`](IDEAS.md).
+- **Error model (§3.5, §5.10, §8):** hybrid — traps for bugs/invariants;
+  Result values (`ok`/`err`) with if-let and postfix `?` (functions only) for
+  operational failure data. No exception-primary model. Dual-return sugar
+  Planned. `input`/`assert` still trap. `match` is Rejected (`E153`).
+- **Option (§3.4, §5.10):** explicit Option with `some` / `none`; unwrap with
+  if-let and `??`; distinct from Result and `nothing`; no null. Optional `?T`
+  sugar remains Planned.
+- **Anonymous / expression-body `fn` (§5.8):** Supported; `=>` rejected; `_` in
+  `.where` / `.map` / `.count` unchanged. Pipeline `|>` remains Planned.
+- **Multi-assign (§5.2):** `a, b := …` / `a, b = …` Supported (RHS evaluated
+  before assigns).
+- **Collection map/count (§4.4):** `.map(_)` and `.count(_)` Supported.
+- **Structs (§3.6):** product `struct` with named and positional literals
+  Supported (SF-1). Tagged unions/enums and methods remain Planned.
+- **Modules (§5.11):** `import` + `vol.config.json` discovery/aliases Supported
+  (SF-1); ambient tiny core; explicit path for everything else.
+- **Ownership / allocation direction (Planned):** local escape analysis first;
+  API contracts later; allocation unspecified — do not claim inference.
+- **Parallel direction (Planned):** `parallel` stays Planned; no guarantees
+  until scheduling and failure are specified.
+- **Build modes direction (Planned):** trap default for overflow/bounds; modes
+  and/or explicit wrap ops later.
+- **Pipeline direction (Planned):** method chains Supported; if pipes later,
+  `|>` not bare `|`.
 
 Implementers and LLMs must follow the concrete behavior in sections 1–9.
 
@@ -962,8 +1424,9 @@ Details and commands live in [`IDEAS.md`](IDEAS.md).
 When changing language behavior:
 
 1. If the change adds, removes, or renames Supported surface, **bump the surface
-   freeze** (SF-0 → SF-1, …), add a new language card version, and note the bump
-   in [`IDEAS.md`](IDEAS.md) / README. Pure bugfixes and doc sync stay on SF-0.
+   freeze** (SF-1 → SF-2, …), add a new language card (`vol_v2.md`, …), and note
+   the bump in [`IDEAS.md`](IDEAS.md) / README. Pure bugfixes and doc sync stay
+   on the active freeze without a bump. Do not keep intermediate draft cards.
 2. Update this specification (including the quick vocabulary tables when forms change).
 3. Add or adjust tests in `internal/lang`.
 4. Update `README.md` examples if users should learn the change.
@@ -972,7 +1435,7 @@ When changing language behavior:
 
 ```text
 go test ./...
-go run ./cmd/vol run ./examples/first.vol
+go run ./cmd/vol run ./examples/basics/first.vol
 git diff --check
 ```
 

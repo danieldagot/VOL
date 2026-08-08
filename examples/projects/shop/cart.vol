@@ -1,0 +1,26 @@
+export Item, line_total, cart_total, checkout
+
+struct Item {
+    name
+    price
+    qty
+}
+
+fn line_total(item) {
+    return item.price * item.qty
+}
+
+fn cart_total(items) {
+    total := 0
+    items.each item {
+        total = total + line_total(item)
+    }
+    return total
+}
+
+fn checkout(items) {
+    if items.len == 0 {
+        return err("empty cart")
+    }
+    return ok(cart_total(items))
+}

@@ -1,0 +1,16 @@
+// Anonymous functions: fn(params) { ... } as values.
+
+double := fn(x) {
+    return x * 2
+}
+print double(21)
+
+add := fn(a, b) {
+    return a + b
+}
+print add(3, 4)
+
+// Immediate call
+print fn(n) {
+    return n * n
+}(6)

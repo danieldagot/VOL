@@ -22,13 +22,21 @@ const (
 	TokenFn
 	TokenReturn
 	TokenExport
+	TokenImport
 	TokenConst
 	TokenAnd
 	TokenOr
 	TokenNot
+	TokenSome
+	TokenNone
+	TokenMatch
+	TokenStruct
+	TokenOk
+	TokenErr
 	TokenColonEqual
 	TokenColon
 	TokenQuestion
+	TokenQuestionQuestion
 	TokenEqual
 	TokenEqualEqual
 	TokenBangEqual

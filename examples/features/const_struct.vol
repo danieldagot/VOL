@@ -1,0 +1,9 @@
+// const is shallow: the binding cannot be reassigned, but fields stay mutable.
+
+struct Counter {
+    n
+}
+
+const c := Counter { n: 0 }
+c.n = 1
+print c.n

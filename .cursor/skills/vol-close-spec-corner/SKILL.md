@@ -84,7 +84,8 @@ After the user confirms, do this loop:
 3. Change the interpreter / lexer / parser / resolver only if behavior or accepted syntax changes
 4. Add tests for the edge cases from Phase 2
 5. Update `README.md` only if users would write different code or status lists change
-6. Update `examples/*.vol` only when the feature is important enough to teach
+6. Update `examples/` (basics / features / projects) when the feature is teachable;
+   sync `examples/README.md`
 
 ### Spec hygiene (mandatory)
 
@@ -99,7 +100,7 @@ After the user confirms, do this loop:
 ```text
 gofmt -w <changed Go files>
 go test ./...
-go run ./cmd/vol run ./examples/first.vol
+go run ./cmd/vol run ./examples/basics/first.vol
 git diff --check
 ```
 

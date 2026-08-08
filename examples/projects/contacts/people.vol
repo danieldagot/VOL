@@ -1,0 +1,20 @@
+export Contact, find_by_name, display
+
+struct Contact {
+    name
+    email
+}
+
+fn find_by_name(book, name) {
+    found := none
+    book.each c {
+        if c.name == name {
+            found = some(c)
+        }
+    }
+    return found
+}
+
+fn display(c) {
+    return c.name + " <" + c.email + ">"
+}

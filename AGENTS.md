@@ -33,20 +33,28 @@ VOL aims to combine concise, intent-oriented source code with memory safety,
 predictable execution, and native performance.
 
 **Current reality:** VOL is a tree-walking interpreter prototype with a small
-provisional syntax. **Surface Freeze SF-0** pins that Supported surface
-([`SPEC.md`](SPEC.md) §0) and the LLM card `bench/llm/cards/vol_v0.md`. Do not
-add Planned syntax under SF-0. There is no native backend, static type system,
-ownership checker, or standard library. Keep vision and implementation status
-distinct in every document.
+provisional syntax. **Surface Freeze SF-1** pins that vision-aligned Supported
+surface ([`SPEC.md`](SPEC.md) §0) and the LLM card `bench/llm/cards/vol_v1.md`
+(SF-0 / `vol_v0` remains for historical `core_v2` tables). Do not add Planned
+syntax under SF-1 without a freeze bump. There is no native backend, static type
+system, ownership checker, or broad standard library (ambient tiny core only).
+Keep vision and implementation status distinct in every document.
 
 Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 
 - bindings are **mutable by default**; opt-in `const name := expression` is Supported (shallow; `S030`/`R030` on reassignment)
+- multi-assign `a, b := …` / `a, b = …` is Supported (RHS fully evaluated before assigns)
 - array assignment **shares** references; use `.copy()` (shallow) or `.deep_copy()` (recursive) for isolation
 - integer overflow **traps** (`R028`) with a `fix` suggestion; wrapping modes are Planned
-- `.where` predicates are **pure**; side effects belong in `.each`
+- `.where` predicates are **pure**; side effects belong in `.each`; `.map` / `.count` are Supported
 - missing `return` yields `nothing`; discarding in a call statement is OK;
   assigning or using `nothing` as a value is `R029`
+- Option uses `some` / `none` with if-let and `??`; Result uses `ok` / `err`
+  with if-let and postfix `?` (functions only); both distinct from `nothing`;
+  bugs still trap; `match` is Rejected (`E153`)
+- anonymous `fn(params) { ... }` and expression-body `fn(params) expr` are Supported (`=>` is not)
+- product `struct` with named and positional literals and `.` field access is Supported
+- `import "path"` + `vol.config.json` discovery/aliases; `export` is live across modules
 - `.len` is the length property (string: Unicode scalars); `.length` is rejected
 - `while` is permanent Supported vocabulary (with `repeat` and `.each` for other intents)
 - `if` is a statement (`elif` / `else`); value choice uses `? :` (not expression-`if`)
@@ -204,9 +212,11 @@ Priority:
 4. Performance
 5. Compile speed
 
-Near-term project priority: **SF-0 is active** — keep the frozen surface precise
-(tests, diagnostics, docs) and build foundations (formatter, error model,
-modules) before an SF-1 feature bump. See `IDEAS.md` and `SPEC.md` §0.
+Near-term project priority: **SF-1 is active** — keep the frozen surface precise
+(tests, diagnostics, docs) and build foundations (formatter; richer std via
+imports) before an SF-2 feature bump. Remaining directions (enums, dual-return
+sugar, ownership/alloc, build modes, `|>`, parallel) are sketched in
+[`IDEAS.md`](IDEAS.md). See `SPEC.md` §0 / §11.
 
 ---
 
@@ -447,8 +457,10 @@ removed, renamed, or changed, inspect and update every applicable file below.
   [`SPEC.md`](SPEC.md) decided rules. Do not show diagnostic samples that imply
   undecided or rejected defaults (for example immutable-by-default or silent
   integer wrap).
-- `examples/*.vol`: Update or add a small executable example when a feature is
-  important enough to teach users directly.
+- `examples/`: Update or add a small executable example when a feature is
+  important enough to teach users directly. Prefer `examples/basics/` (tour),
+  `examples/features/` (one-topic demos), or `examples/projects/` (multi-file
+  apps). Keep [`examples/README.md`](examples/README.md) in sync.
 - `vol.config.json`: Update only when project discovery, roots, aliases, or other
   project-level configuration changes.
 
@@ -490,7 +502,7 @@ Run:
 ```text
 gofmt -w <changed Go files>
 go test ./...
-go run ./cmd/vol run ./examples/first.vol
+go run ./cmd/vol run ./examples/basics/first.vol
 git diff --check
 ```
 

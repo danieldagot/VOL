@@ -1,0 +1,10 @@
+export User, greet
+
+struct User {
+    name
+    age
+}
+
+fn greet(u) {
+    return "Hello, " + u.name
+}

@@ -252,3 +252,250 @@ func TestBuiltinArityIsResolved(t *testing.T) {
 		}
 	}
 }
+
+func TestOptionSomeNoneIfLetAndCoalesce(t *testing.T) {
+	output, diagnostic := run(t, `
+maybe := some(7)
+print maybe
+if some n := maybe {
+    print n
+} else {
+    print "missing"
+}
+print maybe ?? 0
+empty := none
+print empty
+if some n := empty {
+    print n
+} else {
+    print "missing"
+}
+print empty ?? "guest"
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "some(7)\n7\n7\nnone\nmissing\nguest\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestAnonymousFunctionExpression(t *testing.T) {
+	output, diagnostic := run(t, `
+double := fn(x) {
+    return x * 2
+}
+print double(21)
+print fn(a, b) {
+    return a + b
+}(3, 4)
+triple := fn(x) x * 3
+print triple(7)
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "42\n7\n21\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestMultiAssignAndDestructuring(t *testing.T) {
+	output, diagnostic := run(t, `
+a, b := 0, 1
+print a
+print b
+a, b = b, a + b
+print a
+print b
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "0\n1\n1\n1\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestResultPropagate(t *testing.T) {
+	output, diagnostic := run(t, `
+fn divide(a, b) {
+    if b == 0 {
+        return err("zero")
+    }
+    return ok(a / b)
+}
+fn twice(a, b) {
+    n := divide(a, b)?
+    return ok(n * 2)
+}
+if ok v := twice(10, 2) {
+    print v
+} else err e {
+    print e
+}
+if ok v := twice(10, 0) {
+    print v
+} else err e {
+    print e
+}
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "10\nzero\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestMapAndCount(t *testing.T) {
+	output, diagnostic := run(t, `
+nums := [1, 2, 3, 4]
+print nums.map(_ * 2)
+print nums.count(_ > 2)
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "[2, 4, 6, 8]\n2\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestPositionalStructLiteral(t *testing.T) {
+	output, diagnostic := run(t, `
+struct User {
+    name
+    age
+}
+u := User { "Ada", 36 }
+print u.name
+print u.age
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "Ada\n36\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestIfLetRequiresOption(t *testing.T) {
+	_, diagnostic := run(t, `if some n := 1 {
+    print n
+} else {
+    print "x"
+}`)
+	if diagnostic == nil || diagnostic.Code != "R034" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestResultOkErrAndIfLet(t *testing.T) {
+	output, diagnostic := run(t, `
+r := ok(7)
+print r
+if ok n := r {
+    print n
+} else err msg {
+    print msg
+}
+e := err("nope")
+print e
+if ok n := e {
+    print n
+} else err msg {
+    print msg
+}
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "ok(7)\n7\nerr(nope)\nnope\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestIfLetRequiresResult(t *testing.T) {
+	_, diagnostic := run(t, `if ok n := 1 {
+    print n
+} else err e {
+    print e
+}`)
+	if diagnostic == nil || diagnostic.Code != "R037" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestMatchRejected(t *testing.T) {
+	_, diagnostic := run(t, `match none {
+    some n { print n }
+    none { print "x" }
+}`)
+	if diagnostic == nil || diagnostic.Code != "E153" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+	if diagnostic.Fix == "" {
+		t.Fatal("expected fix suggestion")
+	}
+}
+
+func TestCoalesceRejectsResult(t *testing.T) {
+	_, diagnostic := run(t, `print ok(1) ?? 0`)
+	if diagnostic == nil || diagnostic.Code != "R042" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestCoalesceShortCircuit(t *testing.T) {
+	output, diagnostic := run(t, `
+side := 0
+fn bump() {
+    side = side + 1
+    return 9
+}
+print some(3) ?? bump()
+print side
+print none ?? bump()
+print side
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "3\n0\n9\n1\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestStructConstructAccessAndAssign(t *testing.T) {
+	output, diagnostic := run(t, `
+struct User {
+    name
+    age
+}
+u := User { name: "Ada", age: 36 }
+print u.name
+u.age = 37
+print u.age
+print u
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "Ada\n37\nUser { name: Ada, age: 37 }\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestStructLiteralRequiresAllFields(t *testing.T) {
+	_, diagnostic := run(t, `
+struct Point {
+    x
+    y
+}
+p := Point { x: 1 }
+`)
+	if diagnostic == nil || diagnostic.Code != "R039" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}

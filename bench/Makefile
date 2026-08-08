@@ -38,5 +38,7 @@ REQUEST_TIMEOUT ?=
 llm-ollama: sync
 	uv run python llm/harness/run_generate_repair.py --provider ollama --model $(MODEL) --suite smoke --replicates 1 --tasks "$(TASKS)" $(if $(REQUEST_TIMEOUT),--request-timeout $(REQUEST_TIMEOUT),)
 
+# LANGS=vol skips Python when iterating VOL-only (reuse last published Python numbers).
+LANGS ?= vol,python
 llm-core: sync
-	uv run python llm/harness/run_generate_repair.py --provider ollama --model $(MODEL) --suite core --replicates 3 --tasks "$(TASKS)" $(if $(REQUEST_TIMEOUT),--request-timeout $(REQUEST_TIMEOUT),)
+	uv run python llm/harness/run_generate_repair.py --provider ollama --model $(MODEL) --suite core --langs $(LANGS) --replicates 3 --tasks "$(TASKS)" $(if $(REQUEST_TIMEOUT),--request-timeout $(REQUEST_TIMEOUT),)

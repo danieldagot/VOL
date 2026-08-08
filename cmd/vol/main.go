@@ -38,24 +38,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	source, err := os.ReadFile(path)
-	if err != nil {
+	if _, err := os.Stat(path); err != nil {
 		fmt.Fprintf(stderr, "vol: %v\n", err)
-		return 1
-	}
-
-	reportDiagnostic := func(d *lang.Diagnostic) {
-		if jsonMode {
-			encoded, _ := json.Marshal(d)
-			fmt.Fprintln(stderr, string(encoded))
-		} else {
-			fmt.Fprintln(stderr, d.Human(string(source)))
-		}
-	}
-
-	program, diagnostic := lang.Parse(path, string(source))
-	if diagnostic != nil {
-		reportDiagnostic(diagnostic)
 		return 1
 	}
 
@@ -66,7 +50,23 @@ func run(args []string, stdout, stderr io.Writer) int {
 			programArgs = programArgs[1:]
 		}
 	}
-	if diagnostic = lang.ExecuteWithOptions(program, stdout, lang.ExecuteOptions{Input: os.Stdin, Args: programArgs}); diagnostic != nil {
+
+	reportDiagnostic := func(d *lang.Diagnostic) {
+		if jsonMode {
+			encoded, _ := json.Marshal(d)
+			fmt.Fprintln(stderr, string(encoded))
+			return
+		}
+		source := ""
+		if d.File != "" {
+			if data, err := os.ReadFile(d.File); err == nil {
+				source = string(data)
+			}
+		}
+		fmt.Fprintln(stderr, d.Human(source))
+	}
+
+	if diagnostic := lang.RunFile(path, stdout, lang.ExecuteOptions{Input: os.Stdin, Args: programArgs}); diagnostic != nil {
 		reportDiagnostic(diagnostic)
 		return 1
 	}

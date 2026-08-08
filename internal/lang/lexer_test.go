@@ -7,7 +7,7 @@ import (
 )
 
 func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
-	source := `name _value true false if elif else repeat while print fn return export const and or not 42 3.5 "text" := : ? = == != < <= > >= + - * / { } [ ] ( ) , .`
+	source := `name _value true false if elif else repeat while print fn return export import const and or not some none match struct ok err 42 3.5 "text" := : ?? ? = == != < <= > >= + - * / { } [ ] ( ) , .`
 	tokens, diagnostic := lex("tokens.vol", source)
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
@@ -16,9 +16,10 @@ func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
 	want := []TokenKind{
 		TokenIdentifier, TokenIdentifier,
 		TokenTrue, TokenFalse, TokenIf, TokenElif, TokenElse, TokenRepeat, TokenWhile,
-		TokenPrint, TokenFn, TokenReturn, TokenExport, TokenConst, TokenAnd, TokenOr, TokenNot,
+		TokenPrint, TokenFn, TokenReturn, TokenExport, TokenImport, TokenConst, TokenAnd, TokenOr, TokenNot,
+		TokenSome, TokenNone, TokenMatch, TokenStruct, TokenOk, TokenErr,
 		TokenInteger, TokenFloat, TokenString,
-		TokenColonEqual, TokenColon, TokenQuestion, TokenEqual, TokenEqualEqual, TokenBangEqual,
+		TokenColonEqual, TokenColon, TokenQuestionQuestion, TokenQuestion, TokenEqual, TokenEqualEqual, TokenBangEqual,
 		TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual,
 		TokenPlus, TokenMinus, TokenStar, TokenSlash,
 		TokenLeftBrace, TokenRightBrace, TokenLeftBracket, TokenRightBracket,
@@ -31,7 +32,7 @@ func TestLexerRecognizesCompleteVocabulary(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("token kinds\n got: %#v\nwant: %#v", got, want)
 	}
-	if tokens[0].Lexeme != "name" || tokens[17].Lexeme != "42" || tokens[19].Lexeme != "text" {
+	if tokens[0].Lexeme != "name" || tokens[24].Lexeme != "42" || tokens[26].Lexeme != "text" {
 		t.Fatalf("unexpected lexemes: %#v", tokens)
 	}
 }

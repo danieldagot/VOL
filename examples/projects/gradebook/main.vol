@@ -1,0 +1,12 @@
+// Classroom gradebook: structs, imports, .map / .count / .where.
+
+import "examples/projects/gradebook/grades"
+
+class := [Student { name: "Ada", score: 92 }, Student { name: "Grace", score: 88 }, Student { name: "Alan", score: 54 }, Student { name: "Katherine", score: 97 }]
+
+print "Roster: " + string(names_of(class))
+print "Average: " + string(average(class))
+print "Passing: " + string(passing_count(class))
+
+high := class.where(_.score >= 90)
+print "Honor roll: " + string(names_of(high))

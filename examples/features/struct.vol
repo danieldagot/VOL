@@ -1,0 +1,12 @@
+struct User {
+    name
+    age
+}
+
+u := User { name: "Ada", age: 36 }
+print u.name
+u.age = 37
+print u.age
+print u
+v := User { "Grace", 40 }
+print v.name

@@ -8,16 +8,20 @@ specified and tested.
 
 ## Near-Term Priority: Precise Core Before New Features
 
-**Surface Freeze SF-0 is active** (see [`SPEC.md`](SPEC.md) §0). The Supported
-Prototype v0 surface and LLM card `bench/llm/cards/vol_v0.md` are frozen.
-Do not expand the language until foundations below justify an SF-1 bump.
+**Surface Freeze SF-1 is active** (see [`SPEC.md`](SPEC.md) §0). The vision-aligned
+Supported surface and LLM card `bench/llm/cards/vol_v1.md` are frozen. SF-0 /
+`vol_v0` remains for historical harness tables. Do not expand the language until
+foundations justify SF-2.
 
-Frozen core (do not grow under SF-0):
+Frozen core (do not grow under SF-1 without a bump):
 
-- values, variables, functions
-- `if` / `elif` / `else`, `repeat`, `while`, `? :`
-- arrays, `.each`, `.where`, `.sum()`
-- built-ins already accepted by the interpreter
+- values, variables (including multi-assign), named/anonymous/expression-body `fn`,
+  product structs (named + positional literals)
+- `if` / `elif` / `else`, if-let, `repeat`, `while`, `? :`, Option `??`, Result `?`
+- arrays, `.each`, `.where`, `.map`, `.count`, `.sum()`, `some` / `none`, `ok` / `err`
+- `import` / `export` with `vol.config.json` discovery
+- built-ins already accepted by the interpreter (ambient tiny core)
+- `match` is Rejected (`E153`)
 
 Immediate documentation and design work:
 
@@ -25,15 +29,24 @@ Immediate documentation and design work:
       scopes, evaluation order, numeric behavior, arrays/strings, mutation,
       functions, control flow, and failure behavior for the implemented core.
 - [x] Declare Surface Freeze SF-0 (SPEC + `vol_v0` language card).
+- [x] Declare Surface Freeze SF-1 (vision-aligned surface; card `vol_v1`).
 - [ ] Keep `SPEC.md` synchronized whenever interpreter behavior changes.
-- [x] Error/result model sketch (hybrid traps + Result; dual-return sugar later).
-- [ ] Foundations before SF-1: smaller matched language card, formatter design,
-      modules sketch (still Planned — not syntax).
+- [x] Error/result model — **Result values + if-let / `?` implemented** (SF-1);
+      dual-return still Planned.
+- [x] Option / optional-values — **implemented** (`some`/`none`/if-let/`??`); `?T` still Planned.
+- [x] Modules — **implemented** (config + `path.vol` / `path/mod.vol`; ambient tiny core).
+- [x] Phase-2 design directions #2–#11 (structs/Result/unwrap/density in SF-1;
+      remaining ownership/alloc, parallel, build modes, pipelines).
+- [ ] Foundations before SF-2: formatter design; richer std libraries behind imports.
 - [x] Write `LLM_BENCHMARK.md` with a falsifiable generate/repair protocol;
       harness + Gemini `core_v2` published — see checklist in that file.
 - [ ] Keep Planned syntax out of `SPEC.md`; only Supported and Provisional forms belong there.
 - [x] Publish frozen `core_v2` with default Python baseline (`--langs vol,python`).
 - [ ] Publish ≥1 other model on `core_v2` before treating LLM results as stable.
+- [x] Re-run / publish against `vol_v1` / SF-1 (`core_v2` Gemini 20260808-040028);
+      second model still needed before treating numbers as stable.
+- [x] **Token-efficient syntax (in SF-1)** — see [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md)
+      (unwrap redesign + density sugar shipped; measure before further sugar).
 
 ## Near-Term Foundation
 
@@ -55,6 +68,7 @@ Immediate documentation and design work:
 - [x] Integer, floating-point, Boolean, and string literals.
 - [x] Variables with inferred types.
 - [x] Mutability default: bindings are mutable (`:=` / `=`). See `SPEC.md` §5.2.
+- [x] Multi-assign / multi-declare (`a, b := …` / `a, b = …`) (SF-1). See `SPEC.md` §5.2.
 - [x] Opt-in immutable bindings with `const name := expression` (shallow). See `SPEC.md` §5.2.
 - [x] Arithmetic, comparison, and Boolean operators.
 - [x] Integer overflow traps by default (`R028`). See `SPEC.md` §4.3.
@@ -70,6 +84,7 @@ Immediate documentation and design work:
 - [x] Explicit array clone: `a.copy()` (shallow) and `a.deep_copy()` (recursive). See `SPEC.md` §3.3.
 - [x] Collection iteration with `.each`.
 - [x] Filtering with `.where` and aggregation with `.sum()`.
+- [x] `.map(_)` and `.count(_)` (SF-1).
 - [x] `.where` predicates are pure by rule; side effects use `.each` (`SPEC.md` §4.4).
 - [ ] Purity diagnostics / checks for `.where` predicates.
 - [x] Functions, parameters, calls, and return values.
@@ -119,19 +134,23 @@ Planned:
 - allow clearly pure helper calls such as Boolean predicates over `_`
 - treat purity as a prerequisite for any future fusion or parallel `.where`
 
-### Wrapping integer arithmetic / overflow modes
+### Wrapping integer arithmetic / overflow and build modes
 
 Decided language rule (already in `SPEC.md` §4.3): integer overflow **traps** by
 default (`R028`) with a human message and machine-readable `fix` field so LLMs
-can help repair programs.
+can help repair programs. Bounds checks likewise trap today (`R016`).
 
-Planned escapes (not accepted today):
+**Direction decided (not implemented):** keep trap as the default; later add
+**build modes** and/or **explicit wrapping ops** in the same family:
 
-- explicit wrapping operations, and/or
-- build modes such as debug-trap (default today) vs release-wrap
+- debug / default: trap on overflow and out-of-bounds (today’s behavior)
+- optional release-wrap (or similar) mode for overflow when explicitly selected
+- explicit wrapping operations for local opt-in without changing global mode
+- bounds-checking policy across modes follows the same “safe by default, opt in
+  to weaker checking” story — exact mode names TBD
 
-JSON diagnostic output is now implemented: `vol --json run <file.vol>` emits a
-single JSON object on stderr. The human form is still the default.
+Do not document silent wrap as Supported. JSON diagnostic output is implemented:
+`vol --json run <file.vol>` emits a single JSON object on stderr (human form default).
 
 ### Explicit array clone ✓ implemented
 
@@ -175,148 +194,137 @@ Remaining open items:
 
 ### Syntactic sugar from familiar languages (arrows + pipes)
 
-**Blocked by Surface Freeze SF-0.** Desired surface sugar inspired by languages
-used so far (JS arrow functions, PowerShell pipelines). Both are **Planned**
-only — not accepted syntax. Prefer one canonical form per intent; do not ship
-JS `=>` and PowerShell `|` and keep today’s `fn` / `.where` / `.sum` as three
-competing spellings without a rule. Revisit only with an SF-1 bump.
+#### Anonymous / arrow functions ✓ SF-1
 
-#### Anonymous / arrow functions
-
-Today: only named `fn name(params) { ... }`, plus `_` inside `.where` predicates.
-Wanted: short first-class functions for callbacks and local helpers (JS feel).
-
-Candidate shapes (pick one later; do not implement all):
+**Implemented:** anonymous `fn(params) { ... }` and expression-body
+`fn(params) expr` (see `SPEC.md` §5.8). Named `fn name(...)` and `_` in
+`.where` / `.map` / `.count` remain Supported. Prefer anonymous `fn` over
+JS-style `=>` (still rejected).
 
 ```vol
-// A — anonymous fn (same keyword as named functions)
 double := fn(x) { return x * 2 }
-
-// B — expression arrow (JS-like)
-double := (x) => x * 2
-add := (a, b) => a + b
-
-// C — keep `_` for collection predicates; named/anonymous fn elsewhere
+triple := fn(x) x * 3
 items.where(_ > 5)
 ```
 
-Open questions:
+Open follow-ups:
 
-- Prefer anonymous `fn` (A) over `=>` (B) unless JS familiarity is worth a second glyph.
-- Expression body vs block body; required parens for a single parameter?
-- Does arrow/`fn` replace `_` in `.where`, or coexist? Coexistence needs a clear
-  canonical form for the formatter and language card.
-- Closures already exist for nested named `fn`; anonymous forms must share the
-  same capture and `nothing` / `return` rules (`SPEC.md` §5.8).
+- Canonical filter/map form: `_` vs `fn` in collection ops for the formatter/card
 
 #### Pipeline sugar
 
-Today: method chaining expresses collection intent —
+Today: method chaining expresses collection intent (Supported):
 
 ```vol
 nums.where(_ > 0).sum()
 ```
 
-Wanted: PowerShell-like left-to-right pipelines for “pass this into the next
-step.” Bare `|` is attractive from shells but conflicts with a future bitwise OR
-in a systems language — prefer `|>` (or keep method chains only) unless `|` is
-explicitly reserved for pipes and bitwise uses another spelling.
-
-Candidate shapes:
+**Direction:** keep **method chains** under SF-1. If pipeline sugar is added at
+a later freeze (SF-2+), use **`|>`** (first-arg / Elixir-like), not bare `|`.
 
 ```vol
-// Method chain (already Supported — default until pipes are specified)
-nums.where(_ > 0).sum()
-
-// First-arg / pipeline sugar (Elixir/F#-like), not shell stdout
+// Planned — not accepted today
 result := nums |> where(_ > 0) |> sum
-
-// Bare | (PowerShell-like) — only if bitwise OR is deferred or respelt
-result := nums | where(_ > 0) | sum
 ```
 
-Open questions:
+Open follow-ups (if `|>` ships):
 
-- Semantics: value as first argument (`x |> f` ⇒ `f(x)`), special method-name
-  RHS (`x |> where(...)`), or collection-only pipeline?
-- Eager vs lazy; interaction with `.where` purity and future `.map` / reduce.
-- Formatter canonical form: method chain vs `|>` when both would be legal.
-- Do not document `|` as Supported until bitwise-or policy is decided.
+- Semantics: `x |> f` ⇒ `f(x)` vs special method-name RHS vs collection-only
+- Eager vs lazy; interaction with `.where` / `.map` / `.count` purity and reduce
+- Formatter canonical form when both chain and `|>` would be legal
 
 ### Parallel intent
 
+**Direction decided (not implemented):** `parallel { ... }` remains Planned.
+VOL claims **no parallelization guarantees** until scheduling, allocation,
+ordering, and failure behavior are specified. Do not document automatic
+parallelization as safe or deterministic today.
+
 ```vol
+// Planned — not accepted today; semantics undefined until specified
 parallel {
     process(requests)
 }
 ```
 
-Automatic parallelization must preserve correctness and predictable resource use.
-Exact semantics, scheduling, allocation, and failure behavior are undecided.
+### Error / result model ✓ SF-1 (values + if-let / `?`)
 
-### Error / result model (design direction — not syntax)
+**Implemented:** Result values `ok(x)` / `err(x)` with if-let unwrap and postfix
+`?` propagate inside functions (see `SPEC.md` §3.5 / §5.10). `match` removed
+(`E153`). Hybrid rule remains:
 
-**Direction decided; blocked for implementation by Surface Freeze SF-0** (and by
-missing types / stdlib). Today the interpreter only **aborts** on failure
-(`SPEC.md` §8): no `try`/`catch`, no error values. That interim behavior stays
-until an SF bump ships the model below.
-
-**Hybrid rule:**
-
-1. **Traps (language / programmer mistakes)** — keep aborting with diagnostics:
-   overflow (`R028`), bounds, type mistakes, div-by-zero, failed `assert`, and
-   similar invariant breaks. These are not meant to be handled as normal values.
-2. **Result values (expected operational failure)** — when I/O, parse, net, DB,
-   and similar APIs exist, they return a Result-like success/failure value the
-   program can inspect or propagate. Prefer one canonical Result shape over
-   exceptions.
-3. **No exceptions** as the primary error model (`try`/`catch` is not planned
-   as the default).
-
-**Canonical form (Planned spelling — pick exact names with types/SF-1):**
+1. **Traps** for bugs/invariants (overflow, bounds, `assert`, …).
+2. **Result values** for operational success/failure data the program can inspect.
+3. **No exceptions** as the primary model.
 
 ```vol
-// Illustrative only — not accepted today
-result := open("config.json")   // Result[File, Error] (or equivalent tags)
-match result {
-    ok file { /* use file */ }
-    err e { /* handle or return err */ }
-}
+r := ok(7)
+if ok n := r { print n } else err e { print e }
+n := divide(10, 2)?
 ```
 
-**Future dual-return sugar (optional, not canonical alone):**
+Still Planned:
 
-Go-style multi-assign may be added later as **sugar over Result**, not a second
-competing model. Ignoring the error binding must remain a diagnosable mistake
-(same discipline as discarding an unchecked Result).
+- dual-return sugar over Result
+- Unused-Result / ignored-`err` diagnostics
+- Result-returning I/O (`input` stays trap `R024` for now)
+- richer error types once tagged unions exist
+
+### Optional / nullable values ✓ SF-1
+
+**Implemented:** explicit Option with `some(x)` / `none`, if-let, and `??`
+(see `SPEC.md` §3.4 / §5.10). Distinct from `nothing` (`R029`) and Result.
+No universal `null`. Empty string / empty array remain ordinary data.
+`match` removed (`E153`).
 
 ```vol
-// Illustrative sugar — not accepted today; desugars to Result
-file, err := open("config.json")
-if err != none {
-    return err
-}
+maybe := some("VOL")
+if some name := maybe { print name } else { print "not found" }
+print maybe ?? "guest"
 ```
 
-Open follow-ups (do not invent surface until types exist):
+Still Planned:
 
-- Exact Result / error type spelling and whether `?` propagate is worth tokens.
-- Trap vs Result boundary for decode / parse helpers.
-- Unused-Result and ignored-`err` diagnostics.
-- Interaction with `nothing` / `R029` (separate: missing return ≠ error value).
-- Whether built-in `input` stays trap (`R024`) or becomes Result when I/O grows.
+- light `?T` sugar (Option remains canonical)
+- `or` / `or_else` / force-unwrap helpers
+- nested Option flatten policy
+- dual-return comma-ok for Option (not preferred)
 
-### Modules and imports
+### Structs ✓ SF-1; enums still Planned
 
-VOL may use folders as module boundaries, with project-root-relative imports or
-aliases from `vol.config.json`:
+**Implemented:** product `struct` with named-field and positional literals and
+`.` access (see `SPEC.md` §3.6).
+
+```vol
+struct User {
+    name
+    age
+}
+u := User { name: "Ada", age: 36 }
+v := User { "Ada", 36 }
+```
+
+Still Planned: methods, enums / tagged unions, pattern match on user tags.
+
+### Modules and imports ✓ SF-1
+
+**Implemented:** `import "path"` / `@alias`, nearest `vol.config.json`, resolve
+to `path.vol` or `path/mod.vol`, live exports, cycle detection (see `SPEC.md`
+§5.11).
 
 ```vol
 import "services/users"
 import "@db/models"
 ```
 
-Symbol-selection syntax and the module resolver are not implemented.
+Still Planned: symbol-selection imports, multi-file folder packages beyond the
+entry rule, sorted export-list formatter.
+
+#### Standard-library import policy
+
+**Direction decided (enforced):** ambient tiny core only — `print`, `input`,
+`assert`, `string`, `args`, and collection methods in SPEC. Everything else
+requires an **explicit import** when those libraries exist.
 
 ### Block comments
 
@@ -359,12 +367,15 @@ proven safe with respect to mutation, side effects, ordering, and error behavior
 
 ## Projects and Modules
 
-- [ ] Discover the nearest `vol.config.json` by walking from the source file toward the filesystem root.
-- [ ] Resolve imports relative to the configured project root.
-- [ ] Treat folders as module namespaces with one canonical resolution rule.
-- [ ] Resolve path aliases such as `@db/*` without source-relative traversal.
-- [ ] Reject aliases and imports that escape the project root unless explicitly allowed.
-- [ ] Detect import cycles and report their complete path deterministically.
+**Implemented (SF-1):** config discovery + `path.vol` / `path/mod.vol` + aliases.
+Checklist:
+
+- [x] Discover the nearest `vol.config.json` by walking from the source file toward the filesystem root.
+- [x] Resolve imports relative to the configured project root.
+- [x] Canonical resolution: `P.vol` else `P/mod.vol`.
+- [x] Resolve path aliases such as `@db/*` without source-relative traversal.
+- [x] Reject aliases and imports that escape the project root.
+- [x] Detect import cycles and report their complete path deterministically.
 - [ ] Collect exports written anywhere in a module and format one sorted export list at the top.
 
 Proposed configuration:
@@ -430,8 +441,26 @@ Planned execution stages:
 
 ## Safety and Memory
 
-Ownership, borrowing, and lifetimes are research goals, not current language
-semantics. Before claiming inference, the specification must answer at least:
+### Ownership direction (not implemented)
+
+**Direction decided:** defer a full borrow checker. Prefer **local escape
+analysis** first (stack when values do not escape); require **explicit API
+contracts** for ownership across public boundaries later. Today’s shallow `const`
+and shared array references (`SPEC.md` §3.3 / §5.2) stay as documented — they are
+not ownership or move semantics.
+
+Do not claim ownership, borrowing, or lifetime inference in docs or diagnostics
+until those rules are written and tested.
+
+### Allocation control (not implemented)
+
+**Direction decided:** allocation policy is **unspecified** for the interpreter
+prototype. Do **not** claim that the compiler infers allocation. Explicit
+allocators / layout constraints stay research until a native backend exists.
+When inference is specified later, expose control when programmers must constrain
+layout, latency, or FFI.
+
+Questions that must be answered before inference claims:
 
 - Who owns returned memory?
 - Can references escape a scope?
@@ -448,7 +477,8 @@ Checklist:
 - [ ] Avoid hidden unbounded allocation.
 - [ ] Provide explicit control when inference is insufficient.
 - [ ] Make inferred allocation and ownership inspectable.
-- [ ] Define selectable safety and optimization build modes.
+- [ ] Define selectable safety and optimization build modes (see wrapping /
+      overflow section above).
 
 Guiding rule once semantics exist:
 
@@ -539,17 +569,35 @@ not LLM task-success efficiency.
   See `SPEC.md` §4.4.
 - ~~Missing return value?~~ **Decided:** `nothing` if unused as a statement
   result; `R029` if assigned or used as a value. See `SPEC.md` §5.8.
-- ~~How are fallible operations and errors represented?~~ **Direction decided
-  (not implemented):** hybrid — traps for bugs/invariants; Result for expected
-  operational failure; no exception-primary model; optional Go-style dual-return
-  sugar later over Result. See “Error / result model” above.
-- How are nullable or optional values represented?
-- How are structs, enums, and tagged unions declared?
-- How are modules and packages organized?
-- Which standard features require explicit imports?
-- How does a programmer constrain inferred allocation?
-- What guarantees does automatic parallelization provide?
-- Which build modes control bounds and overflow checking?
-- Which ownership questions can be inferred locally, and which need API contracts?
-- Anonymous functions: anonymous `fn`, JS-style `=>`, or only `_` in `.where`?
-- Pipeline sugar: method chains only, `|>`, or bare `|` — and what is `|` vs bitwise OR?
+- ~~How are fallible operations and errors represented?~~ **Implemented
+  (SF-1):** hybrid traps + `ok`/`err` + if-let / `?`; no exception-primary
+  model; dual-return sugar still Planned. See “Error / result model” above.
+- ~~How are nullable or optional values represented?~~ **Decided and implemented
+  (SF-1):** explicit Option (`some`/`none`/if-let/`??`); distinct from
+  Result and `nothing`; optional `?T` sugar later. See `SPEC.md` §3.4 / §5.10.
+- ~~How are structs, enums, and tagged unions declared?~~ **Structs implemented
+  (SF-1);** enums/tagged unions still Planned. See “Structs” above.
+- ~~How are modules and packages organized?~~ **Implemented (SF-1):**
+  `import` + `vol.config.json` + `path.vol`/`mod.vol`. See “Modules and imports”.
+- ~~Which standard features require explicit imports?~~ **Direction decided:**
+  ambient tiny core only; everything else explicit import. See “Standard-library
+  import policy” above.
+- ~~Result / recoverable errors?~~ **Implemented (SF-1):** `ok`/`err` +
+  if-let / `?`; dual-return still Planned. See “Error / result model” above.
+- ~~How does a programmer constrain inferred allocation?~~ **Direction decided:**
+  unspecified for now; do not claim inference. See “Allocation control” above.
+- ~~What guarantees does automatic parallelization provide?~~ **Direction
+  decided:** none until scheduling/failure are specified; `parallel` stays
+  Planned. See “Parallel intent” above.
+- ~~Which build modes control bounds and overflow checking?~~ **Direction
+  decided (not implemented):** trap default; modes + explicit wrap ops later.
+  See “Wrapping integer arithmetic / overflow and build modes” above.
+- ~~Which ownership questions can be inferred locally, and which need API
+  contracts?~~ **Direction decided (not implemented):** local escape first;
+  contracts for public APIs later. See “Ownership direction” above.
+- ~~Anonymous functions: anonymous `fn`, JS-style `=>`, or only `_` in `.where`?~~
+  **Decided and implemented (SF-1):** anonymous `fn` + expression body; no
+  `=>`; `_` in `.where` / `.map` / `.count` kept. See `SPEC.md` §5.8.
+- ~~Pipeline sugar: method chains only, `|>`, or bare `|` — and what is `|` vs
+  bitwise OR?~~ **Direction decided (not implemented):** chains under SF-1; if
+  pipes later (SF-2+), `|>` not bare `|`. See “Pipeline sugar” above.

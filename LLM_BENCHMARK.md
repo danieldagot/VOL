@@ -198,16 +198,18 @@ slices, `for`), not a tour of Effective Go.
 Store frozen cards under:
 
 ```text
-bench/llm/cards/vol_v0.md      # Surface Freeze SF-0 (SPEC Prototype v0)
-bench/llm/cards/python_v0.md   # matched Python baseline for SF-0 (default)
-bench/llm/cards/go_v0.md       # matched Go baseline for SF-0 (optional)
+bench/llm/cards/vol_v1.md      # Surface Freeze SF-1 (current; harness default)
+bench/llm/cards/vol_v0.md      # SF-0 (historical core_v2 tables; do not mix freeze IDs)
+bench/llm/cards/python_v0.md   # matched Python baseline (default)
+bench/llm/cards/go_v0.md       # matched Go baseline (optional)
 ```
 
-Cards are bound to the language **surface freeze** (`SF-0` in [`SPEC.md`](SPEC.md)
-§0). Bump the card version suffix (`vol_v1`, …) only with a freeze bump or a
-deliberate card-only revision that does not add language features. Never silently
-edit a card used in a published result table; published summaries must name the
-freeze and card versions.
+Cards are bound to the language **product surface freeze** ([`SPEC.md`](SPEC.md)
+§0): SF-0 (`vol_v0`) and SF-1 (`vol_v1`). Do not keep intermediate draft cards
+for unfinished surfaces. Bump the VOL card version suffix with a freeze bump
+(next: SF-2 → `vol_v2.md`) or a deliberate card-only revision that does not add
+language features. Never silently edit a card used in a published result table;
+published summaries must name the freeze and card versions.
 
 ### 6.3 Task artifacts
 
@@ -437,8 +439,10 @@ cannot be recomputed from committed JSONL.
 - [x] Publish a frozen `core_v2` live run (Gemini) — VOL vs Go
 - [x] Bind cards to Surface Freeze SF-0 (`SPEC.md` §0; `vol_v0` / `python_v0` / `go_v0`)
 - [x] Publish frozen `core_v2` live run with default `--langs vol,python` (Gemini)
-- [ ] Publish ≥1 other model on `core_v2` before syntax optimization
-- [ ] Only then optimize VOL syntax for the table (requires SF-1)
+- [x] Surface Freeze SF-1: vision-aligned surface; card `vol_v1.md` (harness default)
+- [ ] Publish ≥1 other model on `core_v2` before further syntax optimization
+- [x] Re-run / publish `core_v2` against `vol_v1` / SF-1
+      (`20260808-040028`; thinner card + Fix hints; second model still needed)
 
 ---
 
@@ -449,6 +453,13 @@ When changing the protocol:
 1. Bump a protocol version note at the top of this file.
 2. Invalidate or re-run results that depended on old cards/prompts.
 3. Keep density (`bench/results/density*.md`) separate—never mix tables.
+
+**Baseline re-run policy:** do not re-run Python (or Go) on every VOL iteration.
+Use `--langs vol` when only the VOL card, diagnostics, or Supported surface
+changed. Re-run the baseline language only when its card, the task suite,
+protocol, model, temperature, or scoring changed. When publishing a VOL-only
+run, cite the frozen Python (or Go) result artifact used for comparison (same
+model and suite).
 
 A generate/repair number is not official until transcripts and the summary table
 are committed next to the frozen cards that produced them.

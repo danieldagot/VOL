@@ -9,8 +9,9 @@ type symbol struct {
 }
 
 type resolver struct {
-	file   string
-	scopes []map[string]symbol
+	file          string
+	scopes        []map[string]symbol
+	functionDepth int
 }
 
 var builtins = map[string]symbol{
@@ -22,14 +23,34 @@ var builtins = map[string]symbol{
 
 // Resolve validates lexical names and statically-known call arities before execution.
 func Resolve(program *Program) *Diagnostic {
+	return resolveModule(program, nil)
+}
+
+func resolveModule(program *Program, imported map[string]symbol) *Diagnostic {
 	r := &resolver{file: program.File, scopes: []map[string]symbol{{}}}
 	for name, value := range builtins {
 		r.scopes[0][name] = value
 	}
-	// Module functions are visible throughout the module, including before their declaration.
+	for name, sym := range imported {
+		if _, exists := r.scopes[0][name]; exists {
+			return &Diagnostic{
+				Code:    "S034",
+				Message: "Imported name `" + name + "` collides with a built-in.",
+				File:    program.File,
+				Fix:     "Rename the export in the imported module.",
+			}
+		}
+		r.scopes[0][name] = sym
+	}
+	// Module functions and struct types are visible throughout the module.
 	for _, statement := range program.Statements {
-		if fn, ok := statement.(*FunctionDeclaration); ok {
-			if d := r.declare(fn.Name, symbol{kind: "function", arity: len(fn.Parameters)}); d != nil {
+		switch node := statement.(type) {
+		case *FunctionDeclaration:
+			if d := r.declare(node.Name, symbol{kind: "function", arity: len(node.Parameters)}); d != nil {
+				return d
+			}
+		case *StructDeclaration:
+			if d := r.declare(node.Name, symbol{kind: "struct", arity: -1}); d != nil {
 				return d
 			}
 		}
@@ -37,7 +58,8 @@ func Resolve(program *Program) *Diagnostic {
 	// Resolve module execution first so every global is known when function bodies
 	// are checked, while ordinary local declarations remain order-sensitive.
 	for _, statement := range program.Statements {
-		if _, ok := statement.(*FunctionDeclaration); ok {
+		switch statement.(type) {
+		case *FunctionDeclaration, *StructDeclaration:
 			continue
 		}
 		if d := r.statement(statement); d != nil {
@@ -45,11 +67,11 @@ func Resolve(program *Program) *Diagnostic {
 		}
 	}
 	for _, statement := range program.Statements {
-		if _, ok := statement.(*FunctionDeclaration); !ok {
-			continue
-		}
-		if d := r.statement(statement); d != nil {
-			return d
+		switch statement.(type) {
+		case *FunctionDeclaration, *StructDeclaration:
+			if d := r.statement(statement); d != nil {
+				return d
+			}
 		}
 	}
 	return nil
@@ -59,7 +81,12 @@ func (r *resolver) statement(statement Statement) *Diagnostic {
 	switch node := statement.(type) {
 	case *BlockStatement:
 		return r.block(node.Body)
-	case *ExportStatement:
+	case *ExportStatement, *ImportStatement:
+		return nil
+	case *StructDeclaration:
+		if len(r.scopes) > 1 {
+			return r.error(node.Name, "S037", "`struct` declarations are only allowed at module scope.", "Move the struct to module scope.")
+		}
 		return nil
 	case *FunctionDeclaration:
 		if len(r.scopes) > 1 {
@@ -68,12 +95,16 @@ func (r *resolver) statement(statement Statement) *Diagnostic {
 			}
 		}
 		r.begin()
+		r.functionDepth++
 		for _, parameter := range node.Parameters {
 			if d := r.declare(parameter, symbol{kind: "value", arity: -1}); d != nil {
+				r.functionDepth--
+				r.end()
 				return d
 			}
 		}
 		d := r.blockContents(node.Body)
+		r.functionDepth--
 		r.end()
 		return d
 	case *Declaration:
@@ -81,6 +112,33 @@ func (r *resolver) statement(statement Statement) *Diagnostic {
 			return d
 		}
 		return r.declare(node.Name, symbol{kind: "value", arity: -1, const_: node.Const})
+	case *MultiDeclaration:
+		for _, value := range node.Values {
+			if d := r.expression(value); d != nil {
+				return d
+			}
+		}
+		for _, name := range node.Names {
+			if d := r.declare(name, symbol{kind: "value", arity: -1, const_: node.Const}); d != nil {
+				return d
+			}
+		}
+		return nil
+	case *MultiAssignment:
+		for _, name := range node.Names {
+			if sym, found := r.lookup(name.Lexeme); found && sym.const_ {
+				return r.error(name, "S030", "Cannot assign to const binding `"+name.Lexeme+"`.", "Declare a new binding instead, or remove `const` from the declaration.")
+			}
+			if _, found := r.lookup(name.Lexeme); !found {
+				return r.error(name, "S002", "Undefined name `"+name.Lexeme+"`.", "Declare the name before using it.")
+			}
+		}
+		for _, value := range node.Values {
+			if d := r.expression(value); d != nil {
+				return d
+			}
+		}
+		return nil
 	case *Assignment:
 		if target, ok := node.Target.(*Variable); ok {
 			if sym, found := r.lookup(target.Name.Lexeme); found && sym.const_ {
@@ -137,6 +195,31 @@ func (r *resolver) statement(statement Statement) *Diagnostic {
 		d := r.blockContents(node.Body)
 		r.end()
 		return d
+	case *IfLetStatement:
+		if d := r.expression(node.Value); d != nil {
+			return d
+		}
+		r.begin()
+		if d := r.declare(node.Name, symbol{kind: "value", arity: -1}); d != nil {
+			r.end()
+			return d
+		}
+		if d := r.blockContents(node.Then); d != nil {
+			r.end()
+			return d
+		}
+		r.end()
+		if node.IsOption() {
+			return r.block(node.Else)
+		}
+		r.begin()
+		if d := r.declare(node.ErrName, symbol{kind: "value", arity: -1}); d != nil {
+			r.end()
+			return d
+		}
+		d := r.blockContents(node.ErrBody)
+		r.end()
+		return d
 	}
 	return nil
 }
@@ -145,6 +228,41 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 	switch node := expression.(type) {
 	case *Literal:
 		return nil
+	case *SomeExpression:
+		return r.expression(node.Value)
+	case *OkExpression:
+		return r.expression(node.Value)
+	case *ErrExpression:
+		return r.expression(node.Value)
+	case *StructLiteral:
+		if sym, ok := r.lookup(node.Type.Lexeme); !ok || sym.kind != "struct" {
+			return r.error(node.Type, "S038", "`"+node.Type.Lexeme+"` is not a struct type.", "Declare `struct "+node.Type.Lexeme+" { ... }` before constructing it.")
+		}
+		for _, field := range node.Fields {
+			if d := r.expression(field.Value); d != nil {
+				return d
+			}
+		}
+		for _, value := range node.Positional {
+			if d := r.expression(value); d != nil {
+				return d
+			}
+		}
+		return nil
+	case *FunctionExpression:
+		r.begin()
+		r.functionDepth++
+		for _, parameter := range node.Parameters {
+			if d := r.declare(parameter, symbol{kind: "value", arity: -1}); d != nil {
+				r.functionDepth--
+				r.end()
+				return d
+			}
+		}
+		d := r.blockContents(node.Body)
+		r.functionDepth--
+		r.end()
+		return d
 	case *Variable:
 		if _, ok := r.lookup(node.Name.Lexeme); !ok {
 			return r.error(node.Name, "S002", "Undefined name `"+node.Name.Lexeme+"`.", "Declare the name before using it.")
@@ -164,6 +282,16 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 			return d
 		}
 		return r.expression(node.Else)
+	case *Coalesce:
+		if d := r.expression(node.Left); d != nil {
+			return d
+		}
+		return r.expression(node.Right)
+	case *TryPropagate:
+		if r.functionDepth == 0 {
+			return r.error(node.Op, "S041", "Result `?` can only be used inside a function.", "Use if-let at top level, or move this into a function.")
+		}
+		return r.expression(node.Value)
 	case *ArrayLiteral:
 		for _, item := range node.Elements {
 			if d := r.expression(item); d != nil {
@@ -178,18 +306,21 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 	case *Property:
 		return r.expression(node.Object)
 	case *Call:
-		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "where" {
-			if d := r.expression(property.Object); d != nil {
+		if property, ok := node.Callee.(*Property); ok {
+			switch property.Name.Lexeme {
+			case "where", "map", "count":
+				if d := r.expression(property.Object); d != nil {
+					return d
+				}
+				if len(node.Arguments) != 1 {
+					return r.arity(property.Name, "."+property.Name.Lexeme, 1, len(node.Arguments))
+				}
+				r.begin()
+				r.scopes[len(r.scopes)-1]["_"] = symbol{kind: "value", arity: -1}
+				d := r.expression(node.Arguments[0])
+				r.end()
 				return d
 			}
-			if len(node.Arguments) != 1 {
-				return r.arity(property.Name, ".where", 1, len(node.Arguments))
-			}
-			r.begin()
-			r.scopes[len(r.scopes)-1]["_"] = symbol{kind: "value", arity: -1}
-			d := r.expression(node.Arguments[0])
-			r.end()
-			return d
 		}
 		if property, ok := node.Callee.(*Property); ok {
 			switch property.Name.Lexeme {

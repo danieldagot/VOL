@@ -1,0 +1,13 @@
+r := ok(7)
+if ok n := r {
+    print n
+} else err msg {
+    print msg
+}
+
+e := err("missing")
+if ok n := e {
+    print n
+} else err msg {
+    print msg
+}

@@ -1,0 +1,22 @@
+// Nested structs and shared identity (like arrays).
+
+struct Point {
+    x
+    y
+}
+
+struct Box {
+    label
+    origin
+}
+
+p := Point { x: 1, y: 2 }
+b := Box { label: "A", origin: p }
+print b.label
+print b.origin.x
+
+// Assigning shares the Point; mutating through one binding is visible on both.
+shared := p
+shared.x = 9
+print p.x
+print b.origin.x

@@ -1,0 +1,22 @@
+export Student, average, passing_count, names_of
+
+struct Student {
+    name
+    score
+}
+
+fn average(students) {
+    if students.len == 0 {
+        return 0
+    }
+    total := students.map(_.score).sum()
+    return total / students.len
+}
+
+fn passing_count(students) {
+    return students.count(_.score >= 60)
+}
+
+fn names_of(students) {
+    return students.map(_.name)
+}

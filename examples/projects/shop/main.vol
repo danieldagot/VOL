@@ -1,0 +1,24 @@
+// Simple shop cart: Result checkout with if-let and postfix ?.
+
+import "examples/projects/shop/cart"
+
+fn pay(items) {
+    amount := checkout(items)?
+    return ok("charged " + string(amount))
+}
+
+cart := [Item { name: "mug", price: 12, qty: 2 }, Item { name: "sticker", price: 3, qty: 5 }]
+
+print "Subtotal: " + string(cart_total(cart))
+
+if ok msg := pay(cart) {
+    print msg
+} else err e {
+    print e
+}
+
+if ok msg := pay([]) {
+    print msg
+} else err e {
+    print e
+}

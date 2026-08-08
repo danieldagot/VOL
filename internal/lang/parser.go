@@ -1,5 +1,7 @@
 package lang
 
+import "fmt"
+
 type parser struct {
 	file          string
 	tokens        []Token
@@ -39,6 +41,8 @@ func (p *parser) program() (*Program, *Diagnostic) {
 			declared[declaration.Name.Lexeme] = true
 		case *Declaration:
 			declared[declaration.Name.Lexeme] = true
+		case *StructDeclaration:
+			declared[declaration.Name.Lexeme] = true
 		}
 	}
 	exported := map[string]bool{}
@@ -52,8 +56,13 @@ func (p *parser) program() (*Program, *Diagnostic) {
 		exported[name.Lexeme] = true
 	}
 	for _, statement := range program.Statements {
-		if function, ok := statement.(*FunctionDeclaration); ok {
-			function.Public = exported[function.Name.Lexeme]
+		switch declaration := statement.(type) {
+		case *FunctionDeclaration:
+			declaration.Public = exported[declaration.Name.Lexeme]
+		case *Declaration:
+			declaration.Public = exported[declaration.Name.Lexeme]
+		case *StructDeclaration:
+			declaration.Public = exported[declaration.Name.Lexeme]
 		}
 	}
 	return program, nil
@@ -70,7 +79,15 @@ func (p *parser) statement() (Statement, *Diagnostic) {
 	if p.match(TokenExport) {
 		return p.exportStatement(p.previous())
 	}
-	if p.match(TokenFn) {
+	if p.match(TokenImport) {
+		return p.importStatement(p.previous())
+	}
+	if p.match(TokenStruct) {
+		return p.structDeclaration(p.previous())
+	}
+	// Named `fn name(...)` is a statement; anonymous `fn(...)` is an expression.
+	if p.check(TokenFn) && p.peekNext().Kind == TokenIdentifier {
+		p.advance()
 		return p.functionDeclaration(p.previous())
 	}
 	if p.match(TokenReturn) {
@@ -95,6 +112,11 @@ func (p *parser) statement() (Statement, *Diagnostic) {
 	if p.match(TokenIf) {
 		return p.ifStatement(p.previous())
 	}
+	if p.match(TokenMatch) {
+		return nil, p.errorWithFix(p.previous(), "E153",
+			"`match` was removed; unwrap with if-let or `??`.",
+			"Use `if some x := opt { ... } else { ... }`, `if ok x := res { ... } else err e { ... }`, or `opt ?? default`.")
+	}
 	if p.match(TokenRepeat) {
 		return p.repeatStatement(p.previous())
 	}
@@ -107,25 +129,56 @@ func (p *parser) statement() (Statement, *Diagnostic) {
 		if !p.check(TokenIdentifier) {
 			return nil, p.error(p.peek(), "E120", "Expected a name after `const`.")
 		}
-		name := p.advance()
+		names, d := p.identifierList()
+		if d != nil {
+			return nil, d
+		}
 		if !p.match(TokenColonEqual) {
 			return nil, p.error(p.peek(), "E121", "Expected `:=` after const name.")
 		}
-		value, d := p.expression()
+		values, d := p.expressionList()
 		if d != nil {
 			return nil, d
 		}
-		return &Declaration{Keyword: keyword, Name: name, Value: value, Const: true}, nil
+		if len(names) == 1 && len(values) == 1 {
+			return &Declaration{Keyword: keyword, Name: names[0], Value: values[0], Const: true}, nil
+		}
+		if len(names) != len(values) {
+			return nil, p.error(keyword, "E158", fmt.Sprintf("Multi-declare expects %d values, got %d.", len(names), len(values)))
+		}
+		return &MultiDeclaration{Keyword: keyword, Names: names, Values: values, Const: true}, nil
 	}
 
-	if p.check(TokenIdentifier) && p.peekNext().Kind == TokenColonEqual {
-		name := p.advance()
-		p.advance()
-		value, d := p.expression()
+	if p.check(TokenIdentifier) && (p.peekNext().Kind == TokenColonEqual || p.peekNext().Kind == TokenComma) {
+		names, d := p.identifierList()
 		if d != nil {
 			return nil, d
 		}
-		return &Declaration{Name: name, Value: value}, nil
+		if p.match(TokenColonEqual) {
+			values, d := p.expressionList()
+			if d != nil {
+				return nil, d
+			}
+			if len(names) == 1 && len(values) == 1 {
+				return &Declaration{Name: names[0], Value: values[0]}, nil
+			}
+			if len(names) != len(values) {
+				return nil, p.error(names[0], "E158", fmt.Sprintf("Multi-declare expects %d values, got %d.", len(names), len(values)))
+			}
+			return &MultiDeclaration{Names: names, Values: values}, nil
+		}
+		if p.match(TokenEqual) {
+			equal := p.previous()
+			values, d := p.expressionList()
+			if d != nil {
+				return nil, d
+			}
+			if len(names) != len(values) {
+				return nil, p.error(equal, "E159", fmt.Sprintf("Multi-assign expects %d values, got %d.", len(names), len(values)))
+			}
+			return &MultiAssignment{Names: names, Equal: equal, Values: values}, nil
+		}
+		return nil, p.error(p.peek(), "E121", "Expected `:=` or `=` after names.")
 	}
 
 	expr, diagnostic := p.expression()
@@ -139,7 +192,7 @@ func (p *parser) statement() (Statement, *Diagnostic) {
 			return nil, d
 		}
 		switch expr.(type) {
-		case *Variable, *Index:
+		case *Variable, *Index, *Property:
 		default:
 			return nil, p.error(equal, "E102", "Invalid assignment target.")
 		}
@@ -147,7 +200,12 @@ func (p *parser) statement() (Statement, *Diagnostic) {
 	}
 	if property, ok := expr.(*Property); ok && property.Name.Lexeme == "each" {
 		if !p.check(TokenIdentifier) {
-			return nil, p.error(p.peek(), "E103", "Expected an item name after `.each`.")
+			return nil, p.errorWithFix(
+				p.peek(),
+				"E103",
+				"Expected an item name after `.each`.",
+				"Use statement form `items.each item { ... }`, not `.each(fn...)`.",
+			)
 		}
 		name := p.advance()
 		body, d := p.block()
@@ -173,6 +231,47 @@ func (p *parser) exportStatement(keyword Token) (Statement, *Diagnostic) {
 	return declaration, nil
 }
 
+func (p *parser) importStatement(keyword Token) (Statement, *Diagnostic) {
+	if !p.check(TokenString) {
+		return nil, p.error(p.peek(), "E131", "Expected a string path after `import`.")
+	}
+	return &ImportStatement{Keyword: keyword, Path: p.advance()}, nil
+}
+
+func (p *parser) structDeclaration(keyword Token) (Statement, *Diagnostic) {
+	if !p.check(TokenIdentifier) {
+		return nil, p.error(p.peek(), "E132", "Expected a type name after `struct`.")
+	}
+	name := p.advance()
+	if !p.match(TokenLeftBrace) {
+		return nil, p.error(p.peek(), "E133", "Expected `{` after struct name.")
+	}
+	declaration := &StructDeclaration{Keyword: keyword, Name: name}
+	p.skipNewlines()
+	seen := map[string]bool{}
+	for !p.check(TokenRightBrace) && !p.check(TokenEOF) {
+		if !p.check(TokenIdentifier) {
+			return nil, p.error(p.peek(), "E134", "Expected a field name in `struct`.")
+		}
+		field := p.advance()
+		if seen[field.Lexeme] {
+			return nil, p.error(field, "E135", "Duplicate struct field `"+field.Lexeme+"`.")
+		}
+		seen[field.Lexeme] = true
+		declaration.Fields = append(declaration.Fields, field)
+		if d := p.finishStatement(TokenRightBrace); d != nil {
+			return nil, d
+		}
+	}
+	if !p.match(TokenRightBrace) {
+		return nil, p.error(p.peek(), "E136", "Expected `}` to close `struct`.")
+	}
+	if len(declaration.Fields) == 0 {
+		return nil, p.error(name, "E137", "Struct `"+name.Lexeme+"` must declare at least one field.")
+	}
+	return declaration, nil
+}
+
 func (p *parser) functionDeclaration(keyword Token) (Statement, *Diagnostic) {
 	if !p.check(TokenIdentifier) {
 		return nil, p.error(p.peek(), "E110", "Expected a function name after `fn`.")
@@ -181,6 +280,80 @@ func (p *parser) functionDeclaration(keyword Token) (Statement, *Diagnostic) {
 	if !p.match(TokenLeftParen) {
 		return nil, p.error(p.peek(), "E111", "Expected `(` after the function name.")
 	}
+	parameters, d := p.parameterList()
+	if d != nil {
+		return nil, d
+	}
+	p.functionDepth++
+	body, d := p.functionBody()
+	p.functionDepth--
+	if d != nil {
+		return nil, d
+	}
+	return &FunctionDeclaration{Keyword: keyword, Name: name, Parameters: parameters, Body: body}, nil
+}
+
+func (p *parser) functionExpression(keyword Token) (Expression, *Diagnostic) {
+	if !p.match(TokenLeftParen) {
+		return nil, p.error(p.peek(), "E111", "Expected `(` after `fn`.")
+	}
+	parameters, d := p.parameterList()
+	if d != nil {
+		return nil, d
+	}
+	p.functionDepth++
+	body, d := p.functionBody()
+	p.functionDepth--
+	if d != nil {
+		return nil, d
+	}
+	return &FunctionExpression{Keyword: keyword, Parameters: parameters, Body: body}, nil
+}
+
+// functionBody is `{ ... }` or a single expression (implicit return).
+func (p *parser) functionBody() (*Block, *Diagnostic) {
+	if p.check(TokenLeftBrace) {
+		return p.block()
+	}
+	value, d := p.expression()
+	if d != nil {
+		return nil, d
+	}
+	ret := &ReturnStatement{Keyword: Token{Kind: TokenReturn, Lexeme: "return", Pos: value.Position()}, Value: value}
+	return &Block{Open: Token{Kind: TokenLeftBrace, Lexeme: "{", Pos: value.Position()}, Statements: []Statement{ret}}, nil
+}
+
+func (p *parser) identifierList() ([]Token, *Diagnostic) {
+	if !p.check(TokenIdentifier) {
+		return nil, p.error(p.peek(), "E120", "Expected a name.")
+	}
+	names := []Token{p.advance()}
+	for p.match(TokenComma) {
+		if !p.check(TokenIdentifier) {
+			return nil, p.error(p.peek(), "E120", "Expected a name after `,`.")
+		}
+		names = append(names, p.advance())
+	}
+	return names, nil
+}
+
+func (p *parser) expressionList() ([]Expression, *Diagnostic) {
+	first, d := p.expression()
+	if d != nil {
+		return nil, d
+	}
+	values := []Expression{first}
+	for p.match(TokenComma) {
+		value, d := p.expression()
+		if d != nil {
+			return nil, d
+		}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
+func (p *parser) parameterList() ([]Token, *Diagnostic) {
 	var parameters []Token
 	if !p.check(TokenRightParen) {
 		for {
@@ -196,16 +369,76 @@ func (p *parser) functionDeclaration(keyword Token) (Statement, *Diagnostic) {
 	if !p.match(TokenRightParen) {
 		return nil, p.error(p.peek(), "E113", "Expected `)` after function parameters.")
 	}
-	p.functionDepth++
-	body, d := p.block()
-	p.functionDepth--
+	return parameters, nil
+}
+
+func (p *parser) looksLikeIfLet() bool {
+	if !p.check(TokenSome) && !p.check(TokenOk) {
+		return false
+	}
+	if p.current+2 >= len(p.tokens) {
+		return false
+	}
+	return p.tokens[p.current+1].Kind == TokenIdentifier && p.tokens[p.current+2].Kind == TokenColonEqual
+}
+
+func (p *parser) ifLetStatement(keyword Token) (Statement, *Diagnostic) {
+	tag := p.advance() // some or ok
+	name := p.advance()
+	p.advance() // :=
+	value, d := p.expression()
 	if d != nil {
 		return nil, d
 	}
-	return &FunctionDeclaration{Keyword: keyword, Name: name, Parameters: parameters, Body: body}, nil
+	then, d := p.block()
+	if d != nil {
+		return nil, d
+	}
+	checkpoint := p.current
+	p.skipNewlines()
+	if !p.match(TokenElse) {
+		p.current = checkpoint
+		if tag.Kind == TokenSome {
+			return nil, p.errorWithFix(keyword, "E154",
+				"Option if-let requires an `else` branch.",
+				"Write `if some x := opt { ... } else { ... }`.")
+		}
+		return nil, p.errorWithFix(keyword, "E155",
+			"Result if-let requires `else err <name> { ... }`.",
+			"Write `if ok x := res { ... } else err e { ... }`.")
+	}
+	if tag.Kind == TokenSome {
+		otherwise, d := p.block()
+		if d != nil {
+			return nil, d
+		}
+		return &IfLetStatement{Keyword: keyword, Tag: tag, Name: name, Value: value, Then: then, Else: otherwise}, nil
+	}
+	// Result: else err name { ... }
+	if !p.match(TokenErr) {
+		return nil, p.errorWithFix(p.peek(), "E156",
+			"Expected `err` after `else` in Result if-let.",
+			"Write `else err e { ... }` to bind the error payload.")
+	}
+	errKeyword := p.previous()
+	if !p.check(TokenIdentifier) {
+		return nil, p.error(p.peek(), "E157", "Expected a binding name after `err`.")
+	}
+	errName := p.advance()
+	errBody, d := p.block()
+	if d != nil {
+		return nil, d
+	}
+	return &IfLetStatement{
+		Keyword: keyword, Tag: tag, Name: name, Value: value, Then: then,
+		ErrKeyword: errKeyword, ErrName: errName, ErrBody: errBody,
+	}, nil
 }
 
 func (p *parser) ifStatement(keyword Token) (Statement, *Diagnostic) {
+	if p.looksLikeIfLet() {
+		return p.ifLetStatement(keyword)
+	}
 	condition, d := p.expression()
 	if d != nil {
 		return nil, d
@@ -297,13 +530,19 @@ func (p *parser) blockAfterOpen(open Token) (*Block, *Diagnostic) {
 func (p *parser) expression() (Expression, *Diagnostic) { return p.ternary() }
 
 func (p *parser) ternary() (Expression, *Diagnostic) {
-	condition, d := p.or()
+	condition, d := p.coalesce()
 	if d != nil {
 		return nil, d
 	}
-	if !p.match(TokenQuestion) {
+	if !p.check(TokenQuestion) {
 		return condition, nil
 	}
+	// Postfix Result `?` when `?` is not starting `? :`.
+	if p.isPostfixTry() {
+		p.advance()
+		return &TryPropagate{Value: condition, Op: p.previous()}, nil
+	}
+	p.advance()
 	question := p.previous()
 	thenExpr, d := p.ternary()
 	if d != nil {
@@ -318,6 +557,43 @@ func (p *parser) ternary() (Expression, *Diagnostic) {
 		return nil, d
 	}
 	return &Conditional{Condition: condition, Question: question, Then: thenExpr, Colon: colon, Else: elseExpr}, nil
+}
+
+func (p *parser) isPostfixTry() bool {
+	if !p.check(TokenQuestion) {
+		return false
+	}
+	if p.current+1 >= len(p.tokens) {
+		return true
+	}
+	next := p.tokens[p.current+1].Kind
+	switch next {
+	case TokenNewline, TokenEOF, TokenRightParen, TokenRightBracket, TokenRightBrace,
+		TokenComma, TokenPlus, TokenMinus, TokenStar, TokenSlash,
+		TokenEqualEqual, TokenBangEqual, TokenLess, TokenLessEqual, TokenGreater, TokenGreaterEqual,
+		TokenAnd, TokenOr, TokenQuestionQuestion, TokenEqual, TokenColonEqual,
+		TokenDot:
+		return true
+	default:
+		return false
+	}
+}
+
+// coalesce parses Option `??` (tighter than `? :`, looser than `or`), right-associative.
+func (p *parser) coalesce() (Expression, *Diagnostic) {
+	left, d := p.or()
+	if d != nil {
+		return nil, d
+	}
+	if !p.match(TokenQuestionQuestion) {
+		return left, nil
+	}
+	op := p.previous()
+	right, d := p.coalesce()
+	if d != nil {
+		return nil, d
+	}
+	return &Coalesce{Left: left, Op: op, Right: right}, nil
 }
 
 func (p *parser) or() (Expression, *Diagnostic)  { return p.binary(p.and, TokenOr) }
@@ -415,9 +691,108 @@ func (p *parser) postfix() (Expression, *Diagnostic) {
 			expr = &Property{Object: expr, Name: p.advance()}
 			continue
 		}
+		if variable, ok := expr.(*Variable); ok && p.looksLikeStructLiteral() {
+			literal, d := p.structLiteral(variable.Name)
+			if d != nil {
+				return nil, d
+			}
+			expr = literal
+			continue
+		}
 		break
 	}
 	return expr, nil
+}
+
+// looksLikeStructLiteral distinguishes struct literals from block-bodied statements.
+func (p *parser) looksLikeStructLiteral() bool {
+	if !p.check(TokenLeftBrace) {
+		return false
+	}
+	index := p.current + 1
+	for index < len(p.tokens) && p.tokens[index].Kind == TokenNewline {
+		index++
+	}
+	if index >= len(p.tokens) {
+		return false
+	}
+	kind := p.tokens[index].Kind
+	// Bare `{ }` is a block, not an empty struct literal.
+	if kind == TokenRightBrace {
+		return false
+	}
+	if kind == TokenIdentifier {
+		index++
+		if index >= len(p.tokens) {
+			return false
+		}
+		next := p.tokens[index].Kind
+		return next == TokenColon || next == TokenComma || next == TokenRightBrace
+	}
+	switch kind {
+	case TokenInteger, TokenFloat, TokenString, TokenTrue, TokenFalse, TokenNone,
+		TokenSome, TokenOk, TokenErr, TokenFn, TokenLeftParen, TokenLeftBracket, TokenMinus:
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *parser) structLiteral(typeName Token) (Expression, *Diagnostic) {
+	if !p.match(TokenLeftBrace) {
+		return nil, p.error(p.peek(), "E144", "Expected `{` after struct type name.")
+	}
+	literal := &StructLiteral{Type: typeName, Open: p.previous()}
+	p.skipNewlines()
+	if p.check(TokenRightBrace) {
+		p.advance()
+		return literal, nil
+	}
+	// Named if first field is `name:`; otherwise positional.
+	named := p.check(TokenIdentifier) && p.current+1 < len(p.tokens) && p.tokens[p.current+1].Kind == TokenColon
+	if named {
+		seen := map[string]bool{}
+		for {
+			if !p.check(TokenIdentifier) {
+				return nil, p.error(p.peek(), "E145", "Expected a field name in struct literal.")
+			}
+			name := p.advance()
+			if seen[name.Lexeme] {
+				return nil, p.error(name, "E146", "Duplicate field `"+name.Lexeme+"` in struct literal.")
+			}
+			seen[name.Lexeme] = true
+			if !p.match(TokenColon) {
+				return nil, p.error(p.peek(), "E147", "Expected `:` after field name in struct literal.")
+			}
+			value, d := p.expression()
+			if d != nil {
+				return nil, d
+			}
+			literal.Fields = append(literal.Fields, StructFieldInit{Name: name, Value: value})
+			p.skipNewlines()
+			if !p.match(TokenComma) {
+				break
+			}
+			p.skipNewlines()
+		}
+	} else {
+		for {
+			value, d := p.expression()
+			if d != nil {
+				return nil, d
+			}
+			literal.Positional = append(literal.Positional, value)
+			p.skipNewlines()
+			if !p.match(TokenComma) {
+				break
+			}
+			p.skipNewlines()
+		}
+	}
+	if !p.match(TokenRightBrace) {
+		return nil, p.error(p.peek(), "E148", "Expected `}` to close struct literal.")
+	}
+	return literal, nil
 }
 
 func (p *parser) primary() (Expression, *Diagnostic) {
@@ -440,6 +815,55 @@ func (p *parser) primary() (Expression, *Diagnostic) {
 	if p.match(TokenFalse) {
 		token := p.previous()
 		return &Literal{Token: token, Value: false}, nil
+	}
+	if p.match(TokenNone) {
+		token := p.previous()
+		return &Literal{Token: token, Value: optionValue{}}, nil
+	}
+	if p.match(TokenSome) {
+		keyword := p.previous()
+		if !p.match(TokenLeftParen) {
+			return nil, p.error(p.peek(), "E129", "Expected `(` after `some`.")
+		}
+		value, d := p.expression()
+		if d != nil {
+			return nil, d
+		}
+		if !p.match(TokenRightParen) {
+			return nil, p.error(p.peek(), "E130", "Expected `)` after `some` value.")
+		}
+		return &SomeExpression{Keyword: keyword, Value: value}, nil
+	}
+	if p.match(TokenOk) {
+		keyword := p.previous()
+		if !p.match(TokenLeftParen) {
+			return nil, p.error(p.peek(), "E149", "Expected `(` after `ok`.")
+		}
+		value, d := p.expression()
+		if d != nil {
+			return nil, d
+		}
+		if !p.match(TokenRightParen) {
+			return nil, p.error(p.peek(), "E150", "Expected `)` after `ok` value.")
+		}
+		return &OkExpression{Keyword: keyword, Value: value}, nil
+	}
+	if p.match(TokenErr) {
+		keyword := p.previous()
+		if !p.match(TokenLeftParen) {
+			return nil, p.error(p.peek(), "E151", "Expected `(` after `err`.")
+		}
+		value, d := p.expression()
+		if d != nil {
+			return nil, d
+		}
+		if !p.match(TokenRightParen) {
+			return nil, p.error(p.peek(), "E152", "Expected `)` after `err` value.")
+		}
+		return &ErrExpression{Keyword: keyword, Value: value}, nil
+	}
+	if p.match(TokenFn) {
+		return p.functionExpression(p.previous())
 	}
 	if p.match(TokenIdentifier) {
 		return &Variable{Name: p.previous()}, nil
@@ -520,4 +944,8 @@ func (p *parser) finishStatement(terminator TokenKind) *Diagnostic {
 }
 func (p *parser) error(token Token, code, message string) *Diagnostic {
 	return &Diagnostic{Code: code, Message: message, File: p.file, Pos: token.Pos}
+}
+
+func (p *parser) errorWithFix(token Token, code, message, fix string) *Diagnostic {
+	return &Diagnostic{Code: code, Message: message, File: p.file, Pos: token.Pos, Fix: fix}
 }

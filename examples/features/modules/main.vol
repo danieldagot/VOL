@@ -1,0 +1,3 @@
+import "examples/features/modules/math"
+
+print add(answer, answer)
