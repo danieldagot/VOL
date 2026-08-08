@@ -20,6 +20,7 @@ Related docs:
 | [`README.md`](README.md) | Project status and examples |
 | [`IDEAS.md`](IDEAS.md) | Planned features and open questions |
 | [`AGENTS.md`](AGENTS.md) | Project vision and contribution rules |
+| [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md) | Generate/repair protocol; primary table is `intent_v1` / `vol_v2` |
 | [`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md) | Default harness card (SF-2; density dynamics) |
 | [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | Historical SF-1 / `core_v2` task card |
 | [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | Historical `core_v2` card (SF-0) |

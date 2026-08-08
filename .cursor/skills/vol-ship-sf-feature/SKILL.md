@@ -58,7 +58,7 @@ State briefly:
 - Out of scope for this bump
 
 If the user said “the rest,” propose a **single** next slice (default ROI under
-SF-1 leftovers: **formatter / std behind imports**, or **`|>` / enums /
+SF-2 foundations: **formatter / std behind imports**, or SF-3 **`|>` / enums /
 dual-return** when ready) and proceed only on that slice unless they insist on more.
 
 ### 2. Implement in `internal/lang`
@@ -73,7 +73,7 @@ Typical order:
 6. Tests: lexer vocabulary, parser diagnostics, `lang_test.go` / interpreter
    tables, `examples_test.go` row if adding examples
 
-Reuse patterns from the current SF-1 surface (Option / Result / structs / modules) when similar.
+Reuse patterns from the current SF-2 surface (Option / Result / structs / modules / density dynamics) when similar.
 
 ### 3. Examples
 

@@ -24,16 +24,12 @@ anymore—those were merged into `SPEC.md`.
 | `SPEC.md` | Single source for implemented vocabulary, syntax, semantics, diagnostics |
 | `IDEAS.md` | Planned work, open design questions, future features |
 | `AGENTS.md` | Vision, principles, contribution / sync rules, decided prototype bullets |
+| `LLM_BENCHMARK.md` | Falsifiable LLM generate/repair protocol + published-result pointers |
+| `TOKEN_EFFICIENCY.md` | Working preset for density vs workflow iteration (SF-2 exhausted note) |
 | `internal/lang/` | Lexer, parser, AST, resolver, interpreter, diagnostics, tests |
-| `examples/*.vol` | Executable examples claimed by README |
+| `examples/` | Executable examples (`basics/`, `features/`, `projects/`) claimed by README |
 | `cmd/vol/` | CLI (`vol run`, `--json` diagnostics) |
-| `bench/` | Source token density benchmark (VOL vs Python/Go/Rust/Zig; not LLM generate/repair) |
-
-Optional / may be absent (note if missing when relevant):
-
-| Path | Role |
-| --- | --- |
-| `LLM_BENCHMARK.md` | Falsifiable LLM generate/repair task suite (planned; not present yet) |
+| `bench/` | Source token density + LLM harness (`bench/llm/`) |
 
 Do **not** look for or cite `SYNTAX.md` / `VOCABULARY.md` as current sources.
 
@@ -41,22 +37,23 @@ Do **not** look for or cite `SYNTAX.md` / `VOCABULARY.md` as current sources.
 
 Use this snapshot before roasting—do not pretend the repo is still pre-`SPEC.md`:
 
-- **Implemented:** tree-walking interpreter; resolver; structured diagnostics
-  (human + JSON via `vol --json`); stable error codes with `fix` on some codes;
+- **Implemented (SF-2):** tree-walking interpreter; resolver; structured diagnostics
+  (human + JSON via `vol --json`); stable error codes with `Fix` on some codes;
   `i64`/`f64`/bool/string/arrays; `const` opt-in immutability; overflow traps
-  (`R028`); `.where` eager filter + `.sum`; `.len` / `.byte_len`; `.copy` /
-  `.deep_copy`; functions with `nothing` on missing return; `export`; CI tests
-  including fuzz non-panic.
+  (`R028`); `.where` / `.map` / `.count` / `.count()` / `.sum`; `.len` /
+  `.byte_len`; `.copy` / `.deep_copy`; Option / Result; product structs;
+  anonymous `fn`; multi-assign; multi-arg `print` + string `+` coercion;
+  `import`/`export`; functions with `nothing` on missing return; CI + fuzz.
 - **Specified in `SPEC.md`:** lexical tokens, line joining, expression precedence,
-  evaluation order, array identity, `.where` / `.sum` semantics, failure model,
-  conformance examples, **§11 Decided** core rules (mutability default, overflow,
-  purity intent, `if` vs `? :`, permanent `while`, etc.).
-- **Partially evidenced LLM claim:** `bench/` measures **source token density**
-  on 16 equivalent tasks (tiered; ~20% fewer than Python all-suite / ~24% compression after SF-2, etc.)—not task success,
-  compile failures, or repair cost.
+  evaluation order, array identity, collection / Option / Result semantics,
+  failure model, conformance examples, **§11 Decided** core rules (mutability
+  default, overflow, purity intent, `if` vs `? :`, permanent `while`, etc.).
+- **Partially evidenced LLM claim:** `bench/` source density (~20% fewer than
+  Python all-suite / ~24% compression) plus early Gemini `intent_v1`/`vol_v2`
+  workflow runs — not multi-model proof or SF-2 “LLM optimized” evidence.
 - **Still missing / vision-only:** static types, ownership/borrow, generics, native
   backend, formatter rewriter, enforced `.where` purity at runtime,
-  parallel/lazy collection fusion. (Structs/modules/LLM harness exist — verify before roasting.)
+  parallel/lazy collection fusion, enums / `|>` / dual-return (SF-3 candidates).
 
 Identity is **Vocabulary Optimized Language** in README and AGENTS.md. Do not
 roast stale “Vector-Oriented” / “Vibe-Oriented” naming unless it reappears in
@@ -70,7 +67,8 @@ Read the current files (do not rely on memory or an old roast):
 2. `SPEC.md` (especially §4 precedence, §3.3 arrays, §4.4 collections, §8 failure, §11 decided)
 3. `IDEAS.md`
 4. `AGENTS.md`
-5. Spot-check `internal/lang` + `examples/` + `bench/README.md` when docs claim behavior
+5. `LLM_BENCHMARK.md` / `TOKEN_EFFICIENCY.md` when scoring LLM or density claims
+6. Spot-check `internal/lang` + `examples/` + `bench/README.md` when docs claim behavior
 
 Compare **claimed** behavior against **implemented** behavior.
 

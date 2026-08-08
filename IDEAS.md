@@ -40,15 +40,17 @@ Immediate documentation and design work:
 - [x] Modules — **implemented** (config + `path.vol` / `path/mod.vol`; ambient tiny core).
 - [x] Phase-2 design directions #2–#11 (structs/Result/unwrap/density in SF-1;
       remaining ownership/alloc, parallel, build modes, pipelines).
-- [ ] Foundations before SF-2: finish `vol fmt` rewriter (CLI stub + style rules
+- [ ] Foundations before SF-3: finish `vol fmt` rewriter (CLI stub + style rules
       drafted); richer std libraries behind imports (design only — aliases ≠ stdlib).
 - [x] Write `LLM_BENCHMARK.md` with a falsifiable generate/repair protocol;
-      harness + Gemini `core_v2` published — see checklist in that file.
+      harness + Gemini `intent_v1` / `vol_v2` (primary) and `core_v2` / `vol_v1`
+      (continuity) published — see checklist in that file.
 - [ ] Keep Planned syntax out of `SPEC.md`; only Supported and Provisional forms belong there.
 - [x] Publish frozen `core_v2` with default Python baseline (`--langs vol,python`).
-- [ ] Publish ≥1 other model on `core_v2` before treating LLM results as stable.
-- [x] Re-run / publish against `vol_v1` after source-check hygiene (`.count`/`.where`);
-      published `20260808-041440`; second model still needed.
+- [x] Publish `intent_v1` against `vol_v2` (SF-2; `20260808-051437`).
+- [ ] Publish ≥1 other model on `intent_v1` before treating LLM results as stable.
+- [x] Re-run / publish `core_v2` against `vol_v1` after source-check hygiene
+      (`.count`/`.where`); published `20260808-041440`.
 - [x] **Density / unwrap surface (in SF-1)** — `.map` / `.count`, if-let /
       `??` / `?` shipped in SPEC. Shipped surface ≠ proven LLM workflow win;
       measure before further sugar (`LLM_BENCHMARK.md`).
@@ -227,8 +229,9 @@ Today: method chaining expresses collection intent (Supported):
 nums.where(_ > 0).sum()
 ```
 
-**Direction:** keep **method chains** under SF-1. If pipeline sugar is added at
-a later freeze (SF-2+), use **`|>`** (first-arg / Elixir-like), not bare `|`.
+**Direction:** keep **method chains** as the Supported form under SF-2. If
+pipeline sugar is added at a later freeze (SF-3+), use **`|>`** (first-arg /
+Elixir-like), not bare `|`.
 
 ```vol
 // Planned — not accepted today
@@ -567,12 +570,11 @@ task success / total tokens consumed
 
 including generated code, compiler or runtime diagnostics, repair prompts, and
 revisions across a fixed task suite. Protocol is defined in
-[`LLM_BENCHMARK.md`](LLM_BENCHMARK.md). The protocol-v1 harness and published
-Gemini `core_v2` results exist; after source-check hygiene the `vol_v1` task-card
-run matches Python on first-try / success @ K with modest cold overhead (warm
-slightly under Python once the card is amortized). That is still one model on a
-tiny suite — not a broad LLM claim. Do not treat SF-1 itself as proven
-optimization.
+[`LLM_BENCHMARK.md`](LLM_BENCHMARK.md). Primary published language-use table:
+Gemini `intent_v1` with `vol_v2` / SF-2 matches Python on first-try / success @ K
+with lower cold and warm means (one model). Historical `core_v2` / `vol_v1`
+(SF-1) continuity remains. That is still one model on a tiny suite — not a broad
+LLM claim. Do not treat SF-2 itself as proven optimization.
 
 **Static source token density** (step 1 — implemented) is measured in
 [`bench/`](bench/README.md): hand-written equivalent programs in VOL, Python, Go,
@@ -636,5 +638,5 @@ only if measured necessary (not glyph theater).
   **Decided and implemented (SF-1):** anonymous `fn` + expression body; no
   `=>`; `_` in `.where` / `.map` / `.count` kept. See `SPEC.md` §5.8.
 - ~~Pipeline sugar: method chains only, `|>`, or bare `|` — and what is `|` vs
-  bitwise OR?~~ **Direction decided (not implemented):** chains under SF-1; if
-  pipes later (SF-2+), `|>` not bare `|`. See “Pipeline sugar” above.
+  bitwise OR?~~ **Direction decided (not implemented):** chains under SF-2; if
+  pipes later (SF-3+), `|>` not bare `|`. See “Pipeline sugar” above.

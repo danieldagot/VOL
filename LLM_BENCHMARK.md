@@ -1,6 +1,6 @@
 # VOL LLM Workflow Benchmark (Protocol v1.1)
 
-> Status: **protocol v1.1 harness implemented; Gemini `core_v2` VOL vs Python published; Go/`core_v1` historical**
+> Status: **protocol v1.1 harness implemented; primary Gemini `intent_v1`/`vol_v2` (SF-2) vs Python published; `core_v2`/`vol_v1` continuity; Go/`core_v1` historical**
 > Companion to: [`bench/`](bench/README.md) (source token density only)
 
 This document defines how VOL measures whether it is actually better for
@@ -409,17 +409,18 @@ The harness markdown includes cold totals, prompt vs completion means, warm
 | VOL | | | | | | | |
 | Python | | | | | | | |
 
-### 8.2 Headlines to put in README later
+### 8.2 Headlines for README
 
-Only after a frozen **`core_v2`** run that includes the languages being claimed:
+Prefer frozen **`intent_v1`** / `vol_v2` (SF-2) for language-use headlines; keep
+**`core_v2`** / `vol_v1` for continuity tables. Include the languages being claimed:
 
 - VOL vs Python success @ K (absolute points); optional VOL vs Go
 - VOL vs baseline cold and warm total-token ratios
 - Prompt vs completion deltas (so card cost is visible)
-- Clear disclaimer: model, date, suite, protocol, K, card versions
+- Clear disclaimer: model, date, suite, protocol, K, card versions / freeze ids
 
-Keep historical VOL-vs-Go `core_v1` / early `core_v2` results labeled; do not
-mix them into Python-baseline tables without naming both baselines.
+Keep historical VOL-vs-Go `core_v1` / early `core_v2` / SF-1 `intent_v1` results
+labeled; do not mix freeze IDs or baselines in one table.
 
 ---
 

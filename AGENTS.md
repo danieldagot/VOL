@@ -142,7 +142,7 @@ specified. Do not imply any of that from the vision section alone.
 ### 6. AI Native
 
 Tooling and diagnostics should be easy for humans and agents to consume. That is
-a design goal; SF-1 surface + early harness runs do not prove workflow superiority.
+a design goal; SF-2 surface + early harness runs do not prove workflow superiority.
 
 Goals:
 
@@ -327,9 +327,9 @@ Every build may report:
 - token count for a documented tokenizer
 
 **Static source token density** (implemented today) is measured in
-[`bench/`](bench/README.md): equivalent hand-written programs in VOL, Go, Rust,
-and Zig are compared by token count under named OpenAI tokenizers. That measures
-source size only. Do **not** cite density ratios as LLM workflow proof, SF-1
+[`bench/`](bench/README.md): equivalent hand-written programs in VOL, Python, Go,
+Rust, and Zig are compared by token count under named OpenAI tokenizers. That measures
+source size only. Do **not** cite density ratios as LLM workflow proof, SF-2
 success, or task-success efficiency. See [`README.md`](README.md) for current
 ratios.
 

@@ -73,17 +73,20 @@ uv run python llm/harness/run_generate_repair.py --provider gemini --suite core
 
 **When to re-run Python:** only if the Python card, suite tasks, protocol, model,
 temperature, or harness scoring change. VOL card tweaks, Fix-text diagnostics,
-source-check hygiene, and SF-1 surface polish can use `--langs vol` with
+source-check hygiene, and SF-2 surface/card polish can use `--langs vol` with
 `--baseline-jsonl` so the published JSONL/summary stays self-contained.
 
 The separate static-density benchmark below has its own 16-task tiered suite.
 Those density tasks are not the LLM workflow suite.
 
-The published protocol-v1.1 (`core_v2`) Gemini run with the default Python
-baseline and `vol_v1` is
-[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md).
-Both languages reached 100% first-try and success @ K; VOL was about +11.2% cold
-/ −3.3% warm vs Python (card ~436 vs ~336).
+Primary published language-use table: Gemini `intent_v1` with `vol_v2` / SF-2
+([`llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md`](llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md))
+— both languages 100% first-try / success @ K; VOL about −10.0% cold / −13.1%
+warm vs Python (card ~316 vs ~336). One model; not a broad claim.
+
+Historical continuity: protocol-v1.1 `core_v2` with `vol_v1` / SF-1 is
+[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md)
+(+11.2% cold / −3.3% warm; card ~436 vs ~336).
 
 `--tasks` accepts a comma-separated list of task IDs (for example,
 `01-hello,07-functions`). `--request-timeout SECONDS` caps each model API
