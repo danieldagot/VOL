@@ -61,26 +61,27 @@ vs completion and cold vs warm (card-amortized) totals:
 
 ```sh
 uv run python llm/harness/run_generate_repair.py --provider gemini --suite core
-# VOL-only (skip Python when iterating VOL card/syntax — reuse last published Python numbers):
-uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol
+# VOL-only + merge frozen Python rows from a prior JSONL (same model/suite):
+uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol \
+  --baseline-jsonl llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.jsonl
 # optional compiled baseline:
 uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol,go
 ```
 
 **When to re-run Python:** only if the Python card, suite tasks, protocol, model,
-temperature, or harness scoring change. VOL card tweaks, Fix-text diagnostics, and
-SF-1 surface polish can use `--langs vol` and compare against the latest published
-Python row (same model/suite). Do not treat a VOL-only JSONL as a new paired
-baseline table without naming the Python artifact you compared against.
+temperature, or harness scoring change. VOL card tweaks, Fix-text diagnostics,
+source-check hygiene, and SF-1 surface polish can use `--langs vol` with
+`--baseline-jsonl` so the published JSONL/summary stays self-contained.
 
 The separate static-density benchmark below still contains 13 tasks. Those 13
 are not the LLM workflow suite.
 
 The published protocol-v1.1 (`core_v2`) Gemini run with the default Python
-baseline and SF-1 / `vol_v1` is
-[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.md).
-Both languages reached 100% success @ K; VOL first-try was 60%, with about
-+82.9% cold and +88.1% warm tokens vs Python (card ~423 vs Python ~336).
+baseline and `vol_v1` is
+[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md)
+(Python rows reused from `…040028.jsonl`). Both languages reached 100% first-try
+and success @ K; VOL was about +11.2% cold / −3.3% warm vs Python (card ~436 vs
+~336). The earlier `…040028` table is superseded (source-check mismatch).
 
 `--tasks` accepts a comma-separated list of task IDs (for example,
 `01-hello,07-functions`). `--request-timeout SECONDS` caps each model API

@@ -1,4 +1,4 @@
-# VOL language card (v1 / SF-1)
+# VOL language card (v1 / core_v2)
 
 Single `.vol` file. No `main`. Top-level statements run in order.
 **Newlines separate statements** — not `print a print b` (`E119`). No `match`.
@@ -24,6 +24,7 @@ Single `.vol` file. No `main`. Top-level statements run in order.
 
 - `[1, 2]`, `a[i]`, `a.len` (not `.length`)
 - `_` expression (not a `fn` value): `items.where(_ > 5)`, `items.map(_ * 2)`, `items.count(_ > 5)`, `items.sum()`
+- Prefer `.count(pred)` when you only need a count
 - String `+`; `string(v)`
 
 ## Functions / I/O

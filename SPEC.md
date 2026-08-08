@@ -1,6 +1,6 @@
 # VOL Language Specification (Prototype v0 / SF-1)
 
-> Status: **Surface Freeze SF-1** (vision-aligned prototype; card `vol_v1`)
+> Status: **Surface Freeze SF-1** (vision-aligned prototype; harness card `vol_v1` = `core_v2` subset)
 > Audience: humans and LLMs
 
 > Source of truth for behavior: this file plus the tests in `internal/lang`
@@ -20,8 +20,8 @@ Related docs:
 | [`README.md`](README.md) | Project status and examples |
 | [`IDEAS.md`](IDEAS.md) | Planned features and open questions |
 | [`AGENTS.md`](AGENTS.md) | Project vision and contribution rules |
-| [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | LLM language card for SF-1 (current) |
-| [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | LLM language card for SF-0 (historical `core_v2` tables) |
+| [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | `core_v2` task card (SF-1-bound subset; not a full SF-1 tour) |
+| [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | Historical `core_v2` card (SF-0) |
 
 This file is the single source for implemented syntax, vocabulary, and semantics.
 Planned words such as `parallel` belong only in [`IDEAS.md`](IDEAS.md).
@@ -65,7 +65,11 @@ implemented and tested, but spelling or meaning may change.
 It is the **vision-aligned** prototype pin: Option/Result (if-let, `??`, postfix
 `?`; `match` rejected), modules, product structs, anonymous and expression-body
 `fn`, multi-assign, `.map` / `.count`, and the rest of the Implemented core.
-The matching LLM card is [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md).
+The harness card for published `core_v2` runs is
+[`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md): an SF-1-bound **task
+card** for that suite (collections / control / `fn`), not a full SF-1 product
+tour of Option/Result/structs/`import`. Do not treat card size as the whole
+freeze.
 
 **Product freezes** (use these in status docs and LLM result tables; do not mix
 freeze IDs in one table):
@@ -73,7 +77,7 @@ freeze IDs in one table):
 | Freeze | Card | Meaning |
 | --- | --- | --- |
 | SF-0 | `vol_v0.md` | First pin (historical `core_v2` results) |
-| SF-1 | `vol_v1.md` | Vision-aligned surface (current; published `core_v2`) |
+| SF-1 | `vol_v1.md` | Vision-aligned language surface; card is `core_v2`-scoped |
 | SF-2+ | `vol_v2.md` (when shipped) | Next real expansion (`|>`, enums, dual-return, …) |
 
 Only keep cards for product freezes that have (or will have) published harness

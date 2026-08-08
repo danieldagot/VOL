@@ -34,11 +34,15 @@ predictable execution, and native performance.
 
 **Current reality:** VOL is a tree-walking interpreter prototype with a small
 provisional syntax. **Surface Freeze SF-1** pins that vision-aligned Supported
-surface ([`SPEC.md`](SPEC.md) §0) and the LLM card `bench/llm/cards/vol_v1.md`
-(SF-0 / `vol_v0` remains for historical `core_v2` tables). Do not add Planned
-syntax under SF-1 without a freeze bump. There is no native backend, static type
-system, ownership checker, or broad standard library (ambient tiny core only).
-Keep vision and implementation status distinct in every document.
+surface ([`SPEC.md`](SPEC.md) §0). The harness card `bench/llm/cards/vol_v1.md`
+is a `core_v2` **task card** (SF-1-bound subset — not a full SF-1 product tour).
+SF-0 / `vol_v0` remains for historical tables. Do not add Planned syntax under
+SF-1 without a freeze bump. SF-1 is a **syntax pin**, not proof of LLM workflow
+superiority. Hand-written source-density numbers in `bench/` are not
+generate/repair evidence. There is no native backend, static type system,
+ownership checker, or broad standard library (ambient tiny core only). Ownership,
+vectorization, and parallelization are vision/research only until specified and
+tested. Keep vision and implementation status distinct in every document.
 
 Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 
@@ -105,56 +109,44 @@ Avoid:
 
 Infer only when the language specification defines what inference means.
 
-### 4. Compiler First (Research Goal)
+### 4. Compiler First (Research Goal — not implemented)
 
-A future compiler may perform analyses such as:
+**Vision only.** A future compiler *might* perform analyses such as ownership,
+borrow/lifetime inference, escape analysis, vectorization, parallelization, or
+other optimization — **after** each has written semantic rules and tests. None
+of these exist in the current interpreter. Do not document them as behavior,
+diagnostics, or implied SF-1 capabilities. Local non-escaping ownership may be
+tractable later; removing ownership contracts from public APIs is much harder.
 
-- ownership analysis
-- borrow analysis
-- lifetime inference
-- escape analysis
-- vectorization
-- parallelization
-- optimization
+### 5. Native Performance (research target — not implemented)
 
-None of these are language semantics until specified. Local non-escaping
-ownership inference may be tractable; removing ownership contracts from public
-APIs is much harder. Do not document unimplemented inference as behavior.
-
-### 5. Native Performance
-
-VOL is intended to be a compiled language.
-
-Performance targets:
+VOL is **intended** to become a compiled language. Targets below are aspirations,
+not properties of today's tree-walker:
 
 - comparable to C
 - memory safety
 - zero-cost abstractions
 - predictable execution
+- no mandatory garbage collector or heavyweight runtime
 
-VOL programs should not require a garbage collector or heavyweight runtime.
-
-A future compiler should provide:
-
-- stack allocation whenever values do not escape
-- compile-time specialization
-- dead-code elimination across the standard library
-- automatic vectorization and safe parallelization where semantics allow
-- data-oriented memory layouts
-- explicit control over allocation and representation when required
-- optional safety checks according to build mode
+A future native backend *might* pursue stack allocation for non-escaping values,
+specialization, DCE, vectorization/parallelization **where semantics allow**,
+layout control, and selectable safety checks — only after those semantics are
+specified. Do not imply any of that from the vision section alone.
 
 ### 6. AI Native
 
-The compiler is designed to work with AI.
+Tooling and diagnostics should be easy for humans and agents to consume. That is
+a design goal; SF-1 surface + early harness runs do not prove workflow superiority.
 
 Goals:
 
-- deterministic formatting
-- deterministic diagnostics
-- structured errors
-- machine-readable compiler output
-- falsifiable LLM generation and repair benchmarks
+- deterministic formatting (Planned)
+- deterministic diagnostics (human + JSON — Supported today)
+- structured errors with stable codes (Supported today)
+- machine-readable compiler/interpreter output (`vol --json` — Supported)
+- falsifiable LLM generation and repair benchmarks (protocol + early runs;
+  not a proven VOL win yet)
 
 Errors have both human and JSON formats. Diagnostics carry `code`, `message`,
 `file`, `position`, and optional `fix`. The CLI prints the human form by default;
@@ -262,9 +254,10 @@ semantics are defined.
 
 ---
 
-## Standard Library Philosophy
+## Standard Library Philosophy (vision — not shipped)
 
-VOL is batteries included for systems and backend development.
+**Aspiration:** batteries included for systems and backend development. Today only
+an ambient tiny core exists; richer libraries require explicit imports when added.
 
 The foundations should be small, orthogonal, and predictable while the available capabilities should be broad.
 
@@ -291,17 +284,18 @@ The library may be broad, but using it should remain token-efficient and concept
 
 ---
 
-## Runtime Philosophy
+## Runtime Philosophy (research target)
 
-VOL provides high-level capabilities without hiding their cost.
+**Aspiration:** high-level capabilities without hiding their cost. Today's
+interpreter does not infer ownership, allocation, or parallelism.
 
-Defaults should be safe and efficient. Systems programmers must be able to inspect and constrain compiler decisions when correctness, performance, memory layout, latency, or interoperability requires it.
+Defaults should be safe and efficient once a native runtime exists. Systems
+programmers must be able to inspect and constrain compiler decisions when
+correctness, performance, memory layout, latency, or interoperability requires it.
 
-The rule is:
+The rule (only after inference has written semantic rules) is:
 
 > Infer by default. Expose control when necessary.
-
-That rule applies only after inference has written semantic rules.
 
 VOL must not impose:
 
@@ -310,7 +304,8 @@ VOL must not impose:
 - hidden unbounded allocation
 - unpredictable background work
 
-Compiler reports and tooling should make inferred allocations, ownership, concurrency, and expensive operations visible.
+When (and only when) inference rules exist, tooling should make inferred
+allocations, ownership, concurrency, and expensive operations visible.
 
 ---
 
@@ -328,17 +323,17 @@ Every build may report:
 **Static source token density** (implemented today) is measured in
 [`bench/`](bench/README.md): equivalent hand-written programs in VOL, Go, Rust,
 and Zig are compared by token count under named OpenAI tokenizers. That measures
-source size only—not whether an LLM generates correct VOL, or how many tokens
-generate/repair workflows consume. See [`README.md`](README.md) for current ratios.
+source size only. Do **not** cite density ratios as LLM workflow proof, SF-1
+success, or task-success efficiency. See [`README.md`](README.md) for current
+ratios.
 
-Future metrics:
-
-Meaning per Token (MPT)
-
-MPT is undefined as a single scalar. The operational generate/repair protocol
-is in [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md): task success relative to total
-tokens across generation, diagnostics, and repair (not source length alone).
-Harness runs and published result tables are still todo.
+**Generate/repair workflow** protocol is in [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md)
+(task success vs total tokens across generation, diagnostics, and repair). Early
+published `core_v2` runs exist; they do **not** establish VOL superiority. The
+current Gemini table (`vol_v1` task card) matches Python on first-try / success
+@ K with modest cold overhead after source-check hygiene. Meaning per Token
+(MPT) remains undefined as a single scalar. More models and realistic tasks are
+required before treating results as stable.
 
 ---
 

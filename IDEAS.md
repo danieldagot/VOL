@@ -9,7 +9,8 @@ specified and tested.
 ## Near-Term Priority: Precise Core Before New Features
 
 **Surface Freeze SF-1 is active** (see [`SPEC.md`](SPEC.md) §0). The vision-aligned
-Supported surface and LLM card `bench/llm/cards/vol_v1.md` are frozen. SF-0 /
+Supported surface is frozen. Harness card `bench/llm/cards/vol_v1.md` is the
+`core_v2` task card (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
 `vol_v0` remains for historical harness tables. Do not expand the language until
 foundations justify SF-2.
 
@@ -29,7 +30,7 @@ Immediate documentation and design work:
       scopes, evaluation order, numeric behavior, arrays/strings, mutation,
       functions, control flow, and failure behavior for the implemented core.
 - [x] Declare Surface Freeze SF-0 (SPEC + `vol_v0` language card).
-- [x] Declare Surface Freeze SF-1 (vision-aligned surface; card `vol_v1`).
+- [x] Declare Surface Freeze SF-1 (vision-aligned surface; `vol_v1` = `core_v2` task card).
 - [ ] Keep `SPEC.md` synchronized whenever interpreter behavior changes.
 - [x] Error/result model — **Result values + if-let / `?` implemented** (SF-1);
       dual-return still Planned.
@@ -43,11 +44,11 @@ Immediate documentation and design work:
 - [ ] Keep Planned syntax out of `SPEC.md`; only Supported and Provisional forms belong there.
 - [x] Publish frozen `core_v2` with default Python baseline (`--langs vol,python`).
 - [ ] Publish ≥1 other model on `core_v2` before treating LLM results as stable.
-- [x] Re-run / publish against `vol_v1` / SF-1 (`core_v2` Gemini 20260808-040028);
-      second model still needed before treating numbers as stable.
-- [x] **Token-efficient syntax (in SF-1)** — unwrap redesign + density sugar
-      (`.map` / `.count`, if-let / `??` / `?`) shipped in SPEC; measure before
-      further sugar (`LLM_BENCHMARK.md`).
+- [x] Re-run / publish against `vol_v1` after source-check hygiene (`.count`/`.where`);
+      published `20260808-041440` (`…040028` superseded); second model still needed.
+- [x] **Density / unwrap surface (in SF-1)** — `.map` / `.count`, if-let /
+      `??` / `?` shipped in SPEC. Shipped surface ≠ proven LLM workflow win;
+      measure before further sugar (`LLM_BENCHMARK.md`).
 
 ## Near-Term Foundation
 
@@ -539,15 +540,18 @@ task success / total tokens consumed
 
 including generated code, compiler or runtime diagnostics, repair prompts, and
 revisions across a fixed task suite. Protocol is defined in
-[`LLM_BENCHMARK.md`](LLM_BENCHMARK.md). The protocol-v1 harness and one
-Gemini core-suite result are implemented; more models and realistic backend
-tasks are still required before making broad claims.
+[`LLM_BENCHMARK.md`](LLM_BENCHMARK.md). The protocol-v1 harness and published
+Gemini `core_v2` results exist; after source-check hygiene the `vol_v1` task-card
+run matches Python on first-try / success @ K with modest cold overhead (warm
+slightly under Python once the card is amortized). That is still one model on a
+tiny suite — not a broad LLM claim. Do not treat SF-1 itself as proven
+optimization.
 
 **Static source token density** (step 1 — implemented) is measured in
 [`bench/`](bench/README.md): hand-written equivalent programs in VOL, Go, Rust,
 and Zig are compared by token count under named OpenAI tokenizers
 (`cl100k_base`, `o200k_base`). That benchmark measures source density only —
-not LLM task-success efficiency.
+not LLM task-success efficiency. Never cite density ratios as workflow proof.
 
 ## Open Design Questions
 

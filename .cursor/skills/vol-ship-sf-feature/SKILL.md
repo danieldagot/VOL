@@ -43,7 +43,8 @@ If the feature is still an open question in IDEAS, stop and run Phase 2 of
 - Docs-only directions that cannot run yet (allocation “unspecified”, parallel
   “no guarantees”) stay docs — do not fake Supported syntax.
 - Never label Supported without tests.
-- Do not keep intermediate draft cards — only product-freeze cards (`vol_v0`, `vol_v1`, …).
+- Do not keep intermediate draft cards — only freeze-bound cards (`vol_v0`, `vol_v1`, …).
+  Note: `vol_v1` is the `core_v2` task card (SF-1 subset), not a full SF-1 product tour.
 
 ## Workflow
 

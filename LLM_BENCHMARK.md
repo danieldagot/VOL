@@ -178,16 +178,20 @@ Target **≤ ~400 tokens** each (measure with the same tokenizer used for scorin
 or the API’s tokenizer). Cards must only describe **currently Supported** VOL
 features from [`SPEC.md`](SPEC.md) / README “What Actually Works.”
 
-VOL card must include at least:
+VOL `core_v2` card (`vol_v1`) must include at least:
 
 - no `main`; top-level statements run
 - `:=` / `=` / opt-in `const`
 - `if` / `elif` / `else` (statement); `? :` for values
 - `repeat`, `while`, `.each`
-- arrays, `.len`, `.where(_ …)`, `.sum()`
+- arrays, `.len`, `.where(_ …)` / `.count(_ …)`, `.sum()`
 - `fn` / `return`; missing return is `nothing` (do not assign it)
 - `print`, `string()`, `assert`
 - integer overflow traps
+
+It is a **task card** for `core_v2`, bound to SF-1 Supported syntax, not a full
+SF-1 product tour. Omit Option/Result/structs/`import` until a suite exercises
+them (a fuller card is a separate, deliberate revision).
 
 Python card: equivalently dense stdlib-only reminders (`print`, lists, `for`,
 `assert`), not a tour of the standard library.
@@ -198,18 +202,21 @@ slices, `for`), not a tour of Effective Go.
 Store frozen cards under:
 
 ```text
-bench/llm/cards/vol_v1.md      # Surface Freeze SF-1 (current; harness default)
+bench/llm/cards/vol_v1.md      # core_v2 task card (SF-1-bound; harness default)
 bench/llm/cards/vol_v0.md      # SF-0 (historical core_v2 tables; do not mix freeze IDs)
 bench/llm/cards/python_v0.md   # matched Python baseline (default)
 bench/llm/cards/go_v0.md       # matched Go baseline (optional)
 ```
 
-Cards are bound to the language **product surface freeze** ([`SPEC.md`](SPEC.md)
-§0): SF-0 (`vol_v0`) and SF-1 (`vol_v1`). Do not keep intermediate draft cards
-for unfinished surfaces. Bump the VOL card version suffix with a freeze bump
-(next: SF-2 → `vol_v2.md`) or a deliberate card-only revision that does not add
-language features. Never silently edit a card used in a published result table;
-published summaries must name the freeze and card versions.
+Cards are **bound to** a product surface freeze ([`SPEC.md`](SPEC.md) §0) but
+need not enumerate every Supported form. SF-0 → `vol_v0`; SF-1 → `vol_v1`
+(`core_v2` subset). Do not keep intermediate draft cards for unfinished
+surfaces. Bump the VOL card version suffix with a freeze bump (next: SF-2 →
+`vol_v2.md`) or a deliberate card-only revision that does not add language
+features. Never silently edit a card used in a published result table without
+republishing; published summaries must name the freeze and card versions.
+Source checks must accept every form the card teaches for the same intent
+(e.g. `.count` and `.where` for counting).
 
 ### 6.3 Task artifacts
 
@@ -439,10 +446,13 @@ cannot be recomputed from committed JSONL.
 - [x] Publish a frozen `core_v2` live run (Gemini) — VOL vs Go
 - [x] Bind cards to Surface Freeze SF-0 (`SPEC.md` §0; `vol_v0` / `python_v0` / `go_v0`)
 - [x] Publish frozen `core_v2` live run with default `--langs vol,python` (Gemini)
-- [x] Surface Freeze SF-1: vision-aligned surface; card `vol_v1.md` (harness default)
+- [x] Surface Freeze SF-1; `vol_v1.md` = `core_v2` task card (SF-1-bound subset)
 - [ ] Publish ≥1 other model on `core_v2` before further syntax optimization
-- [x] Re-run / publish `core_v2` against `vol_v1` / SF-1
-      (`20260808-040028`; thinner card + Fix hints; second model still needed)
+- [x] Re-run / publish `core_v2` against `vol_v1`
+      (`20260808-041440`; Python via `--baseline-jsonl` from `…040028`;
+      `…040028` VOL numbers poisoned by `.where`-only source checks — superseded)
+- [x] `11-leaderboard` / `13-temperatures` source checks accept `.count` or `.where`
+- [x] Harness `--baseline-jsonl` for VOL-only republish with frozen Python rows
 
 ---
 
@@ -455,11 +465,12 @@ When changing the protocol:
 3. Keep density (`bench/results/density*.md`) separate—never mix tables.
 
 **Baseline re-run policy:** do not re-run Python (or Go) on every VOL iteration.
-Use `--langs vol` when only the VOL card, diagnostics, or Supported surface
-changed. Re-run the baseline language only when its card, the task suite,
-protocol, model, temperature, or scoring changed. When publishing a VOL-only
-run, cite the frozen Python (or Go) result artifact used for comparison (same
-model and suite).
+Use `--langs vol` when only the VOL card, diagnostics, source checks, or
+Supported surface changed. Re-run the baseline language only when its card, the
+task suite, protocol, model, temperature, or scoring changed. When publishing a
+VOL-only run, merge frozen baseline rows with `--baseline-jsonl <prior.jsonl>`
+(same model and suite) so the new JSONL/summary is self-contained and names the
+artifact.
 
 A generate/repair number is not official until transcripts and the summary table
 are committed next to the frozen cards that produced them.

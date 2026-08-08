@@ -14,12 +14,22 @@ VOL asks what a systems programming language should look like when LLMs are firs
 
 Its primary goal is to maximize **semantic density**: express more intent with fewer tokens while preserving deterministic structure, readability, safety, and native performance. The language should be efficient for an LLM to generate, understand, review, modify, and debug.
 
-That goal is a research direction, not a measured property of the current prototype. Token counts also depend on each model's tokenizer, so “fewer tokens” alone is not a success metric. The intended long-term measure is task success relative to total tokens consumed across generation, diagnostics, and repair. See [`IDEAS.md`](IDEAS.md).
+That goal is a research direction, not a measured property of the current
+prototype. SF-1 freezes Supported syntax; it does **not** prove LLM optimization.
+Hand-written source-density benches are not generate/repair evidence. Token
+counts also depend on each model's tokenizer, so “fewer tokens” alone is not a
+success metric. The intended long-term measure is task success relative to total
+tokens consumed across generation, diagnostics, and repair — see
+[`LLM_BENCHMARK.md`](LLM_BENCHMARK.md) and [`IDEAS.md`](IDEAS.md).
 
 ## Project Status
 
 **VOL is currently a very early tree-walking interpreter prototype.**
-There is no native compiler, no static type system, no ownership or borrow checker, no standard library, and no backend. What exists is a minimal interpreter that can execute small programs written in a provisional syntax.
+There is no native compiler, no static type system, no ownership or borrow
+checker, no broad standard library (ambient tiny core only), and no backend.
+Ownership, vectorization, and parallelization are not language semantics today.
+What exists is a minimal interpreter that can execute small programs written in
+a provisional syntax.
 
 This README separates **what works today** from **long-term design targets**. Treat vision language as a target, not a shipped reality.
 
@@ -41,9 +51,10 @@ This README separates **what works today** from **long-term design targets**. Tr
 — Option/Result (if-let, `??`, postfix `?`; `match` removed), modules, product
 structs, anonymous and expression-body `fn`, multi-assign, `.map`/`.count`, and
 the rest of the Implemented core. Further vocabulary (`|>`, enums, dual-return
-sugar, …) waits for an SF-2 bump. LLM card:
-[`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md). SF-0 /
-[`vol_v0`](bench/llm/cards/vol_v0.md) remains for historical `core_v2` tables.
+sugar, …) waits for an SF-2 bump. Harness card
+[`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) is the `core_v2` **task
+card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
+[`vol_v0`](bench/llm/cards/vol_v0.md) remains for historical tables.
 
 - integer, floating-point, Boolean, and string literals
 - inferred variable declarations with `:=` (including multi-declare `a, b := …`)
@@ -313,7 +324,8 @@ On 13 equivalent small programs, VOL currently uses about:
 
 That is source size only — hand-written programs that print the same output. It
 does **not** measure whether an LLM generates correct VOL more easily, or how
-many tokens generate/repair workflows consume.
+many tokens generate/repair workflows consume. Do not cite these ratios as
+workflow proof or as evidence that SF-1 is “LLM optimized.”
 
 Full per-task numbers: [`bench/results/density.md`](bench/results/density.md).
 How to run / regenerate: [`bench/README.md`](bench/README.md).
@@ -328,8 +340,10 @@ The default workflow baseline is **Python** (interpreted peer for the current
 prototype). Go remains an optional compiled baseline (`--langs vol,go`).
 
 One protocol-v1.1 (`core_v2`) run is published for `gemini-3.5-flash-lite`,
-temperature 0, three replicates, and at most two repair rounds — **VOL (SF-1 /
-`vol_v1`) vs Python**. The suite has five tasks covering generation,
+temperature 0, three replicates, and at most two repair rounds — **VOL
+(`vol_v1` / SF-1-bound `core_v2` task card) vs Python**. VOL rows are a fresh
+live run; Python rows are reused from the prior frozen artifact via
+`--baseline-jsonl`. The suite has five tasks covering generation,
 diagnostic-seeded repair, and modification. Summaries split prompt vs completion
 and report cold totals (card re-sent every request) plus warm totals (estimated
 language-card cost amortized away).
@@ -337,20 +351,22 @@ language-card cost amortized away).
 | Language | First-try | Success @ K | Mean cold | Mean warm | Mean completion |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Python | 100% | 100% | 762.9 | 426.9 | 135.1 |
-| VOL | 60% | 100% | 1395.3 | 803.1 | 191.9 |
+| VOL | 100% | 100% | 848.6 | 412.6 | 109.9 |
 
-VOL matched Python on **success @ K** but used about **82.9% more cold** and
-**88.1% more warm** workflow tokens (card teaching cost + repair rounds on
-leaderboard/temperatures). Completions were about 42.1% larger; prompts about
-91.7% larger. First-try was 60% (leaderboard and temperatures needed repairs;
-diagnostic repair `R007` still succeeded first-try). Card size is ~423 tokens
-(`vol_v1`) vs Python ~336.
+VOL matched Python on **first-try** and **success @ K**, used about **11.2% more
+cold** workflow tokens, and about **3.3% fewer warm** tokens once the card is
+amortized. Completions were about 18.7% smaller; prompts about 17.7% larger.
+Card size is ~436 tokens (`vol_v1`) vs Python ~336. An earlier table
+(`20260808-040028`) is **superseded**: it required `\.where(` while the card
+taught `.count`, which forced fake repair rounds and poisoned first-try / token
+totals.
 
-This small synthetic suite does not establish real-world superiority for any
-language and does not measure runtime performance. A second model on `core_v2`
-is still needed before treating results as stable.
+This small synthetic run still does **not** prove real-world LLM superiority or
+runtime performance. A second model on `core_v2` is needed before treating
+results as stable. Do not mix these workflow numbers with the hand-written
+density table above.
 
-Full result: [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.md).
+Full result: [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md).
 Protocol and limitations: [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md).
 
 ## Requirements

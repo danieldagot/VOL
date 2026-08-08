@@ -32,6 +32,9 @@ Examples:
   uv run python llm/harness/run_generate_repair.py --provider openai --model gpt-4.1-mini
   uv run python llm/harness/run_generate_repair.py --provider gemini --model gemini-3.6-flash
   uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol,go
+  # VOL-only re-run, reuse frozen Python rows from a prior JSONL:
+  uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol \\
+    --baseline-jsonl llm/results/core_v2_live_gemini_…_python.jsonl
 """
 
 from __future__ import annotations
@@ -720,6 +723,8 @@ def summarize(
     max_repairs: int,
     dry_run: bool,
     card_tokens: dict[str, int],
+    baseline_note: str | None = None,
+    live_languages: list[str] | None = None,
 ) -> str:
     languages = sorted({r.language for r in results})
     lines: list[str] = [
@@ -753,20 +758,31 @@ def summarize(
                 for lang in languages
             )
         ),
-        "",
-        "> Dry-run uses reference solutions and is **not** an LLM benchmark result."
-        if dry_run
-        else "> Live API run. Recompute from committed JSONL if numbers are quoted.",
-        "",
-        "> **Cold** totals use provider `prompt_tokens` + `completion_tokens` (language card",
-        "> re-sent every request). **Warm** subtracts the estimated card tokens from each",
-        "> prompt (amortized / cached-card accounting).",
-        "",
-        "## Summary",
-        "",
-        "| Language | First-try % | Success @ K % | Median cold (success) | Mean ± SD cold (all) | N task-replicates |",
-        "| --- | --- | --- | --- | --- | --- |",
     ]
+    if baseline_note:
+        live = ", ".join(live_languages or [])
+        lines.append(
+            f"- Baseline reuse: live langs=[{live}]; frozen rows from `{baseline_note}`"
+        )
+    lines.extend(
+        [
+            "",
+            (
+                "> Dry-run uses reference solutions and is **not** an LLM benchmark result."
+                if dry_run
+                else "> Live API run. Recompute from committed JSONL if numbers are quoted."
+            ),
+            "",
+            "> **Cold** totals use provider `prompt_tokens` + `completion_tokens` (language card",
+            "> re-sent every request). **Warm** subtracts the estimated card tokens from each",
+            "> prompt (amortized / cached-card accounting).",
+            "",
+            "## Summary",
+            "",
+            "| Language | First-try % | Success @ K % | Median cold (success) | Mean ± SD cold (all) | N task-replicates |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+    )
 
     for language in languages:
         subset = [r for r in results if r.language == language]
@@ -953,6 +969,105 @@ def record_to_json(rec: AttemptRecord) -> dict:
     }
 
 
+def attempt_from_json(row: dict) -> AttemptRecord:
+    return AttemptRecord(
+        suite=str(row["suite"]),
+        task=str(row["task"]),
+        task_kind=str(row["task_kind"]),
+        language=str(row["language"]),
+        model=str(row["model"]),
+        temperature=float(row["temperature"]),
+        replicate=int(row["replicate"]),
+        attempt=int(row["attempt"]),
+        prompt_tokens=int(row["prompt_tokens"]),
+        completion_tokens=int(row["completion_tokens"]),
+        exit_code=row.get("exit_code"),
+        outcome=str(row["outcome"]),
+        diagnostic_code=row.get("diagnostic_code"),
+        stdout=str(row.get("stdout") or ""),
+        stderr=str(row.get("stderr") or ""),
+        source=str(row.get("source") or ""),
+        dry_run=bool(row.get("dry_run", False)),
+        card_tokens_est=int(row.get("card_tokens_est") or 0),
+        repair_seeded=bool(row.get("repair_seeded", False)),
+    )
+
+
+def load_baseline_results(
+    path: Path,
+    *,
+    suite: str,
+    model: str,
+    skip_languages: set[str],
+) -> tuple[list[TaskResult], dict[str, int], str]:
+    """Load frozen attempt rows for languages not being re-run.
+
+    Returns (task results, card_tokens_est by language, baseline path note).
+    """
+    if not path.is_file():
+        die(f"baseline JSONL not found: {path}")
+    by_key: dict[tuple[str, str, int], list[AttemptRecord]] = {}
+    card_tokens: dict[str, int] = {}
+    models: set[str] = set()
+    suites: set[str] = set()
+    with path.open(encoding="utf-8") as fh:
+        for line_no, line in enumerate(fh, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                die(f"baseline JSONL {path}:{line_no}: {exc}")
+            lang = str(row.get("language", ""))
+            if lang in skip_languages:
+                continue
+            if lang not in LANG_META:
+                die(f"baseline JSONL {path}:{line_no}: unsupported language {lang!r}")
+            rec = attempt_from_json(row)
+            models.add(rec.model)
+            suites.add(rec.suite)
+            card_tokens[lang] = rec.card_tokens_est
+            key = (rec.language, rec.task, rec.replicate)
+            by_key.setdefault(key, []).append(rec)
+    if not by_key:
+        die(f"baseline JSONL {path} has no rows outside --langs {sorted(skip_languages)}")
+    if suite not in suites:
+        die(
+            f"baseline JSONL suite(s) {sorted(suites)} do not include current suite {suite!r}"
+        )
+    if model not in models:
+        die(
+            f"baseline JSONL model(s) {sorted(models)} do not include current model {model!r}"
+        )
+    results: list[TaskResult] = []
+    for (language, task, replicate), attempts in sorted(by_key.items()):
+        attempts.sort(key=lambda a: a.attempt)
+        success = any(a.outcome == "success" for a in attempts)
+        first_try = bool(attempts) and attempts[0].outcome == "success"
+        seed_diag = None
+        if attempts and attempts[0].repair_seeded:
+            seed_diag = attempts[0].diagnostic_code
+        results.append(
+            TaskResult(
+                task=task,
+                task_kind=attempts[0].task_kind,
+                language=language,
+                replicate=replicate,
+                success=success,
+                first_try=first_try,
+                attempts=attempts,
+                seed_diagnostic_code=seed_diag,
+            )
+        )
+    note = str(path)
+    try:
+        note = str(path.resolve().relative_to(VOL_REPO.resolve()))
+    except ValueError:
+        pass
+    return results, card_tokens, note
+
+
 def resolve_tasks(suite: str, only: list[str] | None) -> list[str]:
     if suite == "smoke":
         tasks = list(SMOKE_TASKS)
@@ -1040,6 +1155,15 @@ def main() -> None:
         help="Maximum time for one model request; provider default when omitted",
     )
     parser.add_argument("--dry-run", action="store_true", help="Use reference solutions; no API")
+    parser.add_argument(
+        "--baseline-jsonl",
+        type=Path,
+        default=None,
+        help=(
+            "Prior frozen JSONL: merge attempt rows for languages not listed in --langs "
+            "(same model + suite). Use with --langs vol to reuse published Python/Go."
+        ),
+    )
     parser.add_argument("--out-dir", type=Path, default=None, help="Results directory")
     args = parser.parse_args()
 
@@ -1092,14 +1216,31 @@ def main() -> None:
 
     model_label = model_name
     results: list[TaskResult] = []
+    baseline_note: str | None = None
+    baseline_results: list[TaskResult] = []
+
+    if args.baseline_jsonl is not None:
+        baseline_results, baseline_cards, baseline_note = load_baseline_results(
+            args.baseline_jsonl,
+            suite=suite_name,
+            model=model_label,
+            skip_languages=set(languages),
+        )
+        for lang, est in baseline_cards.items():
+            card_tokens.setdefault(lang, est)
+        results.extend(baseline_results)
 
     print(
         f"suite={suite_name} mode={mode} provider={args.provider if not args.dry_run else 'none'} "
         f"model={model_label} base={base_url or '-'} tasks={len(tasks)} langs={languages} "
         f"card_tokens={card_tokens}"
+        + (f" baseline={baseline_note}" if baseline_note else "")
     )
 
     with partial_jsonl_path.open("w", encoding="utf-8") as jsonl:
+        for tr in baseline_results:
+            for attempt in tr.attempts:
+                jsonl.write(json.dumps(record_to_json(attempt), ensure_ascii=False) + "\n")
         for language in languages:
             for task in tasks:
                 for replicate in range(1, args.replicates + 1):
@@ -1143,6 +1284,8 @@ def main() -> None:
         max_repairs=args.max_repairs,
         dry_run=args.dry_run,
         card_tokens=card_tokens,
+        baseline_note=baseline_note,
+        live_languages=languages,
     )
     summary_path.write_text(summary, encoding="utf-8")
     print()

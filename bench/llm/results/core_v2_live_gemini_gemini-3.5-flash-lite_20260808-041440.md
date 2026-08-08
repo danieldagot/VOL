@@ -1,11 +1,5 @@
 # VOL LLM generate/repair results
 
-> **SUPERSEDED.** Do not quote these numbers. `11-leaderboard` /
-> `13-temperatures` required `\.where(` while `vol_v1` taught `.count`, which
-> forced repair rounds on already-correct programs. Current published table:
-> [`core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md)
-> (Python rows below were reused via `--baseline-jsonl`).
-
 - Date: 2026-08-08
 - Suite: `core_v2`
 - Protocol: v1.1
@@ -15,7 +9,8 @@
 - Dry-run: False
 - Surface freeze: Python=SF-0, VOL=SF-1
 - Cards: `python_v0.md` (SF-0), `vol_v1.md` (SF-1)
-- Card tokens (est. `cl100k_base`): Python=336, VOL=423
+- Card tokens (est. `cl100k_base`): Python=336, VOL=436
+- Baseline reuse: live langs=[vol]; frozen rows from `bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.jsonl`
 
 > Live API run. Recompute from committed JSONL if numbers are quoted.
 
@@ -28,44 +23,44 @@
 | Language | First-try % | Success @ K % | Median cold (success) | Mean ± SD cold (all) | N task-replicates |
 | --- | --- | --- | --- | --- | --- |
 | Python | 100.0 | 100.0 | 771 | 762.9 ± 142.9 | 15 |
-| VOL | 60.0 | 100.0 | 870 | 1395.3 ± 782.1 | 15 |
+| VOL | 100.0 | 100.0 | 884 | 848.6 ± 110.5 | 15 |
 
 ## Prompt vs completion (cold, all attempts)
 
 | Language | Mean prompt | Mean completion | Mean cold total | Prompt share | Completion share |
 | --- | --- | --- | --- | --- | --- |
 | Python | 627.8 | 135.1 | 762.9 | 82.3% | 17.7% |
-| VOL | 1203.3 | 191.9 | 1395.3 | 86.2% | 13.8% |
+| VOL | 738.7 | 109.9 | 848.6 | 87.1% | 12.9% |
 
 ## VOL vs Python token deltas (cold means)
 
 | Metric | VOL vs Python |
 | --- | --- |
-| Generated completion tokens | +42.1% |
-| Prompt tokens | +91.7% |
-| Total workflow tokens (cold) | +82.9% |
-| Abs. prompt delta / task-replicate | +575.5 |
-| Abs. completion delta / task-replicate | +56.9 |
+| Generated completion tokens | -18.7% |
+| Prompt tokens | +17.7% |
+| Total workflow tokens (cold) | +11.2% |
+| Abs. prompt delta / task-replicate | +110.9 |
+| Abs. completion delta / task-replicate | -25.2 |
 
 ## Cold vs warm (card amortized)
 
 | Language | Mean cold | Mean warm | Warm − cold | Card est. |
 | --- | --- | --- | --- | --- |
 | Python | 762.9 | 426.9 | -336.0 | 336 |
-| VOL | 1395.3 | 803.1 | -592.2 | 423 |
+| VOL | 848.6 | 412.6 | -436.0 | 436 |
 
-Warm VOL vs Python total: +88.1% (means 803.1 vs 426.9).
+Warm VOL vs Python total: -3.3% (means 412.6 vs 426.9).
 
 ## By workflow kind
 
 | Kind | Language | Success @ K % | Mean cold | Mean prompt | Mean completion | N |
 | --- | --- | --- | --- | --- | --- | --- |
 | generation | Python | 100.0 | 696.7 | 577.3 | 119.3 | 9 |
-| generation | VOL | 100.0 | 1238.3 | 1069.8 | 168.6 | 9 |
+| generation | VOL | 100.0 | 795.9 | 692.3 | 103.6 | 9 |
 | modification | Python | 100.0 | 953.3 | 679.0 | 274.3 | 3 |
-| modification | VOL | 100.0 | 2391.0 | 1975.0 | 416.0 | 3 |
+| modification | VOL | 100.0 | 970.7 | 770.0 | 200.7 | 3 |
 | repair | Python | 100.0 | 771.0 | 728.0 | 43.0 | 3 |
-| repair | VOL | 100.0 | 870.3 | 832.3 | 38.0 | 3 |
+| repair | VOL | 100.0 | 884.7 | 846.7 | 38.0 | 3 |
 
 ## Diagnostic repair notes
 
@@ -75,32 +70,17 @@ Warm VOL vs Python total: +88.1% (means 803.1 vs 426.9).
 
 | Task | Lang | Rep | Seed diag | Success | First-try | Attempts | Cold tokens | Last outcome |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 08-strings-assert | vol | 1 | R007 | True | True | 1 | 870 | success |
-| 08-strings-assert | vol | 2 | R007 | True | True | 1 | 870 | success |
-| 08-strings-assert | vol | 3 | R007 | True | True | 1 | 871 | success |
 | 08-strings-assert | python | 1 | — | True | True | 1 | 771 | success |
 | 08-strings-assert | python | 2 | — | True | True | 1 | 770 | success |
 | 08-strings-assert | python | 3 | — | True | True | 1 | 772 | success |
+| 08-strings-assert | vol | 1 | R007 | True | True | 1 | 884 | success |
+| 08-strings-assert | vol | 2 | R007 | True | True | 1 | 884 | success |
+| 08-strings-assert | vol | 3 | R007 | True | True | 1 | 886 | success |
 
 ## Per task-replicate
 
 | Task | Kind | Lang | Rep | Success | First-try | Attempts | Cold | Prompt | Completion | Warm | Last outcome |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 05-arrays-each | generation | vol | 1 | True | True | 1 | 735 | 662 | 73 | 312 | success |
-| 05-arrays-each | generation | vol | 2 | True | True | 1 | 735 | 662 | 73 | 312 | success |
-| 05-arrays-each | generation | vol | 3 | True | True | 1 | 735 | 662 | 73 | 312 | success |
-| 08-strings-assert | repair | vol | 1 | True | True | 1 | 870 | 832 | 38 | 447 | success |
-| 08-strings-assert | repair | vol | 2 | True | True | 1 | 870 | 832 | 38 | 447 | success |
-| 08-strings-assert | repair | vol | 3 | True | True | 1 | 871 | 833 | 38 | 448 | success |
-| 10-fibonacci | generation | vol | 1 | True | True | 1 | 674 | 631 | 43 | 251 | success |
-| 10-fibonacci | generation | vol | 2 | True | True | 1 | 672 | 631 | 41 | 249 | success |
-| 10-fibonacci | generation | vol | 3 | True | True | 1 | 674 | 631 | 43 | 251 | success |
-| 11-leaderboard | modification | vol | 1 | True | False | 2 | 2371 | 1965 | 406 | 1525 | success |
-| 11-leaderboard | modification | vol | 2 | True | False | 2 | 2431 | 1995 | 436 | 1585 | success |
-| 11-leaderboard | modification | vol | 3 | True | False | 2 | 2371 | 1965 | 406 | 1525 | success |
-| 13-temperatures | generation | vol | 1 | True | False | 2 | 2272 | 1899 | 373 | 1426 | success |
-| 13-temperatures | generation | vol | 2 | True | False | 2 | 2272 | 1899 | 373 | 1426 | success |
-| 13-temperatures | generation | vol | 3 | True | False | 2 | 2376 | 1951 | 425 | 1530 | success |
 | 05-arrays-each | generation | python | 1 | True | True | 1 | 630 | 562 | 68 | 294 | success |
 | 05-arrays-each | generation | python | 2 | True | True | 1 | 630 | 562 | 68 | 294 | success |
 | 05-arrays-each | generation | python | 3 | True | True | 1 | 630 | 562 | 68 | 294 | success |
@@ -116,3 +96,18 @@ Warm VOL vs Python total: +88.1% (means 803.1 vs 426.9).
 | 13-temperatures | generation | python | 1 | True | True | 1 | 891 | 639 | 252 | 555 | success |
 | 13-temperatures | generation | python | 2 | True | True | 1 | 861 | 639 | 222 | 525 | success |
 | 13-temperatures | generation | python | 3 | True | True | 1 | 891 | 639 | 252 | 555 | success |
+| 05-arrays-each | generation | vol | 1 | True | True | 1 | 750 | 677 | 73 | 314 | success |
+| 05-arrays-each | generation | vol | 2 | True | True | 1 | 750 | 677 | 73 | 314 | success |
+| 05-arrays-each | generation | vol | 3 | True | True | 1 | 750 | 677 | 73 | 314 | success |
+| 08-strings-assert | repair | vol | 1 | True | True | 1 | 884 | 846 | 38 | 448 | success |
+| 08-strings-assert | repair | vol | 2 | True | True | 1 | 884 | 846 | 38 | 448 | success |
+| 08-strings-assert | repair | vol | 3 | True | True | 1 | 886 | 848 | 38 | 450 | success |
+| 10-fibonacci | generation | vol | 1 | True | True | 1 | 694 | 646 | 48 | 258 | success |
+| 10-fibonacci | generation | vol | 2 | True | True | 1 | 688 | 646 | 42 | 252 | success |
+| 10-fibonacci | generation | vol | 3 | True | True | 1 | 688 | 646 | 42 | 252 | success |
+| 11-leaderboard | modification | vol | 1 | True | True | 1 | 972 | 770 | 202 | 536 | success |
+| 11-leaderboard | modification | vol | 2 | True | True | 1 | 968 | 770 | 198 | 532 | success |
+| 11-leaderboard | modification | vol | 3 | True | True | 1 | 972 | 770 | 202 | 536 | success |
+| 13-temperatures | generation | vol | 1 | True | True | 1 | 939 | 754 | 185 | 503 | success |
+| 13-temperatures | generation | vol | 2 | True | True | 1 | 965 | 754 | 211 | 529 | success |
+| 13-temperatures | generation | vol | 3 | True | True | 1 | 939 | 754 | 185 | 503 | success |

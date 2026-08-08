@@ -1,7 +1,7 @@
 {
   "kind": "modification",
   "source_checks": {
-    "vol": ["player1\\s*:=\\s*\\[", "player2\\s*:=\\s*\\[", "\\.where\\s*\\("],
+    "vol": ["player1\\s*:=\\s*\\[", "player2\\s*:=\\s*\\[", "\\.(?:where|count)\\s*\\("],
     "go": ["player1\\s*:=\\s*\\[\\]int", "player2\\s*:=\\s*\\[\\]int", "\\brange\\b"],
     "python": ["player1\\s*=\\s*\\[", "player2\\s*=\\s*\\[", "\\bfor\\b"]
   }
