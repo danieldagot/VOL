@@ -8,13 +8,16 @@ specified and tested.
 
 ## Near-Term Priority: Precise Core Before New Features
 
-**Surface Freeze SF-2 is active** (see [`SPEC.md`](SPEC.md) §0). Supported surface
-includes SF-1 plus density dynamics (multi-arg `print`, string `+` coercion,
-`.count()` length). Default harness card: `bench/llm/cards/vol_v2.md`. SF-1 /
-`vol_v1` and SF-0 / `vol_v0` remain for historical harness tables. Do not expand
-further until foundations justify SF-3.
+**Surface Freeze SF-3 is active** (see [`SPEC.md`](SPEC.md) §0). Supported surface
+keeps SF-2 syntax and adds reserved `@std` plus dict runtime. Default harness
+card: `bench/llm/cards/vol_v3.md`. SF-2 / `vol_v2`, SF-1 / `vol_v1`, and SF-0 /
+`vol_v0` remain for historical harness tables.
 
-Frozen core (do not grow under SF-2 without a bump):
+**Next product freeze (Planned):** **SF-4+** language sugar (`|>`, enums,
+dual-return, dict literals, …) and later DB/ORM/WebSocket work — see sections
+below. Keep SF-3 syntax frozen (no new keywords/operators) without a bump.
+
+Frozen core (do not grow under SF-3 without a bump):
 
 - values, variables (including multi-assign), named/anonymous/expression-body `fn`,
   product structs (named + positional literals)
@@ -33,27 +36,161 @@ Immediate documentation and design work:
 - [x] Declare Surface Freeze SF-0 (SPEC + `vol_v0` language card).
 - [x] Declare Surface Freeze SF-1 (vision-aligned surface; `vol_v1` = `core_v2` task card).
 - [x] Declare Surface Freeze SF-2 (density dynamics; `vol_v2` card).
+- [x] Decide SF-3 scope: usable `@std` (see section below); syntax sugar → SF-4+.
 - [ ] Keep `SPEC.md` synchronized whenever interpreter behavior changes.
 - [x] Error/result model — **Result values + if-let / `?` implemented** (SF-1);
-      dual-return still Planned.
+      dual-return still Planned (SF-4+).
 - [x] Option / optional-values — **implemented** (`some`/`none`/if-let/`??`); `?T` still Planned.
 - [x] Modules — **implemented** (config + `path.vol` / `path/mod.vol`; ambient tiny core).
 - [x] Phase-2 design directions #2–#11 (structs/Result/unwrap/density in SF-1;
       remaining ownership/alloc, parallel, build modes, pipelines).
-- [ ] Foundations before SF-3: finish `vol fmt` rewriter (CLI stub + style rules
-      drafted); richer std libraries behind imports (design only — aliases ≠ stdlib).
+- [x] Implement SF-3 `@std` (reserved root, modules, dict runtime) — shipped; see section below.
+- [ ] Finish `vol fmt` rewriter (CLI stub + style rules drafted); parallel to SF-3,
+      not freeze-defining.
 - [x] Write `LLM_BENCHMARK.md` with a falsifiable generate/repair protocol;
-      harness + Gemini `intent_v1` / `vol_v2` (primary) and `core_v2` / `vol_v1`
-      (continuity) published — see checklist in that file.
+      harness + Gemini `intent_v1` / `vol_v3` (primary) and `vol_v2` /
+      `core_v2` continuity published — see checklist in that file.
 - [ ] Keep Planned syntax out of `SPEC.md`; only Supported and Provisional forms belong there.
 - [x] Publish frozen `core_v2` with default Python baseline (`--langs vol,python`).
 - [x] Publish `intent_v1` against `vol_v2` (SF-2; `20260808-051437`).
+- [x] Publish `intent_v1` against `vol_v3` (SF-3; 5-task `20260808-061355`;
+      7-task `@std` `20260808-063341`).
 - [ ] Publish ≥1 other model on `intent_v1` before treating LLM results as stable.
 - [x] Re-run / publish `core_v2` against `vol_v1` after source-check hygiene
       (`.count`/`.where`); published `20260808-041440`.
 - [x] **Density / unwrap surface (in SF-1)** — `.map` / `.count`, if-let /
       `??` / `?` shipped in SPEC. Shipped surface ≠ proven LLM workflow win;
       measure before further sugar (`LLM_BENCHMARK.md`).
+
+## Surface Freeze SF-3 (shipped)
+
+**Decision:** SF-3 ships a **usable standard library** behind reserved `@std`
+imports so people can write small real services. **No new language keywords or
+operators** in SF-3 (`|>`, enums, dual-return, `=>`, dict literals → **SF-4+**).
+Ambient tiny core stays tiny (`dict()` added); everything else is explicit
+`import`.
+
+**Shipped:** reserved `@std` registry, dict runtime, modules listed below, SPEC
+§3.7 / §5.12, examples under `examples/features/std/`, card `vol_v3`. Active
+freeze is **SF-3**.
+
+### Std API design (token-density philosophy)
+
+VOL is a **token-dense** language ([`AGENTS.md`](AGENTS.md) principles). `@std`
+must follow the same rules as core syntax — not a verbose Java/Node-style SDK.
+
+Rules for every SF-3 export:
+
+1. **Intent names, short verbs** — `read`, `write`, `run`, `fetch`, `listen`,
+   `parse`, `dump`, `reply`. One familiar word beats a phrase (`read_text`,
+   `starts_with`, `response_json`).
+2. **Every token earns its place** — no redundant prefixes (`std_`, `http_`),
+   no wrapper types when a dict/Result/`?` already expresses the intent.
+3. **Reuse language machinery** — fallible ops return `Result` (if-let / `?`);
+   missing env/query use `Option` + `??`; do not invent std-only error or null
+   APIs.
+4. **Options dict over arity explosion** — uncommon knobs (`cwd`, TLS cert,
+   method/headers) go in one trailing dict, not five overloads or
+   `listen_tls` / `get_or` twins.
+5. **One canonical spelling per intent** — no aliases (`stringify` vs `dump`);
+   pick the denser trainable name and document it.
+6. **Density ≠ cryptic glyphs** — prefer names models already emit (`fetch`,
+   `join`, `query`) over novel abbreviations that raise repair cost.
+7. **Flat imports** — `import "@std/http"` installs short names; no
+   `http.fetch` nesting tax after import.
+8. **Match core vocabulary** — snake_case multi-word only when needed; prefer
+   single tokens (`has`, `prefix`, `suffix`) aligned with `.len` / `.where`
+   brevity.
+
+When adding or renaming a std export, ask: *does this reduce successful
+generate/repair tokens, or only shorten characters?* Prefer the former.
+
+### Toolchain
+
+- Reserved prefix `@std` resolved by the runner (native/host registry or shipped
+  tree), **not** via each project’s `vol.config.json` `paths`.
+- `@std` cannot be remapped by project aliases.
+- Same flat export install as today: `import "@std/http"`.
+
+### Runtime (required for JSON/HTTP; not new surface syntax)
+
+- **dict** values: mutable string-key maps; `d["k"]` get/set; `.len`; `.keys()` →
+  string array; construct via `dict()` / `dict("k", v, …)` / assignment (no
+  `{ k: v }` literals in SF-3).
+- JSON/YAML `null` → `none` for v1.
+
+### Modules in SF-3
+
+Names below are the density-pinned spellings (not verbose drafts).
+
+| Import | Minimum API | Notes |
+| --- | --- | --- |
+| `@std/math` | `abs`, `min`, `max`, `clamp`, `floor`, `ceil`, `sqrt`, `pow` | Always `Result` (`ok` on success; domain/`err` on failure) |
+| `@std/strings` | `trim`, `split`, `join`, `has`, `prefix`, `suffix`, `replace` | Bool preds: `has` / `prefix` / `suffix`; value returns |
+| `@std/fs` | `exists`, `read`, `write`, `list` | Text files v1; `read`/`write`/`list` → `Result`; `exists` → bool |
+| `@std/path` | `join`, `base`, `dir`, `ext` | `/` separators in returned paths |
+| `@std/env` | `get` → Option; optional `set` → Result | Defaults via `get("PORT") ?? "8080"` — no `get_or` |
+| `@std/time` | `now`, `sleep`, `format` | ms; `now` int; `sleep` → Result; `format` Go layout |
+| `@std/url` | `parse` → Result | Fields on value: `scheme`, `host`, `port`, `path`, `query` (dict); no `query_get` helper |
+| `@std/json` | `parse`, `dump` → `Result` | Objects → dict; `null` → `none`; not `stringify` |
+| `@std/yaml` | `parse`, `dump` → `Result` | Same mapping as JSON |
+| `@std/http` | `fetch`, `listen`, `reply` | `listen(addr, handler)` or `listen(addr, handler, opts)` with `cert`/`key` for TLS; `reply(status, body)` — if `body` is dict/array, JSON + content-type; HTTPS `fetch` uses system TLS |
+| `@std/process` | `run(argv)` / `run(argv, opts)` → `Result` | `ok(Proc)` even on non-zero exit; fields `status`, `stdout`, `stderr`; opts: `cwd`, `env`, `stdin` |
+| `@std/db` | `open`, `exec`, `query`, `close` | SQLite; rows = array of dicts; SQL NULL ↔ `none` |
+
+Authoritative signatures and failure codes: [`SPEC.md`](SPEC.md) §5.12.
+
+Fallible I/O, parse, network, process, and DB use existing Result + if-let / `?`.
+
+Dense usage sketch (Supported shape — `listen` blocks until the process exits):
+
+```vol
+import "@std/http"
+import "@std/db"
+import "@std/env"
+
+port := get("PORT") ?? "8443"
+fn setup() {
+    conn := open("app.db")?
+    exec(conn, "create table if not exists hits (n int)")?
+    close(conn)?
+}
+setup()
+
+fn handle(req) {
+    return reply(200, "{\"ok\":true}")
+}
+
+// TLS: pass opts dict with cert/key; omit opts for plaintext
+listen("0.0.0.0:" + port, handle)
+```
+
+### Explicitly out of SF-3 (stay in this file as later work)
+
+These are **not** part of the SF-3 pin. Track them here for SF-4+ or later:
+
+- Language sugar: `|>` pipelines, enums/tagged unions, dual-return, `=>`, `?T`,
+  dict `{ k: v }` literals
+- **Postgres / MySQL** drivers (SF-3 DB is SQLite only)
+- **ORM** / migrations frameworks
+- **WebSockets**
+- Multipart upload frameworks, general crypto toolkit beyond TLS listen/fetch
+- Full CLI flag parser (v1: `args` + `@std/env`)
+- Test framework, logging/tracing suite, C interop, cross-compilation
+- Ownership, parallel, build modes, native backend
+- Ambient growth of builtins instead of `@std`
+
+### Implementation order (when building SF-3)
+
+1. Reserved `@std` resolve + native module registry
+2. dict runtime + string index
+3. math, strings, fs, path
+4. env, time, url
+5. json, yaml (`parse` / `dump`)
+6. http (`fetch`, `listen`+opts, `reply`)
+7. process, db (SQLite)
+8. examples, SPEC std section, freeze bump, `vol_v3` card
+   (card must show dense `@std` spellings, not verbose SDK prose)
 
 ## Near-Term Foundation
 
@@ -229,8 +366,8 @@ Today: method chaining expresses collection intent (Supported):
 nums.where(_ > 0).sum()
 ```
 
-**Direction:** keep **method chains** as the Supported form under SF-2. If
-pipeline sugar is added at a later freeze (SF-3+), use **`|>`** (first-arg /
+**Direction:** keep **method chains** as the Supported form under SF-2 / SF-3.
+If pipeline sugar is added later (**SF-4+**), use **`|>`** (first-arg /
 Elixir-like), not bare `|`.
 
 ```vol
@@ -261,8 +398,8 @@ parallel {
 ### Error / result model ✓ SF-1 (values + if-let / `?`)
 
 **Implemented:** Result values `ok(x)` / `err(x)` with if-let unwrap and postfix
-`?` propagate inside functions (see `SPEC.md` §3.5 / §5.10). `match` removed
-(`E153`). Hybrid rule remains:
+`?` propagate inside functions or at module top level (top-level `err` → `R049`;
+see `SPEC.md` §3.5 / §5.10). `match` removed (`E153`). Hybrid rule remains:
 
 1. **Traps** for bugs/invariants (overflow, bounds, `assert`, …).
 2. **Result values** for operational success/failure data the program can inspect.
@@ -271,7 +408,7 @@ parallel {
 ```vol
 r := ok(7)
 if ok n := r { print n } else err e { print e }
-n := divide(10, 2)?
+n := divide(10, 2)?   // inside a function, or top-level (abort on err)
 ```
 
 Still Planned:
@@ -335,15 +472,13 @@ entry rule, sorted export-list formatter.
 
 **Direction decided (enforced for ambient surface):** ambient tiny core only —
 `print`, `input`, `assert`, `string`, `args`, and collection methods in SPEC.
-Everything else requires an **explicit import** when those libraries exist.
+Everything else requires an **explicit import**.
 
-**Aliases ≠ stdlib:** `vol.config.json` `paths` are **project-local**. A working
-demo uses `@lib` under `examples/features/modules/aliases/`. Spellings like
-`@std` / `@compiler` below are **vision only** for agents and docs — not present
-in the repo root config and not a reserved standard-library root. A richer std
-behind imports remains Planned; candidate first modules (when implemented): math
-helpers, strings, filesystem, then net/serialization — always via explicit
-`import`, never ambient growth.
+**SF-3 (shipped):** reserved toolchain `@std` (see
+[Surface Freeze SF-3 (shipped)](#surface-freeze-sf-3-shipped)). Project
+`vol.config.json` `paths` remain for **project-local** aliases only (demo:
+`examples/features/modules/aliases/` `@lib`). They must not remap `@std`.
+`@compiler` remains vision-only until a compiler tree exists.
 
 ### Block comments
 
@@ -407,16 +542,16 @@ Checklist:
 - [x] Detect import cycles and report their complete path deterministically.
 - [ ] Collect exports written anywhere in a module and format one sorted export list at the top.
 
-Vision configuration (not loaded by the runner — keep out of repo-root
-`vol.config.json` until real `std/` / `compiler/` trees exist):
+**SF-3:** `@std` is reserved by the runner — do **not** put `"@std": "std"` in
+repo-root `vol.config.json` as the delivery mechanism. Optional later vision for
+`@compiler` only:
 
 ```json
 {
   "name": "vol",
   "root": ".",
   "paths": {
-    "@compiler": "compiler",
-    "@std": "std"
+    "@compiler": "compiler"
   }
 }
 ```
@@ -531,20 +666,30 @@ Guiding rule once semantics exist:
 
 Build broad capabilities on small, orthogonal foundations. Unused functionality must not increase executable size or runtime cost.
 
-Priority areas:
+**SF-3 pin** (first usable `@std` — see
+[Surface Freeze SF-3 (shipped)](#surface-freeze-sf-3-shipped)):
 
-- [ ] Filesystems and processes.
-- [ ] Networking, HTTP, and TLS.
-- [ ] Serialization and structured data.
-- [ ] Databases and storage.
-- [ ] Synchronous and asynchronous I/O.
+- [x] Filesystems (`@std/fs`, `@std/path`) and processes (`@std/process`).
+- [x] Networking, HTTP, and TLS server (`@std/http`: `fetch`, `listen`+opts, `reply`).
+- [x] Serialization (`@std/json`, `@std/yaml`) + dict runtime.
+- [x] Databases — **SQLite only** in SF-3 (`@std/db`).
+- [x] Env / time / url helpers (`@std/env`, `@std/time`, `@std/url`).
+- [x] Math / strings (`@std/math`, `@std/strings`).
+
+**After SF-3 (stay Planned here):**
+
+- [ ] Postgres / MySQL drivers (and other remote DB clients).
+- [ ] ORM / migrations frameworks.
+- [ ] WebSockets.
+- [ ] Synchronous and asynchronous I/O beyond the SF-3 blocking APIs.
 - [ ] Concurrency and parallelism.
-- [ ] Cryptography, hashing, and compression.
+- [ ] Cryptography, hashing, and compression (beyond TLS listen/fetch).
 - [ ] Logging, tracing, and metrics.
-- [ ] Configuration and command-line parsing.
+- [ ] Configuration and full command-line flag parsing.
 - [ ] Testing, benchmarking, and profiling.
 - [ ] C interoperability.
 - [ ] Cross-compilation.
+- [ ] Multipart frameworks; general crypto toolkit.
 
 ## Compiler Metrics and LLM Evaluation
 
@@ -571,10 +716,11 @@ task success / total tokens consumed
 including generated code, compiler or runtime diagnostics, repair prompts, and
 revisions across a fixed task suite. Protocol is defined in
 [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md). Primary published language-use table:
-Gemini `intent_v1` with `vol_v2` / SF-2 matches Python on first-try / success @ K
-with lower cold and warm means (one model). Historical `core_v2` / `vol_v1`
-(SF-1) continuity remains. That is still one model on a tiny suite — not a broad
-LLM claim. Do not treat SF-2 itself as proven optimization.
+Gemini `intent_v1` (7 tasks incl. `@std`) with `vol_v3` / SF-3 matches Python on
+first-try / success @ K with lower cold and warm means (one model;
+`20260808-063341`). Historical 5-task SF-3, `vol_v2` / SF-2, and `core_v2` /
+`vol_v1` continuity remain. That is still one model on a tiny suite — not a
+broad LLM claim. Do not treat SF-3 itself as proven optimization.
 
 **Static source token density** (step 1 — implemented) is measured in
 [`bench/`](bench/README.md): hand-written equivalent programs in VOL, Python, Go,
@@ -582,10 +728,10 @@ Rust, and Zig are compared by token count under named OpenAI tokenizers
 (`cl100k_base`, `o200k_base`). That benchmark measures source density only —
 not LLM task-success efficiency. Never cite density ratios as workflow proof.
 
-**Working preset:** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) — SF-2 density
-dynamics + lean `vol_v2` + `.sum` Fix shipped; `intent_v1` Gemini first-try 100%
-with cold/warm below Python. Further juice → `vol fmt`, second model, or SF-3
-only if measured necessary (not glyph theater).
+**Working preset:** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) — SF-3
+`dict("k", v, …)` + `vol_v3` + `@std` intent tasks shipped; `intent_v1` Gemini
+first-try 100% with cold/warm below Python (`…063341`). Further juice →
+`vol fmt`, second model, or SF-4+ only if measured necessary (not glyph theater).
 
 ## Open Design Questions
 
@@ -618,9 +764,10 @@ only if measured necessary (not glyph theater).
   (SF-1);** enums/tagged unions still Planned. See “Structs” above.
 - ~~How are modules and packages organized?~~ **Implemented (SF-1):**
   `import` + `vol.config.json` + `path.vol`/`mod.vol`. See “Modules and imports”.
-- ~~Which standard features require explicit imports?~~ **Direction decided:**
-  ambient tiny core only; everything else explicit import. See “Standard-library
-  import policy” above.
+- ~~Which standard features require explicit imports?~~ **Implemented (SF-3):**
+  ambient tiny core only (`dict()` added); everything else explicit
+  `import "@std/…"`. See SF-3 section and [`SPEC.md`](SPEC.md) §5.12.
+  Postgres/MySQL, ORM, WebSockets stay out of SF-3.
 - ~~Result / recoverable errors?~~ **Implemented (SF-1):** `ok`/`err` +
   if-let / `?`; dual-return still Planned. See “Error / result model” above.
 - ~~How does a programmer constrain inferred allocation?~~ **Direction decided:**
@@ -638,5 +785,5 @@ only if measured necessary (not glyph theater).
   **Decided and implemented (SF-1):** anonymous `fn` + expression body; no
   `=>`; `_` in `.where` / `.map` / `.count` kept. See `SPEC.md` §5.8.
 - ~~Pipeline sugar: method chains only, `|>`, or bare `|` — and what is `|` vs
-  bitwise OR?~~ **Direction decided (not implemented):** chains under SF-2; if
-  pipes later (SF-3+), `|>` not bare `|`. See “Pipeline sugar” above.
+  bitwise OR?~~ **Direction decided (not implemented):** chains under SF-2/SF-3;
+  if pipes later (SF-4+), `|>` not bare `|`. See “Pipeline sugar” above.

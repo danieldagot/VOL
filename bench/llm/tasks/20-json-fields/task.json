@@ -1,0 +1,15 @@
+{
+  "kind": "generation",
+  "source_checks": {
+    "vol": [
+      "@std/json",
+      "\\bparse\\s*\\(",
+      "\\bdump\\s*\\(",
+      "\\bdict\\s*\\("
+    ],
+    "python": [
+      "json\\.loads\\s*\\(",
+      "json\\.dumps\\s*\\("
+    ]
+  }
+}

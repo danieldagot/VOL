@@ -1,0 +1,18 @@
+{
+  "kind": "generation",
+  "source_checks": {
+    "vol": [
+      "@std/strings",
+      "\\btrim\\s*\\(",
+      "\\b(split|join)\\s*\\(",
+      "\\bhas\\s*\\(",
+      "\\breplace\\s*\\("
+    ],
+    "python": [
+      "\\.strip\\s*\\(",
+      "\\.split\\s*\\(|\\.join\\s*\\(",
+      "\\bin\\b",
+      "\\.replace\\s*\\("
+    ]
+  }
+}

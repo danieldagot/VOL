@@ -1,6 +1,6 @@
-# VOL Language Specification (Prototype v0 / SF-2)
+# VOL Language Specification (Prototype v0 / SF-3)
 
-> Status: **Surface Freeze SF-2** (density dynamics; harness card `vol_v2`)
+> Status: **Surface Freeze SF-3** (usable `@std` + dict; harness card `vol_v3`)
 > Audience: humans and LLMs
 
 > Source of truth for behavior: this file plus the tests in `internal/lang`
@@ -20,8 +20,9 @@ Related docs:
 | [`README.md`](README.md) | Project status and examples |
 | [`IDEAS.md`](IDEAS.md) | Planned features and open questions |
 | [`AGENTS.md`](AGENTS.md) | Project vision and contribution rules |
-| [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md) | Generate/repair protocol; primary table is `intent_v1` / `vol_v2` |
-| [`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md) | Default harness card (SF-2; density dynamics) |
+| [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md) | Generate/repair protocol; primary published table is `intent_v1` / `vol_v3` (SF-3) |
+| [`bench/llm/cards/vol_v3.md`](bench/llm/cards/vol_v3.md) | Default harness card (SF-3; `@std` + dict) |
+| [`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md) | Historical SF-2 / density dynamics card |
 | [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | Historical SF-1 / `core_v2` task card |
 | [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | Historical `core_v2` card (SF-0) |
 
@@ -61,14 +62,14 @@ Notation:
 **Supported** means implemented and covered by tests. **Provisional** means
 implemented and tested, but spelling or meaning may change.
 
-### Surface freeze SF-2
+### Surface freeze SF-3
 
-**SF-2** freezes the Supported / Provisional surface in this document and §11.
-It includes the SF-1 vision-aligned surface plus **token-density dynamics**:
-multi-arg `print`, string-context `+` coercion, and zero-arg `.count()` as
-length. The default harness card is
-[`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md). Historical published
-`core_v2` / `intent_v1` tables that cite SF-1 / `vol_v1` stay tied to that card.
+**SF-3** freezes the Supported / Provisional surface in this document and §11.
+It keeps **SF-2 syntax** (no new keywords/operators) and adds a usable
+**reserved `@std`** library plus **dict** runtime values. The default harness
+card is [`bench/llm/cards/vol_v3.md`](bench/llm/cards/vol_v3.md). Historical
+published tables that cite SF-2 / `vol_v2` or SF-1 / `vol_v1` stay tied to those
+cards.
 
 **Product freezes** (use these in status docs and LLM result tables; do not mix
 freeze IDs in one table):
@@ -78,19 +79,20 @@ freeze IDs in one table):
 | SF-0 | `vol_v0.md` | First pin (historical `core_v2` results) |
 | SF-1 | `vol_v1.md` | Vision-aligned surface before density dynamics |
 | SF-2 | `vol_v2.md` | Density dynamics (multi-arg `print`, string `+` coercion, `.count()`) |
-| SF-3+ | (when shipped) | Next expansion (`|>`, enums, dual-return, …) |
+| SF-3 | `vol_v3.md` | First usable `@std` + dict runtime. **Syntax stays SF-2.** |
+| SF-4+ | (later) | Language sugar (`|>`, enums, dual-return, dict `{k:v}` literals, …); Postgres/MySQL, ORM, WebSockets, … |
 
 Only keep cards for product freezes that have (or will have) published harness
 runs. Intermediate implementation drafts are not cards.
 
-| Allowed under SF-2 | Requires bumping to SF-3 (or later) |
+| Allowed under SF-3 | Requires bumping to SF-4 (or later) |
 | --- | --- |
-| Bug fixes that restore documented behavior | New keywords or operators beyond SF-2 |
-| Clearer diagnostics / `fix` text for existing codes | `|>` pipelines, `=>`, dual-return sugar, lazy views |
-| Tests, examples, and doc sync for existing forms | Enums/tagged unions, ownership, parallel |
-| Card wording edits that do **not** add features | Any form that expands the Supported vocabulary further |
+| Bug fixes that restore documented SF-3 behavior | New keywords or operators (`|>`, `=>`, enums, dual-return, …) |
+| Clearer diagnostics / `Fix` text for existing codes | Dict `{ k: v }` literals; Postgres/MySQL; ORM; WebSockets |
+| Tests, examples, and doc sync for existing forms | Ownership, parallel, build modes, native backend |
+| Card wording edits that do **not** add features | Ambient growth of builtins beyond tiny core + `dict()` |
 
-During SF-2, do **not** implement further Planned syntax from [`IDEAS.md`](IDEAS.md)
+During SF-3, do **not** implement Planned SF-4+ syntax from [`IDEAS.md`](IDEAS.md)
 without a freeze bump, SPEC updates, tests, and a new card version.
 
 ### Syntax principles
@@ -174,7 +176,9 @@ do not claim identical implementation.
 | `export name` | Public name | export list | Supported |
 | `{ ... }` | Block / scope | block | Supported |
 | `[a, b, c]` | Array literal | array | Supported |
-| `items[index]` | Index read/write | indexing | Supported |
+| `items[index]` / `dict["key"]` | Index read/write (array int / dict string) | indexing | Supported |
+| `dict.keys()` | Sorted string keys of a dict | map keys | Supported |
+| `import "@std/…"` | Reserved standard-library import (SF-3) | stdlib | Supported |
 | `// text` | Line comment | `//` | Supported |
 
 Capitalization has no visibility meaning. Only `export` makes a name public.
@@ -303,6 +307,7 @@ The prototype is dynamically typed. Every runtime value has one of these kinds:
 | result | `ok(1)`, `err("x")` | success or failure value (see §3.5) |
 | struct | `User { name: "Ada", age: 36 }` | product value (see §3.6) |
 | struct type | `struct User { … }` | constructible type name |
+| dict | `dict()` / `dict("k", v, …)` then `d["k"]` | mutable string-key map (see §3.7) |
 | nothing | missing `return` result | absence of a return; not storable or usable as a normal value (see §5.8) |
 
 `nothing` is not an Option or Result. Option (`some`/`none`) is for optional data.
@@ -317,7 +322,7 @@ There is no static type checker yet. Type mistakes are usually runtime errors
 - `==` and `!=` compare values.
 - For two numbers, comparison uses numeric value. An integer equals a float when
   the float is a whole number in range and matches exactly.
-- Arrays compare by deep structural equality.
+- Arrays and dicts compare by deep structural equality (nested values included).
 - Ordering operators `< <= > >=` require numbers.
 - Mixed integer/float arithmetic and comparisons promote through floating-point
   evaluation when both sides are numbers and at least one is float.
@@ -345,7 +350,7 @@ There is no static type checker yet. Type mistakes are usually runtime errors
 - Indexing uses zero-based integer indices.
 - Out-of-range indices are runtime errors (`R016`).
 - Float indices are rejected (`R015`).
-- Strings cannot be indexed (`R003`).
+- Strings cannot be indexed (`R003`). Dicts use string keys (see §3.7).
 - **Array identity (decided):** assigning an array with `:=` or `=` copies the
   **reference**, not a deep clone. Indexed assignment mutates the shared array.
   The same sharing applies when an array is passed as a function argument: the
@@ -421,9 +426,8 @@ Rules:
 - `ok(expression)` / `err(expression)` wrap a usable value (not `nothing` — `R029`).
 - Display: `ok(…)` or `err(…)` with recursive display of the inner value.
 - Distinct from Option and from `nothing`.
-- Unwrap with if-let or postfix `?` inside functions (§5.10). Using Result where
-  a bare `T` is required fails with a type diagnostic as for other mismatched
-  kinds.
+- Unwrap with if-let or postfix `?` (§5.10). Using Result where a bare `T` is
+  required fails with a type diagnostic as for other mismatched kinds.
 - Dual-return sugar remains Planned ([`IDEAS.md`](IDEAS.md)).
 - Built-ins such as `input` and `assert` still trap; they do not return Result yet.
 
@@ -455,6 +459,46 @@ Rules:
 - Display: `User { name: …, age: … }` in declaration field order.
 - No methods; enums / tagged unions / pattern match on user tags are Planned.
 - `export User` makes the type importable.
+
+### 3.7 Dicts (SF-3)
+
+Mutable string-key maps. **Supported** under SF-3. Object-literal syntax
+`{ k: v }` is **not** accepted (Planned for SF-4+). Construct with ambient
+`dict()` (empty) or `dict("k", v, …)` (alternating string keys and values);
+mutate via string index assignment.
+
+```vol
+d := dict("name", "VOL")
+print d["name"]
+print d.len
+print d.keys()   // sorted string array
+empty := dict()
+empty["n"] = 3
+```
+
+Rules:
+
+- **Construction:** ambient `dict()` with **0** arguments returns a new empty
+  dict. With an **even** number of arguments, pairs are alternating string keys
+  and values (later pairs overwrite earlier keys). Odd arity → `R018` (Fix
+  points at `dict()` / `dict("k", v, …)`). Non-string key → `R045`.
+- **Identity:** assignment and argument passing **share** the dict reference
+  (same rule as arrays). There is no dict `.copy()` / `.deep_copy()`; nested
+  dicts inside arrays are cloned when the array is `.deep_copy()`’d.
+- **Index get/set:** key expression must evaluate to a **string** (`R045`
+  otherwise). Missing key on **get** traps (`R045`); set creates or overwrites.
+  Non-array/non-dict indexing is `R003`.
+- **`.len`:** entry count (integer). `.length` remains rejected (`R007`).
+- **`.keys()`:** zero-argument call; returns a **new** array of string keys
+  sorted lexicographically. Wrong arity → `R020`; non-dict receiver → `R048`.
+- **Not Supported on dicts:** `.each`, `.where`, `.map`, `.count`, `.sum()`,
+  `.copy()`, `.deep_copy()`.
+- **Equality:** deep structural (`==` / `!=`), including nested values.
+- **Display:** `dict { k: v, … }` with keys sorted; values use normal display.
+- **JSON/YAML / SQL null:** host `null` maps to Option `none` when decoding
+  (§5.12). Missing dict keys still trap on get — they are not `none`.
+- Values may be any VOL value (including nested dicts, Options, Results,
+  structs). Opaque host handles from `@std/db` are values too.
 
 ---
 
@@ -943,6 +987,7 @@ fn add(a, b) {
 | `input` | `input()` or `input(prompt)` | read one line; trim trailing `\n` / `\r\n`; EOF with no data yields `""` |
 | `assert` | `assert(cond)` or `assert(cond, message)` | fail with `R027` when `cond` is false |
 | `string` | `string(value)` | convert value to display string |
+| `dict` | `dict()` / `dict("k", v, …)` | mutable string-key map (§3.7) |
 | `args` | value | array of CLI arguments after the source file |
 
 ### 5.10 Option / Result unwrap (if-let, `??`, `?`)
@@ -995,14 +1040,22 @@ fn twice(a, b) {
     n := divide(a, b)?
     return ok(n * 2)
 }
+
+// Module top level (scripts): unwrap or abort
+n := ok(21)?
+print n * 2
 ```
 
 Rules:
 
 - Operand must be a Result (`R044`).
-- Legal only **inside a function** (`S041` at top level).
+- Legal **inside functions** and at **module top level**.
 - If `ok(x)`, the expression yields `x`.
-- If `err(e)`, the enclosing function returns `err(e)` immediately (propagate).
+- If `err(e)` **inside a function**, the enclosing function returns `err(e)`
+  immediately (propagate).
+- If `err(e)` at **module top level**, the program aborts with `R049` (message
+  includes the displayed error value). Prefer if-let when the script should
+  continue after failure.
 - Does not apply to Option — use `??` or if-let.
 
 ### 5.11 Modules and `import`
@@ -1035,13 +1088,243 @@ Rules:
   scope; collisions are `S034`.
 - Dependency modules execute (top-level side effects) in topological order before
   the entry module.
-- Ambient tiny core is unchanged; there is no automatic stdlib. Alias names such
-  as `@std` are **not reserved or magic** — they work only when a project’s
-  `paths` maps them to a real directory that contains the imported `.vol` file.
-  A richer standard library behind imports remains Planned
-  ([`IDEAS.md`](IDEAS.md)).
+- Ambient tiny core remains small (`args`, `input`, `assert`, `string`, `dict`).
+  Broader capability is explicit `import "@std/…"`.
+- **`@std` is reserved (SF-3):** resolved by the native module registry, **not**
+  via project `vol.config.json` `paths`, and **cannot** be remapped by aliases
+  (a `"@std"` paths entry does not hijack reserved imports). Flat import
+  installs short export names; collisions are `S034` (for example
+  `@std/strings` and `@std/path` both export `join`). Full API: §5.12.
 
 Built-in names cannot be redeclared at module scope.
+
+### 5.12 Standard library `@std` (SF-3)
+
+Reserved imports install **flat short names** into the importer’s module scope
+(same collision rules as user modules: `S034`). There is no `http.fetch`
+namespacing after import.
+
+**Resolve rules:**
+
+- Paths matching `@std` or `@std/…` are reserved. They are resolved by the native
+  module registry, **not** by `vol.config.json` `paths`, and **cannot** be
+  remapped by project aliases (an `"@std": "…"` entry is ignored for these
+  imports).
+- Bare `import "@std"` is rejected (`S031`); import a submodule
+  (`import "@std/math"`).
+- Unknown `@std/…` modules are `S031` (fix lists supported module names).
+- Supported modules (exactly these under SF-3):
+
+| Import | Exports |
+| --- | --- |
+| `@std/math` | `abs`, `min`, `max`, `clamp`, `floor`, `ceil`, `sqrt`, `pow` |
+| `@std/strings` | `trim`, `split`, `join`, `has`, `prefix`, `suffix`, `replace` |
+| `@std/fs` | `exists`, `read`, `write`, `list` |
+| `@std/path` | `join`, `base`, `dir`, `ext` |
+| `@std/env` | `get`, `set` |
+| `@std/time` | `now`, `sleep`, `format` |
+| `@std/url` | `parse` |
+| `@std/json` | `parse`, `dump` |
+| `@std/yaml` | `parse`, `dump` |
+| `@std/http` | `fetch`, `listen`, `reply` |
+| `@std/process` | `run` |
+| `@std/db` | `open`, `exec`, `query`, `close` |
+
+**Failure model for `@std`:**
+
+- Operational failure (I/O, parse, network, process spawn, DB, math domain) →
+  **Result** `ok` / `err` (string message in `err`). Unwrap with if-let or
+  postfix `?` (functions or module top level; top-level `err` → `R049`).
+- Missing env keys → **Option** (`none`); defaults via `??` (no `get_or`).
+- Programmer mistakes (wrong types, wrong opts shape, bad arity) → **trap**
+  (`R018` arity, `R046` options not a dict, `R047` argument type mismatch,
+  plus dict codes in §3.7).
+- Density rules (normative for SF-3 surface): short intent verbs; trailing
+  options **dict** instead of arity explosion; one canonical spelling (no
+  `stringify` alias for `dump`); reuse Result/Option; no ambient growth of
+  these APIs.
+
+Examples: [`examples/features/std/`](examples/features/std/),
+[`examples/projects/hits/`](examples/projects/hits/).
+
+#### 5.12.1 `@std/math`
+
+Every export returns a **Result**. Success wraps the number in `ok`; domain /
+overflow failures return `err(message)`. Numbers may be integer or float;
+mixed int/float promotes through float where noted. Wrong types → `R047`.
+
+| Form | Arity | Success value | `err` when |
+| --- | --- | --- | --- |
+| `abs(x)` | 1 | absolute value (int stays int when possible) | `abs` of `MinInt64` |
+| `min(a, b)` | 2 | lesser value (int if both int) | — |
+| `max(a, b)` | 2 | greater value (int if both int) | — |
+| `clamp(x, lo, hi)` | 3 | `x` limited to `[lo, hi]` (int if all int) | `lo > hi` |
+| `floor(x)` | 1 | float floor | — |
+| `ceil(x)` | 1 | float ceil | — |
+| `sqrt(x)` | 1 | float sqrt | `x < 0` |
+| `pow(base, exp)` | 2 | float power | NaN / ±Inf result |
+
+#### 5.12.2 `@std/strings`
+
+Value returns (not Result). All string arguments required; wrong types → `R047`.
+
+| Form | Returns |
+| --- | --- |
+| `trim(s)` | string with leading/trailing Unicode spaces removed |
+| `split(s, sep)` | array of strings |
+| `join(parts, sep)` | string; `parts` must be an array of strings |
+| `has(s, sub)` | bool (`strings.Contains`) |
+| `prefix(s, p)` | bool |
+| `suffix(s, p)` | bool |
+| `replace(s, old, new)` | string (`ReplaceAll`) |
+
+Note: `@std/path` also exports `join`. Importing both into one scope is `S034`.
+
+#### 5.12.3 `@std/fs`
+
+Text files (UTF-8 bytes interpreted as strings). Paths are strings.
+
+| Form | Returns |
+| --- | --- |
+| `exists(path)` | **bool** (`true` if `Stat` succeeds) — not a Result |
+| `read(path)` | `Result` of file contents string |
+| `write(path, text)` | `Result` of `true`; creates parent directories as needed |
+| `list(path)` | `Result` of string array (entry **names** only; order is host order) |
+
+#### 5.12.4 `@std/path`
+
+Host path helpers; returned paths use `/` separators.
+
+| Form | Arity | Returns |
+| --- | --- | --- |
+| `join(seg, …)` | ≥ 1 string segments | joined path string |
+| `base(path)` | 1 | final path element |
+| `dir(path)` | 1 | parent directory path |
+| `ext(path)` | 1 | extension including leading `.`, or `""` |
+
+#### 5.12.5 `@std/env`
+
+| Form | Returns |
+| --- | --- |
+| `get(key)` | `some(string)` if set, else `none` — defaults via `get("PORT") ?? "8080"` |
+| `set(key, value)` | `Result` of `true` (process environment mutation) |
+
+There is no `get_or` helper.
+
+#### 5.12.6 `@std/time`
+
+Milliseconds since Unix epoch for `now` / `sleep` / `format` input.
+
+| Form | Returns |
+| --- | --- |
+| `now()` | integer Unix time in milliseconds (plain int, not Result) |
+| `sleep(ms)` | `Result` of `true`; `ms` must be a non-negative integer (`err` if negative; `R047` if not int) |
+| `format(ms)` | string using layout `RFC3339Nano` in UTC |
+| `format(ms, layout)` | string; `layout` is a Go-style reference-time layout string |
+
+#### 5.12.7 `@std/url`
+
+| Form | Returns |
+| --- | --- |
+| `parse(raw)` | `Result` of struct `Url { scheme, host, port, path, query }` |
+
+`Url` fields:
+
+- `scheme`, `host`, `path`: strings (`host` is hostname without port)
+- `port`: integer (`0` when absent)
+- `query`: dict of string → string (first value per key; empty string if key
+  present with no value)
+
+Missing scheme → `err`. No `query_get` helper — index `query` like any dict.
+
+#### 5.12.8 `@std/json` and `@std/yaml`
+
+| Form | Returns |
+| --- | --- |
+| `parse(text)` | `Result` of a VOL value |
+| `dump(value)` | `Result` of encoded string |
+
+**Decode mapping** (JSON and YAML):
+
+| Host | VOL |
+| --- | --- |
+| object / mapping | dict (YAML keys must be strings) |
+| array | array |
+| string / bool | same |
+| number | integer when exactly representable as `int64`, else float |
+| `null` | Option `none` |
+
+**Encode (`dump`):** dicts and structs → objects; arrays → arrays; `none` →
+`null`; `some(x)` dumps `x`; integers/floats/bools/strings as usual.
+Cannot dump `nothing`, Result, functions, or opaque handles (`err`).
+Canonical name is `dump` — not `stringify`.
+
+#### 5.12.9 `@std/http`
+
+| Form | Arity | Returns |
+| --- | --- | --- |
+| `fetch(url)` / `fetch(url, opts)` | 1–2 | `Result` of `Response { status, body, headers }` |
+| `listen(addr, handler)` / `listen(addr, handler, opts)` | 2–3 | `Result` (normally blocks until the server stops with error) |
+| `reply(status, body)` | 2 | opaque **reply** value, or `err` if dict/array JSON encode fails |
+
+`fetch` opts dict (all optional string/dict values):
+
+- `method` — HTTP method (default `"GET"`, uppercased)
+- `body` — request body string
+- `headers` — dict of string → string
+
+HTTPS uses the system TLS trust store. Client timeout is 30 seconds
+(Provisional host detail).
+
+`Response`: `status` (int), `body` (string), `headers` (dict; first value per
+header key).
+
+`listen` handler is a function of one parameter (a `Request` struct). It should
+return a `reply(…)` value (or a value coerced to a 200 text body). Returning
+`err(msg)` from a Result yields HTTP 500 with that message. Handler arity /
+type mistakes become 500 responses (not process traps).
+
+`Request` fields: `method`, `path` (strings), `query` (dict), `headers` (dict),
+`body` (string).
+
+`listen` opts: `cert` and `key` (both required together for TLS). Plaintext
+when omitted. `listen` blocks the interpreter on the serving goroutine until
+the server exits.
+
+`reply(status, body)`:
+
+- string body → `text/plain; charset=utf-8`
+- dict or array body → JSON encode + `application/json; charset=utf-8`
+- other values → display form as plain text
+
+#### 5.12.10 `@std/process`
+
+| Form | Returns |
+| --- | --- |
+| `run(argv)` / `run(argv, opts)` | `Result` of `Proc { status, stdout, stderr }` |
+
+- `argv` is a non-empty array of strings (`err` if empty; `R047` if wrong types).
+- Non-zero exit status is still **`ok(Proc)`** with `status` set — only spawn /
+  I/O failures are `err`.
+- opts: `cwd` (string), `env` (dict of string → string, **appended** to the
+  current environment), `stdin` (string).
+
+#### 5.12.11 `@std/db`
+
+SQLite only (via host driver). Postgres/MySQL stay Planned (SF-4+).
+
+| Form | Returns |
+| --- | --- |
+| `open(path)` | `Result` of opaque DB **handle** (display `<db>`) |
+| `exec(conn, sql, args…)` | `Result` of rows-affected integer |
+| `query(conn, sql, args…)` | `Result` of array of row dicts |
+| `close(conn)` | `Result` of `true` |
+
+- Extra `args` after `sql` are bound parameters. Option `none` binds SQL NULL;
+  SQL NULL columns decode to `none`.
+- Row dict keys are column names; values are int/float/bool/string/`none`
+  (blobs as strings).
+- Wrong/closed handle → `R047`. Closing an already-closed handle is `ok(true)`.
 
 ---
 
@@ -1057,7 +1340,6 @@ Static errors:
 | `S002` | use of an undefined name |
 | `S003` | wrong argument count for a known function/builtin/`.where`/`.map`/`.count` |
 | `S030` | assignment to a `const` binding |
-| `S041` | Result postfix `?` outside a function |
 
 Additional resolution rules:
 
@@ -1175,10 +1457,10 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 
 | Code | Meaning |
 | --- | --- |
-| `S031` | module not found / unreadable / imports without loader |
+| `S031` | module not found / unreadable / imports without loader; also bare `@std`, unknown `@std/…` |
 | `S032` | import escapes project root or contains `..` |
 | `S033` | import cycle |
-| `S034` | imported name collides |
+| `S034` | imported name collides (including colliding `@std` short names) |
 | `S035` | invalid / unreadable `vol.config.json` or unknown alias |
 | `S036` | export missing at link time |
 | `S037` | nested `struct` declaration |
@@ -1232,6 +1514,11 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `R042` | `??` applied to a Result |
 | `R043` | positional struct literal arity mismatch |
 | `R044` | postfix `?` operand is not a Result |
+| `R045` | dict key missing on get, or key is not a string |
+| `R046` | options argument is not a dict (`fetch` / `listen` / `run` trailing opts) |
+| `R047` | `@std` / builtin argument type mismatch |
+| `R048` | `.keys()` on non-dict |
+| `R049` | top-level postfix `?` received `err` (unhandled Result) |
 | `R999` | internal unsupported expression |
 
 ---
@@ -1323,11 +1610,16 @@ fn twice(a, b) {
     n := divide(a, b)?
     return ok(n * 2)
 }
+
+// Top-level `?` unwraps or aborts (R049 on err)
+n := ok(21)?
+print n * 2 // 42
 ```
 
 Executable tour: [`examples/features/errors.vol`](examples/features/errors.vol)
 (if-let, postfix `?`, labeled failures). Project-sized use:
-[`examples/projects/shop/`](examples/projects/shop/).
+[`examples/projects/shop/`](examples/projects/shop/). Dense `@std` scripts:
+[`examples/features/std/`](examples/features/std/).
 
 ### 9.7 Structs
 
@@ -1358,6 +1650,31 @@ import "examples/features/modules/math"
 print add(21, 21) // 42
 ```
 
+### 9.10 Dicts
+
+```vol
+d := dict("name", "VOL")
+print d["name"] // VOL
+print d.len // 1
+print d.keys() // [name]
+```
+
+### 9.11 `@std` (math / strings)
+
+```vol
+import "@std/math"
+import "@std/strings"
+
+fn demo() {
+    print abs(-7)? // 7
+    print trim("  hi  ") // hi
+    print join(["a", "b"], "-") // a-b
+}
+demo()
+```
+
+Executable tour: [`examples/features/std/`](examples/features/std/).
+
 ---
 
 ## 10. Explicitly out of scope
@@ -1374,7 +1691,10 @@ Do not treat these as specified just because vision docs mention them:
 - generics
 - symbol-selection imports (`import { x } from …`); multi-file folder packages
   beyond `path.vol` / `path/mod.vol`
-- ambient growth of the prelude beyond today’s tiny built-ins
+- ambient growth of the prelude beyond today’s tiny built-ins (`dict()` is the
+  SF-3 addition; further ambient APIs stay out of scope — use `@std`)
+- dict `{ k: v }` literals (construct with `dict()` / `dict("k", v, …)` under SF-3)
+- Postgres / MySQL drivers, ORM, WebSockets (SF-3 DB is SQLite only)
 - `parallel`, async, channels (no parallelization guarantees until specified)
 - wrapping integer arithmetic and overflow/bounds build modes (default is trap;
   see §4.3; modes + wrap ops Planned in [`IDEAS.md`](IDEAS.md))
@@ -1415,9 +1735,10 @@ and Planned work in [`IDEAS.md`](IDEAS.md).
 - **`if` (§5.3):** statement only, with `elif` / `else`. Value choice uses
   `? :` (§4.2.1). Expression-`if` is not part of the language.
 - **Error model (§3.5, §5.10, §8):** hybrid — traps for bugs/invariants;
-  Result values (`ok`/`err`) with if-let and postfix `?` (functions only) for
-  operational failure data. No exception-primary model. Dual-return sugar
-  Planned. `input`/`assert` still trap. `match` is Rejected (`E153`).
+  Result values (`ok`/`err`) with if-let and postfix `?` (functions or module
+  top level; top-level `err` → `R049`) for operational failure data. No
+  exception-primary model. Dual-return sugar Planned. `input`/`assert` still
+  trap. `match` is Rejected (`E153`). `S041` retired (top-level `?` allowed).
 - **Option (§3.4, §5.10):** explicit Option with `some` / `none`; unwrap with
   if-let and `??`; distinct from Result and `nothing`; no null. Optional `?T`
   sugar remains Planned.
@@ -1433,7 +1754,15 @@ and Planned work in [`IDEAS.md`](IDEAS.md).
 - **Structs (§3.6):** product `struct` with named and positional literals
   Supported. Tagged unions/enums and methods remain Planned.
 - **Modules (§5.11):** `import` + `vol.config.json` discovery/aliases Supported;
-  ambient tiny core; explicit path for everything else.
+  ambient tiny core includes `dict()`; reserved `@std` modules Supported (§5.12).
+- **Dict (§3.7):** mutable string-key maps via `dict()` / `dict("k", v, …)` /
+  `["k"]` / `.len` / `.keys()` Supported; odd arity → `R018`; missing key /
+  non-string key → `R045`; `{ k: v }` literals remain Planned (SF-4+).
+- **`@std` (§5.12):** reserved root (not remappable); flat exports; modules
+  math, strings, fs, path, env, time, url, json, yaml, http, process, db
+  (SQLite). Operational failure → Result; `get` → Option; type mistakes →
+  `R046`/`R047`. Dict `{k:v}` literals, Postgres/MySQL, ORM, WebSockets stay
+  Planned.
 - **Ownership / allocation direction (Planned):** local escape analysis first;
   API contracts later; allocation unspecified — do not claim inference.
 - **Parallel direction (Planned):** `parallel` stays Planned; no guarantees

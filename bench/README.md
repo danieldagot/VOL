@@ -40,7 +40,7 @@ Those require a generate/repair harness. Protocol:
 make llm-dry                      # reference solutions only — not an LLM result
 make llm-ollama                   # live 2-task smoke via local Ollama
 make llm-core                     # live core_v2 (includes parity toys)
-make llm-intent                   # live intent_v1 (filter/map/count + repair/mod)
+make llm-intent                   # live intent_v1 (filter/map/count + @std + repair/mod)
 make llm-dry-intent               # dry-run intent reference solutions
 make llm-ollama MODEL=llama3.1:8b
 # run one task, failing a model request after 30 seconds:
@@ -59,7 +59,7 @@ The workflow benchmark has:
 - `smoke` (`smoke_v1`) — wiring only
 - `core` (`core_v2`) — published continuity (includes fib/arrays parity)
 - **`intent` (`intent_v1`)** — prefer for language-use claims (filter/map/count
-  pipelines + repair + modification; no hello/fib toys)
+  pipelines + SF-3 `@std` strings/json + repair + modification; no hello/fib toys)
 
 Default languages are `vol,python`. Summaries report prompt vs completion and
 cold vs warm (card-amortized) totals:
@@ -73,20 +73,35 @@ uv run python llm/harness/run_generate_repair.py --provider gemini --suite core
 
 **When to re-run Python:** only if the Python card, suite tasks, protocol, model,
 temperature, or harness scoring change. VOL card tweaks, Fix-text diagnostics,
-source-check hygiene, and SF-2 surface/card polish can use `--langs vol` with
+source-check hygiene, and SF-3 card/diagnostics polish can use `--langs vol` with
 `--baseline-jsonl` so the published JSONL/summary stays self-contained.
 
-The separate static-density benchmark below has its own 16-task tiered suite.
-Those density tasks are not the LLM workflow suite.
+The separate static-density benchmark below has its own 21-task tiered suite
+(including SF-3 `@std` / stdlib tasks). Those density tasks are not the LLM
+workflow suite.
 
-Primary published language-use table: Gemini `intent_v1` with `vol_v2` / SF-2
-([`llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md`](llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md))
-— both languages 100% first-try / success @ K; VOL about −10.0% cold / −13.1%
-warm vs Python (card ~316 vs ~336). One model; not a broad claim.
+### Published LLM artifacts (keep these)
 
-Historical continuity: protocol-v1.1 `core_v2` with `vol_v1` / SF-1 is
-[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md)
-(+11.2% cold / −3.3% warm; card ~436 vs ~336).
+Primary language-use table: Gemini `intent_v1` with `vol_v3` / SF-3
+(7 tasks incl. `@std` strings/json;
+[`llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-063341.md`](llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-063341.md))
+— both languages 100% first-try / success @ K; VOL about −2.4% cold / −8.0%
+warm vs Python (card ~350 vs ~336). One model; not a broad claim.
+
+Also keep (continuity / baselines cited by docs):
+
+| Artifact | Role |
+| --- | --- |
+| `…063341` | Primary 7-task SF-3 `intent_v1` / `vol_v3` |
+| `…062641` | First expanded-suite run (diagnose) + Python rows reused by `063341` |
+| `…061355` | Historical 5-task SF-3 `intent_v1` (pre-`@std` tasks) |
+| `…051437` | Historical SF-2 `intent_v1` / `vol_v2` |
+| `…051110` | SF-2 baseline (Python rows for later SF-2 republish) |
+| `…045310` | Historical SF-1 `intent_v1` (80% first-try / `.count()` arity) |
+| `core_v2` `…041440` | Protocol-v1.1 `core_v2` / `vol_v1` continuity |
+
+Do not commit intermediate superseded Gemini runs; regenerate density via `make count`
+instead of hand-editing `results/density*`.
 
 `--tasks` accepts a comma-separated list of task IDs (for example,
 `01-hello,07-functions`). `--request-timeout SECONDS` caps each model API
@@ -189,6 +204,7 @@ semantic-density wins (see `harness/count_tokens.py` and reports).
 | **parity** | Control surface near Python (hello, loops, fib, …) |
 | **labeled** | Report-style string labels — sensitive to `print` / `string()` glue |
 | **compression** | Bare numeric output; filter / map / count / sum intent |
+| **stdlib** | SF-3 `@std` / peer stdlib intent (strings, path, env, json, process) |
 
 | ID | Tier | Intent | VOL features exercised |
 |----|------|--------|------------------------|
@@ -208,6 +224,11 @@ semantic-density wins (see `harness/count_tokens.py` and reports).
 | 14-pipeline-stats | compression | count/sum/map pipeline | `.count`, `.where`, `.map`, `.sum` |
 | 15-band-counts | compression | bands, bare numbers | `.count`, `.sum`, `.len` |
 | 16-map-filter | compression | map then count/sum | `.map`, `.count`, `.where` |
+| 17-strings-ops | stdlib | trim / split / join / has / replace | `@std/strings` |
+| 18-path-parts | stdlib | join / base / dir / ext | `@std/path` |
+| 19-env-default | stdlib | set + get with `??` default | `@std/env` |
+| 20-json-fields | stdlib | parse fields + dump object | `@std/json`, `dict("k", v)` |
+| 21-process-echo | stdlib | run subprocess + trim stdout | `@std/process`, `@std/strings` |
 
 ### Equivalence rules
 
@@ -215,9 +236,16 @@ semantic-density wins (see `harness/count_tokens.py` and reports).
 - Required language boilerplate only — no golfing, no artificial padding.
 - Idiomatic style in each language.
 - Python: single-file `main.py` with `python3` (stdlib only).
-- Rust: single-file `main.rs` with `rustc` (no Cargo.toml boilerplate).
+- Rust: single-file `main.rs` with `rustc` (no Cargo.toml / crates).
 - Zig: single-file `main.zig` with `zig run`.
-- Go: `go run main.go` (no external modules, only `fmt`).
+- Go: `go run main.go` (Go standard library only; no external modules).
+  Parity / compression / labeled tasks typically need only `fmt`. Stdlib-tier
+  tasks may use packages such as `strings`, `path/filepath`, `os`, `os/exec`,
+  and `encoding/json`.
+- Stdlib-tier tasks compare VOL `@std` against each language’s idiomatic
+  standard library for the same I/O behavior. Skipped for density fairness:
+  HTTP listen/fetch, SQLite `@std/db`, and filesystem temp-file races (env /
+  process cover host interaction without flaky paths).
 
 ---
 
@@ -229,10 +257,13 @@ Reports include **median (all)** plus tier medians:
 - **median (labeled)** — moves a lot if `print` / string coercion changes; do not
   treat as pure semantic-density proof.
 - **median (parity)** — control floor; often near Python.
+- **median (stdlib)** — SF-3 `@std` import surface vs peer stdlibs; not the same
+  as collection-op compression.
 
 A ratio below 1.0 on compression tasks reflects `.where` / `.map` / `.count` /
 `.sum` versus list comprehensions (Python), explicit loops (Go/Zig), or iterator
-chains (Rust).
+chains (Rust). Stdlib ratios reflect import/`?`/Result style versus each
+language’s library APIs — not collection pipelines.
 
 Do not generalize from this small suite. It anchors the "denser syntax" claim to
 measured numbers, not LLM workflow superiority. See also
@@ -242,6 +273,7 @@ measured numbers, not LLM workflow superiority. See also
 
 ## Roadmap
 
-- [ ] Extend to 20+ tasks once VOL has more settled features
+- [x] Extend past 20 tasks with SF-3 `@std` / stdlib density tasks
+- [x] Generate/repair harness + published Gemini `intent_v1` / `vol_v3` (see `LLM_BENCHMARK.md`)
 - [ ] Add Hugging Face tokenizer counts for open-weight models
-- [ ] Graduate to a generate/repair harness for task-success metrics (see `LLM_BENCHMARK.md` in VOL)
+- [ ] Publish ≥1 other model on `intent_v1` before treating workflow deltas as stable

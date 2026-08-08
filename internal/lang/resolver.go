@@ -16,6 +16,7 @@ type resolver struct {
 
 var builtins = map[string]symbol{
 	"args":   {kind: "value", arity: -1},
+	"dict":   {kind: "builtin", arity: -1},
 	"input":  {kind: "builtin", arity: -1},
 	"assert": {kind: "builtin", arity: -1},
 	"string": {kind: "builtin", arity: 1},
@@ -130,7 +131,7 @@ func (r *resolver) statement(statement Statement) *Diagnostic {
 				return r.error(name, "S030", "Cannot assign to const binding `"+name.Lexeme+"`.", "Declare a new binding instead, or remove `const` from the declaration.")
 			}
 			if _, found := r.lookup(name.Lexeme); !found {
-				return r.error(name, "S002", "Undefined name `"+name.Lexeme+"`.", "Declare the name before using it.")
+				return r.error(name, "S002", "Undefined name `"+name.Lexeme+"`.", undefinedNameFix(name.Lexeme))
 			}
 		}
 		for _, value := range node.Values {
@@ -270,7 +271,7 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 		return d
 	case *Variable:
 		if _, ok := r.lookup(node.Name.Lexeme); !ok {
-			return r.error(node.Name, "S002", "Undefined name `"+node.Name.Lexeme+"`.", "Declare the name before using it.")
+			return r.error(node.Name, "S002", "Undefined name `"+node.Name.Lexeme+"`.", undefinedNameFix(node.Name.Lexeme))
 		}
 	case *Unary:
 		return r.expression(node.Right)
@@ -293,9 +294,6 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 		}
 		return r.expression(node.Right)
 	case *TryPropagate:
-		if r.functionDepth == 0 {
-			return r.error(node.Op, "S041", "Result `?` can only be used inside a function.", "Use if-let at top level, or move this into a function.")
-		}
 		return r.expression(node.Value)
 	case *ArrayLiteral:
 		for _, item := range node.Elements {
@@ -344,7 +342,7 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 		}
 		if property, ok := node.Callee.(*Property); ok {
 			switch property.Name.Lexeme {
-			case "sum", "copy", "deep_copy":
+			case "sum", "copy", "deep_copy", "keys":
 				if d := r.expression(property.Object); d != nil {
 					return d
 				}
@@ -431,4 +429,18 @@ func (r *resolver) rangeArity(token Token, name, want string, got int) *Diagnost
 }
 func (r *resolver) error(token Token, code, message, fix string) *Diagnostic {
 	return &Diagnostic{Code: code, Message: message, File: r.file, Pos: token.Pos, Fix: fix}
+}
+
+// undefinedNameFix steers common LLM / Python aliases toward Supported @std names.
+func undefinedNameFix(name string) string {
+	switch name {
+	case "contains":
+		return "Use `has` from `@std/strings` (there is no `contains`)."
+	case "stringify":
+		return "Use `dump` from `@std/json` or `@std/yaml`."
+	case "json", "yaml", "http", "fs", "path", "env", "db", "process", "math", "strings", "time", "url":
+		return "Imports install flat names; call exports directly (e.g. `parse`), not `" + name + ".…`."
+	default:
+		return "Declare the name before using it."
+	}
 }

@@ -25,6 +25,7 @@ Task tiers:
     parity       — control surface (hello, loops, fib, …); often near Python
     compression  — filter/map/count/sum intent; measures semantic density
     labeled      — report-style tasks with string labels (print-glue sensitive)
+    stdlib       — SF-3 @std / library intent (strings, path, env, json, process)
 
 Limitations:
     - Measures source token density of hand-written equivalent programs only.
@@ -72,6 +73,16 @@ LABELED_TASKS = frozenset(
         "13-temperatures",
     }
 )
+# SF-3 library surface (@std / idiomatic stdlib peers).
+STDLIB_TASKS = frozenset(
+    {
+        "17-strings-ops",
+        "18-path-parts",
+        "19-env-default",
+        "20-json-fields",
+        "21-process-echo",
+    }
+)
 
 
 def task_tier(name: str) -> str:
@@ -79,6 +90,8 @@ def task_tier(name: str) -> str:
         return "compression"
     if name in LABELED_TASKS:
         return "labeled"
+    if name in STDLIB_TASKS:
+        return "stdlib"
     return "parity"
 
 
@@ -137,7 +150,7 @@ def build_table(rows: list[dict], tok_name: str) -> str:
         f"| **{fmt_ratio(median_ratios(rows, 'rust'))}** "
         f"| **{fmt_ratio(median_ratios(rows, 'zig'))}** |"
     )
-    for tier in ("compression", "labeled", "parity"):
+    for tier in ("compression", "labeled", "parity", "stdlib"):
         body_lines.append(tier_median_line(rows, tier))
     return header + "\n".join(body_lines) + "\n"
 
@@ -158,10 +171,11 @@ def main() -> None:
         "> **What this does not measure:** LLM task-success rate or generate/repair cost.",
         "> **Tokenizer note:** ratios depend on the tokenizer; GPT, Claude, and other models",
         "> tokenize differently. Numbers are reported per tokenizer.",
-        f"> **Suite size:** {len(tasks)} tasks (parity / labeled / compression tiers).",
+        f"> **Suite size:** {len(tasks)} tasks (parity / labeled / compression / stdlib tiers).",
         "> Prefer **median (compression)** when judging semantic-density ops;",
         "> **median (labeled)** is sensitive to print/string glue;",
-        "> **median (parity)** is a control near-Python floor.\n",
+        "> **median (parity)** is a control near-Python floor;",
+        "> **median (stdlib)** is SF-3 `@std` / library intent vs peer stdlibs.\n",
     ]
 
     for tok_name in TOKENIZERS:
@@ -214,7 +228,8 @@ def main() -> None:
             f"  VOL/Zig={fmt_ratio(median_ratios(rows, 'zig'))}"
         )
         print(
-            f"  tiers: {fmt_tier('compression')}; {fmt_tier('labeled')}; {fmt_tier('parity')}"
+            f"  tiers: {fmt_tier('compression')}; {fmt_tier('labeled')}; "
+            f"{fmt_tier('parity')}; {fmt_tier('stdlib')}"
         )
         print(f"  Wrote {csv_path.relative_to(REPO_ROOT)}")
         print(f"  Wrote {md_path.relative_to(REPO_ROOT)}")

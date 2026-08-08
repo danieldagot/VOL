@@ -13,7 +13,7 @@
 #   make llm-dry-intent — validate intent_v1 reference solutions
 #   make llm-ollama    — live 2-task smoke suite using local Ollama
 #   make llm-core      — live core_v2 (includes parity toys; historical tables)
-#   make llm-intent    — live intent_v1 (filter/map/count + repair/mod)
+#   make llm-intent    — live intent_v1 (filter/map/count + @std + repair/mod)
 
 .PHONY: bench check count sync llm-dry llm-dry-intent llm-ollama llm-core llm-intent
 

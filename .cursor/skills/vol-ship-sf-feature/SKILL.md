@@ -4,7 +4,7 @@ description: >-
   Ships a Planned VOL language feature as a surface-freeze bump: implements
   lexer/parser/AST/resolver/interpreter, tests, examples, SPEC/IDEAS/README/
   AGENTS sync, and a new LLM card. Use when the user asks to implement pipelines,
-  enums, dual-return, or other IDEAS.md Planned syntax; to bump SF-1→SF-2 (or
+  enums, dual-return, or other IDEAS.md Planned syntax; to bump SF-3→SF-4 (or
   later); or to “ship the next SF feature.”
 disable-model-invocation: true
 ---
@@ -18,7 +18,7 @@ docs-only). Follow [`AGENTS.md`](AGENTS.md) sync rules.
 ## When to use
 
 - User names a Planned feature to implement (imports, structs, Result, `|>`, …)
-- User says ship / implement / SF-2 bump for language surface
+- User says ship / implement / SF-4 bump for language surface
 - Not for pure design Q&A — use `vol-close-spec-corner` first if undecided
 
 ## Before anything
@@ -36,10 +36,11 @@ If the feature is still an open question in IDEAS, stop and run Phase 2 of
 
 ## Scope rules
 
-- **One coherent SF slice** per bump (active freeze is SF-2 / card `vol_v2`; next
-  is SF-3 / `vol_v3`). Do not boil the ocean (ownership + parallel + stdlib in one pass).
-- Prefer the IDEAS **recommended / direction decided** spelling. Do not invent a
-  competing form without asking.
+- **One coherent SF slice** per bump (active freeze is SF-3 / card `vol_v3`;
+  next is SF-4+ sugar or later library work). Do not also ship ownership /
+  parallel / SF-4+ syntax in the same pass unless the user asks.
+- Prefer the IDEAS **density-pinned** spellings. Do not invent a competing form
+  without asking.
 - Docs-only directions that cannot run yet (allocation “unspecified”, parallel
   “no guarantees”) stay docs — do not fake Supported syntax.
 - Never label Supported without tests.
@@ -53,13 +54,14 @@ If the feature is still an open question in IDEAS, stop and run Phase 2 of
 State briefly:
 
 - Feature(s) shipping
-- From freeze → to freeze (e.g. SF-1 → SF-2)
-- New card path (`bench/llm/cards/vol_v2.md`, …)
+- From freeze → to freeze (e.g. SF-3 → SF-4)
+- New card path (`bench/llm/cards/vol_v4.md`, …)
 - Out of scope for this bump
 
-If the user said “the rest,” propose a **single** next slice (default ROI under
-SF-2 foundations: **formatter / std behind imports**, or SF-3 **`|>` / enums /
-dual-return** when ready) and proceed only on that slice unless they insist on more.
+If the user said “the rest,” propose a **single** next slice (default ROI:
+`vol fmt` rewriter, or one SF-4+ item the user names). Do **not** default to
+shipping `|>` / enums / dual-return / Postgres/MySQL / ORM / WebSockets without
+an explicit ask.
 
 ### 2. Implement in `internal/lang`
 
@@ -73,7 +75,7 @@ Typical order:
 6. Tests: lexer vocabulary, parser diagnostics, `lang_test.go` / interpreter
    tables, `examples_test.go` row if adding examples
 
-Reuse patterns from the current SF-2 surface (Option / Result / structs / modules / density dynamics) when similar.
+Reuse patterns from the current SF-3 surface (Option / Result / structs / modules / `@std` / dict / density dynamics) when similar.
 
 ### 3. Examples
 
@@ -115,14 +117,12 @@ Prefer `go test ./...` when time allows; report if skipped.
 
 ## Default next-slice order (if user says “the rest”)
 
-Implement one at a time in this order unless the user overrides (SF-1 already
-has modules, structs, Result/Option unwrap, density sugar):
+Implement one at a time in this order unless the user overrides (SF-3 active):
 
-1. Formatter / richer std libraries behind imports (foundations)
-2. `|>` pipelines (if measured)
-3. Enums / tagged unions
-4. Dual-return sugar over Result
-5. Leave ownership / parallel / alloc / build modes as design until a backend or
+1. `vol fmt` rewriter (parallel foundation; not freeze-defining)
+2. SF-4+ only when asked: `|>`, enums, dual-return, dict literals; Postgres/MySQL,
+   ORM, WebSockets
+3. Leave ownership / parallel / alloc / build modes as design until a backend or
    explicit user ask
 
 ## Anti-patterns

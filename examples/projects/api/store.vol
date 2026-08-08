@@ -1,0 +1,55 @@
+// SQLite-backed notes store for the mocked API (SF-3 @std/db + @std/env).
+
+export init_store, list_notes, add_note, get_note, remove_note
+
+import "@std/db"
+import "@std/env"
+
+store := none
+
+fn init_store() {
+    path := get("API_DB") ?? ":memory:"
+    conn := open(path)?
+    exec(conn, "create table if not exists notes (id integer primary key autoincrement, title text not null)")?
+    store = some(conn)
+    return ok(true)
+}
+
+fn require_conn() {
+    if some conn := store {
+        return ok(conn)
+    } else {
+        return err("store not initialized")
+    }
+}
+
+fn list_notes() {
+    conn := require_conn()?
+    rows := query(conn, "select id, title from notes order by id")?
+    return ok(rows)
+}
+
+fn add_note(title) {
+    conn := require_conn()?
+    exec(conn, "insert into notes(title) values (?)", title)?
+    rows := query(conn, "select id, title from notes order by id desc limit 1")?
+    return ok(rows[0])
+}
+
+fn get_note(id) {
+    conn := require_conn()?
+    rows := query(conn, "select id, title from notes where id = ?", id)?
+    if rows.len == 0 {
+        return err("not found")
+    }
+    return ok(rows[0])
+}
+
+fn remove_note(id) {
+    conn := require_conn()?
+    n := exec(conn, "delete from notes where id = ?", id)?
+    if n == 0 {
+        return err("not found")
+    }
+    return ok(true)
+}

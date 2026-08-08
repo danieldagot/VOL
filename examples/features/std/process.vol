@@ -1,0 +1,8 @@
+// @std/process (SF-3): run(argv) → Result with status/stdout/stderr.
+
+import "@std/process"
+import "@std/strings"
+
+p := run(["echo", "vol"])?
+print p.status
+print trim(p.stdout)

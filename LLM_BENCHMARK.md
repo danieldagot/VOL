@@ -1,6 +1,6 @@
 # VOL LLM Workflow Benchmark (Protocol v1.1)
 
-> Status: **protocol v1.1 harness implemented; primary Gemini `intent_v1`/`vol_v2` (SF-2) vs Python published; `core_v2`/`vol_v1` continuity; Go/`core_v1` historical**
+> Status: **protocol v1.1 harness implemented; primary published Gemini `intent_v1`/`vol_v3` (SF-3) vs Python; historical `vol_v2`/`vol_v1`; `core_v2` continuity; Go/`core_v1` historical**
 > Companion to: [`bench/`](bench/README.md) (source token density only)
 
 This document defines how VOL measures whether it is actually better for
@@ -81,7 +81,7 @@ Optional secondary metrics:
 
 ## 4. Suite S (v1.1 / `core_v2`)
 
-The workflow benchmark is deliberately smaller than the 13-task static-density
+The workflow benchmark is deliberately smaller than the 21-task static-density
 set. Fewer, richer tasks allow at least three replicates without spending most
 of the budget on redundant syntax exercises.
 
@@ -111,18 +111,22 @@ Smoke validates wiring. It is not sufficient evidence for a language claim.
 Includes parity-style tasks (fibonacci, arrays). Keep for continuity with
 published Gemini tables. For “does the LLM use VOL intent ops?” prefer §4.2b.
 
-### 4.2b Intent suite (5 tasks) — `intent_v1` (language-use claims)
+### 4.2b Intent suite (7 tasks) — `intent_v1` (language-use claims)
 
 | ID | Workflow | Intent exercised |
 | --- | --- | --- |
 | `06-where-sum` | generation | filter + sum |
 | `14-pipeline-stats` | generation | count / where / map / sum pipeline |
 | `16-map-filter` | generation | map then count/sum |
+| `17-strings-ops` | generation | SF-3 `@std/strings` (trim/split/join/has/replace) |
+| `20-json-fields` | generation | SF-3 `@std/json` + `dict("k", v, …)` |
 | `08-strings-assert` | diagnostic repair | fix seeded failure using real runner diagnostics |
 | `11-leaderboard` | modification | preserve and extend a working program |
 
 Harness: `--suite intent`. Do not merge `intent_v1` rows into `core_v2` result
 tables. Optional compression add-on: `15-band-counts` via `--tasks`.
+Historical 5-task `intent_v1` tables (pre-stdlib) stay labeled by date; do not
+rewrite them. New SF-3 language-use claims should include tasks `17` and `20`.
 
 Run each `(task, language)` at least three times. Report results separately by
 workflow kind as well as in aggregate.
@@ -194,7 +198,7 @@ Target **≤ ~400 tokens** each (measure with the same tokenizer used for scorin
 or the API’s tokenizer). Cards must only describe **currently Supported** VOL
 features from [`SPEC.md`](SPEC.md) / README “What Actually Works.”
 
-Default VOL card (`vol_v2` / SF-2) must include at least:
+Default VOL card (`vol_v3` / SF-3) must include at least:
 
 - no `main`; top-level statements run; newlines separate statements
 - `:=` / `=`
@@ -205,9 +209,10 @@ Default VOL card (`vol_v2` / SF-2) must include at least:
 - `fn` / `return`; missing return is `nothing`
 - `print` / multi-arg `print`; string `+` coercion; `assert`
 
-It is a **task card**, not a full SF-2 product tour. Prefer ≤ Python card size
-when first-try stays high. Omit `const`, overflow detail, Option/Result/structs/
-`import` until a suite exercises them.
+It is a **task card**, not a full SF-3 product tour. Prefer ≤ Python card size
+when first-try stays high. Include the `@std` / `dict` reminders the suite
+exercises (`17`/`20`); omit `const`, overflow detail, Option/Result/structs/
+general `import` until a suite exercises them.
 
 Python card: equivalently dense stdlib-only reminders (`print`, lists, `for`,
 `assert`), not a tour of the standard library.
@@ -218,7 +223,8 @@ slices, `for`), not a tour of Effective Go.
 Store frozen cards under:
 
 ```text
-bench/llm/cards/vol_v2.md      # SF-2 harness default (density dynamics)
+bench/llm/cards/vol_v3.md      # SF-3 harness default (@std + dict)
+bench/llm/cards/vol_v2.md      # SF-2 historical (density dynamics; published intent_v1)
 bench/llm/cards/vol_v1.md      # SF-1 historical (published core_v2 / intent_v1)
 bench/llm/cards/vol_v0.md      # SF-0 (historical; do not mix freeze IDs)
 bench/llm/cards/python_v0.md   # matched Python baseline (default)
@@ -227,8 +233,8 @@ bench/llm/cards/go_v0.md       # matched Go baseline (optional)
 
 Cards are **bound to** a product surface freeze ([`SPEC.md`](SPEC.md) §0) but
 need not enumerate every Supported form. SF-0 → `vol_v0`; SF-1 → `vol_v1`;
-SF-2 → `vol_v2`. Do not keep intermediate draft cards. Bump the VOL card with
-the next freeze (SF-3 → `vol_v3.md`) or a deliberate card-only revision.
+SF-3 → `vol_v3`. Do not keep intermediate draft cards. Bump the VOL card with
+the next freeze (SF-4+ → `vol_v4.md`) or a deliberate card-only revision.
 Never silently edit a card used in a published result table without
 republishing; published summaries must name the freeze and card versions.
 Source checks must accept every form the card teaches for the same intent
@@ -411,8 +417,9 @@ The harness markdown includes cold totals, prompt vs completion means, warm
 
 ### 8.2 Headlines for README
 
-Prefer frozen **`intent_v1`** / `vol_v2` (SF-2) for language-use headlines; keep
-**`core_v2`** / `vol_v1` for continuity tables. Include the languages being claimed:
+Prefer frozen **`intent_v1`** / `vol_v3` (SF-3) for language-use headlines; keep
+**`vol_v2`** / SF-2 and **`core_v2`** / `vol_v1` for continuity tables. Include
+the languages being claimed:
 
 - VOL vs Python success @ K (absolute points); optional VOL vs Go
 - VOL vs baseline cold and warm total-token ratios
@@ -464,9 +471,16 @@ cannot be recomputed from committed JSONL.
 - [x] Bind cards to Surface Freeze SF-0 (`SPEC.md` §0; `vol_v0` / `python_v0` / `go_v0`)
 - [x] Publish frozen `core_v2` live run with default `--langs vol,python` (Gemini)
 - [x] Surface Freeze SF-1; `vol_v1.md` = `core_v2` task card (SF-1-bound subset)
-- [x] Surface Freeze SF-2; `vol_v2.md` harness default (density dynamics)
+- [x] Surface Freeze SF-2; `vol_v2.md` (density dynamics; published `intent_v1`)
+- [x] Surface Freeze SF-3; `vol_v3.md` harness default (`@std` + dict)
 - [x] Publish `intent_v1` against `vol_v2`
       (`20260808-051437`; VOL live + frozen Python from `20260808-051110`)
+- [x] Publish `intent_v1` against `vol_v3` (5-task pre-stdlib)
+      (`20260808-061355`; VOL live + frozen Python from `20260808-051437`)
+- [x] Expand `intent_v1` with SF-3 `@std` tasks `17`/`20`; republish
+      (`20260808-063341`; VOL live + Python from `20260808-062641`)
+- [x] Keep only cited published `bench/llm/results/` artifacts (primary `063341`
+      plus continuity/baseline JSONL+MD listed in `bench/README.md`)
 - [ ] Publish ≥1 other model before treating workflow deltas as stable
 - [x] Re-run / publish `core_v2` against `vol_v1`
       (`20260808-041440`; includes frozen Python rows from the prior live run)

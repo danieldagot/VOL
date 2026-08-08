@@ -56,10 +56,11 @@ func (e *environment) assign(name string, value any) bool {
 }
 
 type interpreter struct {
-	output io.Writer
-	input  *bufio.Reader
-	env    *environment
-	file   string
+	output    io.Writer
+	input     *bufio.Reader
+	env       *environment
+	file      string
+	callDepth int
 }
 
 type function struct {
@@ -269,9 +270,17 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 			if d := i.requireValue(collection, target.Collection.Position()); d != nil {
 				return d
 			}
+			if dict, ok := collection.(*dictValue); ok {
+				key, d := i.dictKey(target.At)
+				if d != nil {
+					return d
+				}
+				dict.set(key, value)
+				break
+			}
 			array, ok := collection.([]any)
 			if !ok {
-				return i.runtime(target.Position(), "R003", "Only arrays can be indexed.")
+				return i.indexNotIndexable(target.Position(), collection)
 			}
 			index, d := i.arrayIndex(target.At, len(array))
 			if d != nil {
@@ -570,9 +579,20 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if d := i.requireValue(collection, node.Collection.Position()); d != nil {
 			return nil, d
 		}
+		if dict, ok := collection.(*dictValue); ok {
+			key, d := i.dictKey(node.At)
+			if d != nil {
+				return nil, d
+			}
+			value, exists := dict.get(key)
+			if !exists {
+				return nil, i.runtime(node.Position(), "R045", "Unknown dict key `"+key+"`.")
+			}
+			return value, nil
+		}
 		array, ok := collection.([]any)
 		if !ok {
-			return nil, i.runtime(node.Position(), "R003", "Only arrays can be indexed.")
+			return nil, i.indexNotIndexable(node.Position(), collection)
 		}
 		index, d := i.arrayIndex(node.At, len(array))
 		if d != nil {
@@ -600,6 +620,9 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 			}
 			if text, ok := object.(string); ok {
 				return int64(len([]rune(text))), nil
+			}
+			if dict, ok := object.(*dictValue); ok {
+				return dict.len(), nil
 			}
 		}
 		if node.Name.Lexeme == "length" {
@@ -700,6 +723,11 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if result.ok {
 			return result.value, nil
 		}
+		if i.callDepth == 0 {
+			return nil, i.runtimeWithFix(node.Op.Pos, "R049",
+				"Unhandled Result error from `?`: "+display(result.value)+".",
+				"Handle with if-let, or fix the failing operation.")
+		}
 		panic(returnValue{value: resultValue{ok: false, value: result.value}})
 	case *Conditional:
 		condition, d := i.evaluate(node.Condition)
@@ -741,6 +769,9 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "count" {
 			return i.evaluateCount(property, node.Arguments)
 		}
+		if property, ok := node.Callee.(*Property); ok && property.Name.Lexeme == "keys" {
+			return i.evaluateDictKeys(property, node.Arguments)
+		}
 		if property, ok := node.Callee.(*Property); ok {
 			switch property.Name.Lexeme {
 			case "sum", "copy", "deep_copy":
@@ -764,6 +795,9 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 				if d := i.requireValue(arguments[index], argument.Position()); d != nil {
 					return nil, d
 				}
+			}
+			if builtin.name == "listen" {
+				return i.callListen(arguments, node.Position())
 			}
 			return builtin.call(arguments, node.Position())
 		}
@@ -965,8 +999,10 @@ func (i *interpreter) call(fn *function, arguments []any) (value any, diagnostic
 		scope.define(parameter.Lexeme, arguments[index])
 	}
 	returned := false
+	i.callDepth++
 	func() {
 		defer func() {
+			i.callDepth--
 			if recovered := recover(); recovered != nil {
 				if result, ok := recovered.(returnValue); ok {
 					value, returned = result.value, true
@@ -1168,6 +1204,58 @@ func integerEqualsFloat(integer int64, floating float64) bool {
 		math.Trunc(floating) == floating && int64(floating) == integer
 }
 
+func (i *interpreter) callListen(arguments []any, pos Position) (any, *Diagnostic) {
+	if len(arguments) < 2 || len(arguments) > 3 {
+		return nil, i.runtime(pos, "R018", fmt.Sprintf("Function `listen` expects 2 or 3 arguments, got %d.", len(arguments)))
+	}
+	addr, ok := arguments[0].(string)
+	if !ok {
+		return nil, i.runtime(pos, "R047", "`listen` argument 1 must be a string, got "+typeName(arguments[0])+".")
+	}
+	opts := newDict()
+	if len(arguments) == 3 {
+		d, ok := arguments[2].(*dictValue)
+		if !ok {
+			return nil, i.runtime(pos, "R046", "Options must be a dict, got "+typeName(arguments[2])+".")
+		}
+		opts = d
+	}
+	return listenWithInterpreter(i, addr, arguments[1], opts, pos)
+}
+
+func (i *interpreter) evaluateDictKeys(property *Property, arguments []Expression) (any, *Diagnostic) {
+	if len(arguments) != 0 {
+		return nil, i.runtime(property.Position(), "R020", "`.keys()` expects 0 arguments.")
+	}
+	value, d := i.evaluate(property.Object)
+	if d != nil {
+		return nil, d
+	}
+	if d := i.requireValue(value, property.Object.Position()); d != nil {
+		return nil, d
+	}
+	dict, ok := value.(*dictValue)
+	if !ok {
+		return nil, i.runtime(property.Position(), "R048", "`.keys()` requires a dict.")
+	}
+	return dict.keys(), nil
+}
+
+func (i *interpreter) dictKey(expr Expression) (string, *Diagnostic) {
+	value, d := i.evaluate(expr)
+	if d != nil {
+		return "", d
+	}
+	if d := i.requireValue(value, expr.Position()); d != nil {
+		return "", d
+	}
+	key, ok := value.(string)
+	if !ok {
+		return "", i.runtime(expr.Position(), "R045", "Dict key must be a string, got "+typeName(value)+".")
+	}
+	return key, nil
+}
+
 func (i *interpreter) arrayIndex(expr Expression, length int) (int, *Diagnostic) {
 	value, d := i.evaluate(expr)
 	if d != nil {
@@ -1191,6 +1279,15 @@ func (i *interpreter) runtime(pos Position, code, message string) *Diagnostic {
 
 func (i *interpreter) runtimeWithFix(pos Position, code, message, fix string) *Diagnostic {
 	return &Diagnostic{Code: code, Message: message, File: i.file, Pos: pos, Fix: fix}
+}
+
+func (i *interpreter) indexNotIndexable(pos Position, collection any) *Diagnostic {
+	msg := "Only arrays and dicts can be indexed."
+	if _, ok := collection.(resultValue); ok {
+		return i.runtimeWithFix(pos, "R003", msg,
+			"Unwrap Result with `?` or if-let before indexing; e.g. `v := parse(...)?`.")
+	}
+	return i.runtime(pos, "R003", msg)
 }
 
 func (i *interpreter) integerOverflow(pos Position, op string) *Diagnostic {
@@ -1238,6 +1335,15 @@ func display(value any) string {
 		}
 		return instance.typ.name + " { " + strings.Join(parts, ", ") + " }"
 	}
+	if dict, ok := value.(*dictValue); ok {
+		return displayDict(dict)
+	}
+	if handle, ok := value.(*nativeHandle); ok {
+		return handle.String()
+	}
+	if reply, ok := value.(*httpReplyValue); ok {
+		return fmt.Sprintf("reply(%d, %s)", reply.status, display(reply.body))
+	}
 	if typ, ok := value.(*structType); ok {
 		return "struct " + typ.name
 	}
@@ -1266,6 +1372,12 @@ func typeName(value any) string {
 		return "struct"
 	case *structType:
 		return "struct type"
+	case *dictValue:
+		return "dict"
+	case *nativeHandle:
+		return "handle"
+	case *httpReplyValue:
+		return "reply"
 	case int64:
 		return "integer"
 	case float64:
@@ -1316,6 +1428,9 @@ func deepCopyValue(value any) any {
 		}
 		return &structValue{typ: instance.typ, fields: fields}
 	}
+	if dict, ok := value.(*dictValue); ok {
+		return deepCopyDict(dict)
+	}
 	return value
 }
 
@@ -1325,6 +1440,9 @@ func (i *interpreter) installBuiltins(arguments []string) {
 		args[index] = argument
 	}
 	i.env.define("args", args)
+	i.env.define("dict", &builtinFunction{name: "dict", call: func(values []any, pos Position) (any, *Diagnostic) {
+		return builtinDict(values, pos, i.file)
+	}})
 	i.env.define("string", &builtinFunction{name: "string", call: func(values []any, pos Position) (any, *Diagnostic) { return display(values[0]), nil }})
 	i.env.define("input", &builtinFunction{name: "input", call: func(values []any, pos Position) (any, *Diagnostic) {
 		if len(values) == 1 {

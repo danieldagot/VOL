@@ -1,0 +1,6 @@
+import "@std/json"
+
+v := parse("{\"n\":3,\"name\":\"vol\"}")?
+print v["n"]
+print v["name"]
+print dump(dict("n", 3))?

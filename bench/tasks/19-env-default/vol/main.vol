@@ -1,0 +1,5 @@
+import "@std/env"
+
+set("VOL_DENSITY_PORT", "9090")?
+print get("VOL_DENSITY_PORT") ?? "missing"
+print get("VOL_DENSITY_NO_SUCH_KEY") ?? "fallback"

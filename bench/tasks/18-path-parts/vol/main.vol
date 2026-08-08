@@ -1,0 +1,6 @@
+import "@std/path"
+
+print join("reports", "2026", "q1.json")
+print base("reports/2026/q1.json")
+print dir("reports/2026/q1.json")
+print ext("reports/2026/q1.json")

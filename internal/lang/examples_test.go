@@ -38,10 +38,22 @@ func TestExamplesRemainExecutable(t *testing.T) {
 		{file: filepath.Join("features", "modules", "main.vol"), output: "42\n"},
 		{file: filepath.Join("features", "modules", "import_struct.vol"), output: "Hello, Grace\n40\n"},
 		{file: filepath.Join("features", "modules", "aliases", "main.vol"), output: "42\n"},
+		{file: filepath.Join("features", "std", "dict.vol"), output: "VOL\n2\n[n, name]\n"},
+		{file: filepath.Join("features", "std", "math_strings.vol"), output: "40\n10\nvol\na-b-c\ntrue\n"},
+		{file: filepath.Join("features", "std", "fs_path.vol"), output: "hello from fs\ntrue\nvol_sf3_note.txt\n.txt\n"},
+		{file: filepath.Join("features", "std", "env_time.vol"), output: "port: 8080\n1970-01-01\n"},
+		{file: filepath.Join("features", "std", "url.vol"), output: "example.com\n1\n"},
+		{file: filepath.Join("features", "std", "json.vol"), output: "{\"host\":\"example.com\"}\n1\nnone\n"},
+		{file: filepath.Join("features", "std", "yaml.vol"), output: "VOL\nnone\n"},
+		{file: filepath.Join("features", "std", "process.vol"), output: "0\nvol\n"},
+		{file: filepath.Join("features", "std", "db.vol"), output: "1\n"},
+		{file: filepath.Join("features", "std", "http_fetch.vol"), output: "reply ready\n"},
 		{file: filepath.Join("projects", "gradebook", "main.vol"), output: "Roster: [Ada, Grace, Alan, Katherine]\nAverage: 82\nPassing: 3\nHonor roll: [Ada, Katherine]\n"},
 		{file: filepath.Join("projects", "contacts", "main.vol"), output: "Ada <ada@example.com>\nno contact named Alan\n"},
 		{file: filepath.Join("projects", "shop", "main.vol"), output: "Subtotal: 39\npay: charged 39\npay failed: empty cart\n"},
 		{file: filepath.Join("projects", "fibonacci", "main.vol"), output: "0\n1\n1\n2\n3\n5\n8\n13\n"},
+		{file: filepath.Join("projects", "hits", "main.vol"), output: "hits: 1\n"},
+		{file: filepath.Join("projects", "api", "main.vol"), output: "health: reply(200, {\"ok\":true})\ncreated: reply(201, {\"id\":1,\"title\":\"ship it\"})\nlist: reply(200, [{\"id\":1,\"title\":\"ship it\"}])\ngot: reply(200, {\"id\":1,\"title\":\"ship it\"})\ndeleted: reply(200, {\"deleted\":true})\nlist: reply(200, [])\nmissing: reply(404, {\"error\":\"not found\"})\n"},
 	}
 	for _, test := range tests {
 		t.Run(test.file, func(t *testing.T) {

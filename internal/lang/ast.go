@@ -241,7 +241,8 @@ type Coalesce struct {
 func (*Coalesce) expression()          {}
 func (n *Coalesce) Position() Position { return n.Op.Pos }
 
-// TryPropagate unwraps Result: expr? → ok value or return err (inside functions).
+// TryPropagate unwraps Result: expr? → ok value; on err, return err from a
+// function or abort the script at module top level (R049).
 type TryPropagate struct {
 	Value Expression
 	Op    Token

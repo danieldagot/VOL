@@ -424,6 +424,26 @@ if ok v := twice(10, 0) {
 	}
 }
 
+func TestTopLevelResultPropagateOk(t *testing.T) {
+	output, diagnostic := run(t, `
+n := ok(21)?
+print n * 2
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	if output != "42\n" {
+		t.Fatalf("got %q", output)
+	}
+}
+
+func TestTopLevelResultPropagateErr(t *testing.T) {
+	_, diagnostic := run(t, `n := err("boom")?`)
+	if diagnostic == nil || diagnostic.Code != "R049" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
 func TestMapAndCount(t *testing.T) {
 	output, diagnostic := run(t, `
 nums := [1, 2, 3, 4]

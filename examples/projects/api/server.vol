@@ -1,0 +1,27 @@
+// Blocking HTTP server for the mocked notes API.
+// listen runs until the process is stopped — not covered by examples_test.
+//
+//   API_ADDR=127.0.0.1:8787 API_DB=./notes.db go run ./cmd/vol run ./examples/projects/api/server.vol
+//
+// Then:
+//   curl -s http://127.0.0.1:8787/health
+//   curl -s -X POST http://127.0.0.1:8787/notes -d '{"title":"ship it"}'
+//   curl -s http://127.0.0.1:8787/notes
+
+import "examples/projects/api/handlers"
+import "@std/http"
+import "@std/env"
+
+fn start() {
+    boot()?
+    addr := get("API_ADDR") ?? "127.0.0.1:8787"
+    print "listening on", addr
+    listen(addr, handle)?
+    return ok(true)
+}
+
+if ok _ := start() {
+    print "stopped"
+} else err e {
+    print "error:", e
+}

@@ -15,7 +15,7 @@ VOL asks what a systems programming language should look like when LLMs are firs
 Its primary goal is to maximize **semantic density**: express more intent with fewer tokens while preserving deterministic structure, readability, safety, and native performance. The language should be efficient for an LLM to generate, understand, review, modify, and debug.
 
 That goal is a research direction, not a measured property of the current
-prototype. SF-2 freezes Supported syntax; it does **not** prove LLM optimization.
+prototype. SF-3 freezes Supported syntax plus `@std`; it does **not** prove LLM optimization.
 Hand-written source-density benches are not generate/repair evidence. Token
 counts also depend on each model's tokenizer, so “fewer tokens” alone is not a
 success metric. The intended long-term measure is task success relative to total
@@ -26,10 +26,10 @@ tokens consumed across generation, diagnostics, and repair — see
 
 **VOL is currently a very early tree-walking interpreter prototype.**
 There is no native compiler, no static type system, no ownership or borrow
-checker, no broad standard library (ambient tiny core only), and no backend.
-Ownership, vectorization, and parallelization are not language semantics today.
-What exists is a minimal interpreter that can execute small programs written in
-a provisional syntax.
+checker, and no native backend. SF-3 ships a reserved `@std` library and dict
+runtime on top of the ambient tiny core. Ownership, vectorization, and
+parallelization are not language semantics today. What exists is a minimal
+interpreter that can execute small programs written in a provisional syntax.
 
 This README separates **what works today** from **long-term design targets**. Treat vision language as a target, not a shipped reality.
 
@@ -47,14 +47,15 @@ This README separates **what works today** from **long-term design targets**. Tr
 
 ### What Actually Works
 
-**Surface Freeze SF-2:** Supported syntax in [`SPEC.md`](SPEC.md) — SF-1 surface
-plus density dynamics: multi-arg `print`, string `+` coercion, and `.count()` as
-length. Option/Result, modules, structs, anonymous/`fn`, multi-assign,
-`.map`/`.count`, and the rest of the Implemented core remain. Further vocabulary
-(`|>`, enums, dual-return sugar, …) waits for SF-3. Default harness card:
-[`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md). Historical
-[`vol_v1`](bench/llm/cards/vol_v1.md) / [`vol_v0`](bench/llm/cards/vol_v0.md)
-remain for published SF-1 / SF-0 tables.
+**Surface Freeze SF-3:** Supported surface in [`SPEC.md`](SPEC.md) — SF-2 syntax
+plus reserved `@std` (math, strings, fs, path, env, time, url, json, yaml, http,
+process, db/SQLite) and dict runtime (`dict()` / `dict("k", v, …)`, `d["k"]`,
+`.keys()`). No new
+keywords/operators in SF-3. Language sugar (`|>`, enums, dual-return, dict
+literals, …) waits for **SF-4+**. Default harness card:
+[`bench/llm/cards/vol_v3.md`](bench/llm/cards/vol_v3.md). Historical
+[`vol_v2`](bench/llm/cards/vol_v2.md) / [`vol_v1`](bench/llm/cards/vol_v1.md) /
+[`vol_v0`](bench/llm/cards/vol_v0.md) remain for published earlier tables.
 
 - integer, floating-point, Boolean, and string literals
 - inferred variable declarations with `:=` (including multi-declare `a, b := …`)
@@ -76,7 +77,8 @@ remain for published SF-1 / SF-0 tables.
 - Option values with `some(value)` / `none`; unwrap with if-let and `??` (`match` rejected) — see `examples/features/option.vol`
 - Result error handling with `ok(value)` / `err(value)`, if-let, and postfix `?` in functions (bugs still trap) — see `examples/features/errors.vol` and `examples/projects/shop/`
 - product `struct` types, named and positional construction, and field get/set
-- `import "path"` / project-local aliases via nearest `vol.config.json`; live `export` across modules (see `examples/features/modules/aliases/` for `@lib`; future `@std` spelling is vision-only in [`IDEAS.md`](IDEAS.md), not a shipped stdlib)
+- `import "path"` / project-local aliases via nearest `vol.config.json`; live `export` across modules (see `examples/features/modules/aliases/` for `@lib`)
+- reserved `import "@std/…"` standard library (not remappable) and ambient `dict()` / `dict("k", v, …)` — see `examples/features/std/` and `examples/projects/hits/`
 - `print` with one or more values (space-joined display forms)
 - string `+` coercion (`"n=" + 7`); keep `string(value)` for explicit convert
 - interactive text input with `input()` or `input(prompt)`
@@ -96,7 +98,7 @@ remain for published SF-1 / SF-0 tables.
 - static type checking
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter rewriter (`vol fmt` CLI stub parses only today)
-- a published compatibility policy and versioned conformance corpus (SF-0 / SF-1 / SF-2 pins)
+- a published compatibility policy and versioned conformance corpus (SF-0–SF-3 pins)
 - broader LLM workflow results across more models and realistic backend tasks
 - initial language-server support
 
@@ -106,8 +108,8 @@ remain for published SF-1 / SF-0 tables.
 - explicit type syntax
 - ownership and borrowing (direction: local escape first, API contracts later —
   see [`IDEAS.md`](IDEAS.md); not implemented)
-- dual-return sugar over Result; Result-returning I/O APIs
-  (`input`/`assert` still trap — see [`IDEAS.md`](IDEAS.md))
+- dual-return sugar over Result; ambient `input`/`assert` still trap
+  (`@std` I/O already returns Result — see [`IDEAS.md`](IDEAS.md))
 - enums / tagged unions / methods on structs (product `struct` is Supported)
 - symbol-selection imports; multi-file folder packages beyond `path.vol` /
   `path/mod.vol`
@@ -124,9 +126,9 @@ remain for published SF-1 / SF-0 tables.
 - optional `?T` sugar for Option (canonical form is `some`/`none`)
 - C and LLVM backend details
 
-Near-term priority is to keep SF-2 precise and finish foundations (`vol fmt`
-rewriter; richer std **behind imports** when designed — not ambient growth)
-before an SF-3 feature bump. Remaining directions live in [`IDEAS.md`](IDEAS.md).
+Near-term priority is to keep **SF-3** precise (tests, diagnostics, docs for
+`@std` + dict). `vol fmt` rewriter remains parallel foundation work. Syntax
+sugar and Postgres/MySQL / ORM / WebSockets stay for **SF-4+**.
 
 See [`SPEC.md`](SPEC.md) for vocabulary, syntax, and formal behavior of the
 current interpreter, and [`IDEAS.md`](IDEAS.md) for future work and open design
@@ -314,22 +316,24 @@ bench            source token density benchmark (VOL vs Python/Go/Rust/Zig)
 
 ## Source Token Density Benchmark
 
-On 16 equivalent small programs (after SF-2 density dynamics), VOL currently uses about:
+On 21 equivalent small programs (SF-2 collection/report tasks plus SF-3 `@std`
+stdlib tasks; `cl100k_base` medians):
 
-- **~20% fewer tokens than Python** (all-suite median; ratio **0.804**)
+- **~17% fewer tokens than Python** (all-suite median; ratio **0.829**)
 - **~24% fewer than Python** on the **compression** tier (filter/map/count/sum; **0.764**)
 - **~35% fewer than Python** on the **labeled** tier (multi-arg `print` / coercion; **0.651**)
-- **~50% fewer tokens than Go**
-- **~46% fewer tokens than Rust**
-- **~65% fewer tokens than Zig**
+- **~7% fewer than Python** on the **stdlib** tier (`17`–`21`; **0.929**) after
+  top-level Result `?` and `dict("k", v, …)` pairs (no `{k:v}` literals yet)
+- **~51% fewer tokens than Go** / **~48% fewer than Rust** / **~66% fewer than Zig**
+  (all-suite medians)
 
-(medians; nearly the same under both `cl100k_base` and `o200k_base`. Reports also
-split **labeled** vs **parity** tiers — see [`bench/README.md`](bench/README.md).)
+(Nearly the same under `o200k_base`. Prefer **compression** for collection-intent
+claims and **stdlib** for `@std` claims — see [`bench/README.md`](bench/README.md).)
 
 That is source size only — hand-written programs that print the same output. It
 does **not** measure whether an LLM generates correct VOL more easily, or how
 many tokens generate/repair workflows consume. Do not cite these ratios as
-workflow proof or as evidence that SF-2 is “LLM optimized.”
+workflow proof or as evidence that SF-3 is “LLM optimized.”
 
 Full per-task numbers: [`bench/results/density.md`](bench/results/density.md).
 How to run / regenerate: [`bench/README.md`](bench/README.md).
@@ -344,24 +348,27 @@ cd bench && uv sync && uv run python harness/count_tokens.py
 The default workflow baseline is **Python** (interpreted peer for the current
 prototype). Go remains an optional compiled baseline (`--langs vol,go`).
 
-Primary language-use table: **`intent_v1`** with **`vol_v2` / SF-2** vs Python
-(`gemini-3.5-flash-lite`, temperature 0, 3 replicates, K=2). Card ~316 tokens
-(`vol_v2`) vs Python ~336.
+Primary language-use table: **`intent_v1`** (7 tasks, includes SF-3 `@std`
+strings/json) with **`vol_v3` / SF-3** vs Python (`gemini-3.5-flash-lite`,
+temperature 0, 3 replicates, K=2). Card ~350 tokens (`vol_v3`) vs Python ~336.
 
 | Language | First-try | Success @ K | Mean cold | Mean warm | Mean completion |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Python | 100% | 100% | 761.3 | 425.3 | 134.5 |
-| VOL (SF-2) | 100% | 100% | 685.5 | 369.5 | 85.7 |
+| Python | 100% | 100% | 733.6 | 397.6 | 113.1 |
+| VOL (SF-3) | 100% | 100% | 715.7 | 365.7 | 78.4 |
 
-VOL matched Python on **first-try** / **success @ K**, used about **10.0% fewer
-cold** and **13.1% fewer warm** workflow tokens, with ~36% smaller completions.
+VOL matched Python on **first-try** / **success @ K**, used about **2.4% fewer
+cold** and **8.0% fewer warm** workflow tokens, with ~31% smaller completions.
 One-model result — do not treat as stable across models. Full summary:
-[`bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md).
+[`bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-063341.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-063341.md).
 
-Historical SF-1 notes (freeze ids unchanged): `core_v2` matched Python on
-success with ~+11% cold / ~−3% warm
-([`…041440.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md));
-early `intent_v1` on `vol_v1` was 80% first-try (all `.count()` arity misses)
+Historical notes (freeze ids unchanged): pre-stdlib 5-task SF-3 `intent_v1`
+([`…061355.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-061355.md));
+SF-2 `intent_v1` / `vol_v2`
+([`…051437.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md));
+SF-1 `core_v2` (~+11% cold / ~−3% warm
+[`…041440.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md));
+early SF-1 `intent_v1` 80% first-try (`.count()` arity)
 ([`…045310.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-045310.md)).
 
 Protocol and limitations: [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md).
@@ -395,6 +402,8 @@ Organized under [`examples/`](examples/) — full index in
 | `projects/contacts/` | Contact lookup (Option if-let / `??`) |
 | `projects/shop/` | Cart checkout (Result + postfix `?`) |
 | `projects/fibonacci/` | Multi-assign sequence |
+| `projects/hits/` | SQLite hit counter (`@std/db` + `@std/env`) |
+| `projects/api/` | Mocked notes HTTP API (`@std/http` + `@std/db` + `@std/json`) |
 
 For example:
 
@@ -402,6 +411,7 @@ For example:
 go run ./cmd/vol run ./examples/basics/functions.vol
 go run ./cmd/vol run ./examples/basics/arguments.vol -- apple banana
 go run ./cmd/vol run ./examples/projects/gradebook/main.vol
+go run ./cmd/vol run ./examples/projects/api/main.vol
 ```
 
 ## Build the CLI

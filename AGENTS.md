@@ -33,14 +33,15 @@ VOL aims to combine concise, intent-oriented source code with memory safety,
 predictable execution, and native performance.
 
 **Current reality:** VOL is a tree-walking interpreter prototype with a small
-provisional syntax. **Surface Freeze SF-2** pins Supported syntax including
-token-density dynamics ([`SPEC.md`](SPEC.md) §0). The harness card
-`bench/llm/cards/vol_v2.md` is the default task card. SF-1 / `vol_v1` and SF-0 /
-`vol_v0` remain for historical tables. Do not add Planned syntax under SF-2
-without a freeze bump. Surface freezes are **syntax pins**, not proof of LLM
-workflow superiority. Hand-written source-density numbers in `bench/` are not
-generate/repair evidence. There is no native backend, static type system,
-ownership checker, or broad standard library (ambient tiny core only). Ownership,
+provisional syntax. **Surface Freeze SF-3** pins SF-2 syntax plus reserved `@std`
+and dict runtime ([`SPEC.md`](SPEC.md) §0 / §5.12). The harness card
+`bench/llm/cards/vol_v3.md` is the default task card. SF-2 / `vol_v2`, SF-1 /
+`vol_v1`, and SF-0 / `vol_v0` remain for historical tables. Do not add Planned
+SF-4+ syntax under SF-3 without a freeze bump. Surface freezes are **syntax /
+library pins**, not proof of LLM workflow superiority. Hand-written
+source-density numbers in `bench/` are not generate/repair evidence. There is no
+native backend, static type system, or ownership checker. Ambient builtins stay
+tiny (`dict()` plus classic core); broader I/O is explicit `@std`. Ownership,
 vectorization, and parallelization are vision/research only until specified and
 tested. Keep vision and implementation status distinct in every document.
 
@@ -56,14 +57,17 @@ Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 - missing `return` yields `nothing`; discarding in a call statement is OK;
   assigning or using `nothing` as a value is `R029`
 - Option uses `some` / `none` with if-let and `??`; Result uses `ok` / `err`
-  with if-let and postfix `?` (functions only); both distinct from `nothing`;
+  with if-let and postfix `?` (functions or module top level; top-level `err`
+  aborts with `R049`); both distinct from `nothing`;
   bugs still trap; `match` is Rejected (`E153`)
 - anonymous `fn(params) { ... }` and expression-body `fn(params) expr` are Supported (`=>` is not)
 - product `struct` with named and positional literals and `.` field access is Supported
 - `import "path"` + `vol.config.json` discovery/aliases; `export` is live across
-  modules (`examples/features/modules/aliases/` demos `@lib`; `@std` /
-  `@compiler` spellings in [`IDEAS.md`](IDEAS.md) are vision-only, not a
-  shipped stdlib)
+  modules (`examples/features/modules/aliases/` demos `@lib`; reserved `@std`
+  is Supported under SF-3 — [`SPEC.md`](SPEC.md) §5.12; `@compiler` remains
+  vision-only)
+- dict values via ambient `dict()` / `dict("k", v, …)`; index with string keys;
+  `.keys()`; no `{ k: v }` literals yet
 - `.len` is the length property (string: Unicode scalars); `.length` is rejected
 - `while` is permanent Supported vocabulary (with `repeat` and `.each` for other intents)
 - `if` is a statement (`elif` / `else`); value choice uses `? :` (not expression-`if`)
@@ -142,7 +146,7 @@ specified. Do not imply any of that from the vision section alone.
 ### 6. AI Native
 
 Tooling and diagnostics should be easy for humans and agents to consume. That is
-a design goal; SF-2 surface + early harness runs do not prove workflow superiority.
+a design goal; SF-3 surface + early harness runs do not prove workflow superiority.
 
 Goals:
 
@@ -209,12 +213,10 @@ Priority:
 4. Performance
 5. Compile speed
 
-Near-term project priority: **SF-2 is active** — keep the frozen surface precise
-(tests, diagnostics, docs) and finish foundations (`vol fmt` rewriter after the
-CLI stub; richer std **design** behind imports — aliases ≠ stdlib) before an
-SF-3 feature bump. Remaining directions (enums, dual-return sugar,
-ownership/alloc, build modes, `|>`, parallel) are sketched in
-[`IDEAS.md`](IDEAS.md). See `SPEC.md` §0 / §11.
+Near-term project priority: **SF-3 is active** — keep the frozen `@std` + dict
+surface precise (tests, diagnostics, docs). `vol fmt` rewriter stays parallel.
+SF-4+ holds enums, dual-return, `|>`, dict literals, Postgres/MySQL, ORM,
+WebSockets, ownership/alloc, build modes, parallel. See `SPEC.md` §0 / §11.
 
 ---
 
@@ -329,18 +331,19 @@ Every build may report:
 **Static source token density** (implemented today) is measured in
 [`bench/`](bench/README.md): equivalent hand-written programs in VOL, Python, Go,
 Rust, and Zig are compared by token count under named OpenAI tokenizers. That measures
-source size only. Do **not** cite density ratios as LLM workflow proof, SF-2
+source size only. Do **not** cite density ratios as LLM workflow proof, SF-3
 success, or task-success efficiency. See [`README.md`](README.md) for current
 ratios.
 
 **Generate/repair workflow** protocol is in [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md)
 (task success vs total tokens across generation, diagnostics, and repair). Early
 published `core_v2` runs exist; they do **not** establish VOL superiority. The
-published Gemini `intent_v1` (`vol_v2` / SF-2) matches Python on first-try /
-success @ K with lower cold and warm means on that one-model table; historical
-`core_v2` / `vol_v1` rows remain SF-1. Meaning per Token (MPT) remains undefined
-as a single scalar. More models and realistic tasks are required before treating
-results as stable.
+published Gemini `intent_v1` (`vol_v3` / SF-3, 7 tasks incl. `@std`) matches
+Python on first-try / success @ K with lower cold and warm means on that
+one-model table; historical 5-task SF-3, `vol_v2` / SF-2, and `core_v2` /
+`vol_v1` rows remain labeled by freeze.
+Meaning per Token (MPT) remains undefined as a single scalar. More models and
+realistic tasks are required before treating results as stable.
 
 ---
 

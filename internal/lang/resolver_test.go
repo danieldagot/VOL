@@ -41,6 +41,29 @@ func TestResolverValidatesEveryExpressionShape(t *testing.T) {
 	}
 }
 
+func TestUndefinedNameHintsStdAliases(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		fix    string
+	}{
+		{name: "contains", source: `print contains("a", "a")`, fix: "`has`"},
+		{name: "json module path", source: `print json.parse("{}")`, fix: "flat names"},
+		{name: "stringify", source: `print stringify(1)`, fix: "`dump`"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, diagnostic := run(t, test.source)
+			if diagnostic == nil || diagnostic.Code != "S002" {
+				t.Fatalf("diagnostic = %#v", diagnostic)
+			}
+			if !strings.Contains(diagnostic.Fix, test.fix) {
+				t.Fatalf("Fix = %q want substring %q", diagnostic.Fix, test.fix)
+			}
+		})
+	}
+}
+
 func TestResolverRejectsDuplicatesInEveryScope(t *testing.T) {
 	tests := []struct {
 		name   string

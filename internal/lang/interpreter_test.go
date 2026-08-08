@@ -288,6 +288,20 @@ print string([1, true, ["x"]])`
 	}
 }
 
+func TestIndexResultSuggestsUnwrap(t *testing.T) {
+	_, diagnostic := runVolSource(t, `
+import "@std/json"
+v := parse("{\"n\":1}")
+print v["n"]
+`)
+	if diagnostic == nil || diagnostic.Code != "R003" {
+		t.Fatalf("diagnostic = %#v", diagnostic)
+	}
+	if !strings.Contains(diagnostic.Fix, "?") {
+		t.Fatalf("Fix = %q want Result unwrap hint", diagnostic.Fix)
+	}
+}
+
 func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 	tests := []struct {
 		name    string

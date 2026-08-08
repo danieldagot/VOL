@@ -1,0 +1,6 @@
+// @std/http reply helper (SF-3). fetch/listen covered in tests (listen blocks).
+
+import "@std/http"
+
+reply(200, dict("ok", true))
+print "reply ready"

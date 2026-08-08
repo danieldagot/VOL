@@ -1,0 +1,6 @@
+import "@std/process"
+import "@std/strings"
+
+p := run(["echo", "vol"])?
+print p.status
+print trim(p.stdout)

@@ -1,0 +1,38 @@
+// In-process self-test of the mocked notes API (no listen — safe for examples_test).
+
+import "examples/projects/api/handlers"
+
+struct MockReq {
+    method
+    path
+    query
+    headers
+    body
+}
+
+fn mock(method, path, body) {
+    return MockReq {
+        method: method,
+        path: path,
+        query: dict(),
+        headers: dict(),
+        body: body
+    }
+}
+
+fn demo() {
+    boot()?
+    print "health:", handle(mock("GET", "/health", ""))
+    print "created:", handle(mock("POST", "/notes", "{\"title\":\"ship it\"}"))
+    print "list:", handle(mock("GET", "/notes", ""))
+    print "got:", handle(mock("GET", "/notes/1", ""))
+    print "deleted:", handle(mock("DELETE", "/notes/1", ""))
+    print "list:", handle(mock("GET", "/notes", ""))
+    print "missing:", handle(mock("GET", "/notes/1", ""))
+    return ok(true)
+}
+
+if ok _ := demo() {
+} else err e {
+    print "error:", e
+}

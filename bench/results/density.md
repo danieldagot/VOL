@@ -7,10 +7,11 @@ A ratio < 1.0 means VOL is denser (fewer tokens) under that tokenizer.
 > **What this does not measure:** LLM task-success rate or generate/repair cost.
 > **Tokenizer note:** ratios depend on the tokenizer; GPT, Claude, and other models
 > tokenize differently. Numbers are reported per tokenizer.
-> **Suite size:** 16 tasks (parity / labeled / compression tiers).
+> **Suite size:** 21 tasks (parity / labeled / compression / stdlib tiers).
 > Prefer **median (compression)** when judging semantic-density ops;
 > **median (labeled)** is sensitive to print/string glue;
-> **median (parity)** is a control near-Python floor.
+> **median (parity)** is a control near-Python floor;
+> **median (stdlib)** is SF-3 `@std` / library intent vs peer stdlibs.
 
 ## Token density — tokenizer: `cl100k_base`
 
@@ -32,10 +33,16 @@ A ratio < 1.0 means VOL is denser (fewer tokens) under that tokenizer.
 | 14-pipeline-stats | compression | 67 | 81 | 152 | 153 | 225 | 0.827 | 0.441 | 0.438 | 0.298 |
 | 15-band-counts | compression | 73 | 110 | 145 | 159 | 244 | 0.664 | 0.503 | 0.459 | 0.299 |
 | 16-map-filter | compression | 58 | 68 | 118 | 119 | 169 | 0.853 | 0.492 | 0.487 | 0.343 |
-| **median (all)** | | | | | | | **0.804** | **0.497** | **0.536** | **0.350** |
+| 17-strings-ops | stdlib | 44 | 47 | 65 | 58 | 236 | 0.936 | 0.677 | 0.759 | 0.186 |
+| 18-path-parts | stdlib | 52 | 73 | 79 | 99 | 157 | 0.712 | 0.658 | 0.525 | 0.331 |
+| 19-env-default | stdlib | 47 | 48 | 105 | 87 | 147 | 0.979 | 0.448 | 0.540 | 0.320 |
+| 20-json-fields | stdlib | 39 | 42 | 106 | 217 | 205 | 0.929 | 0.368 | 0.180 | 0.190 |
+| 21-process-echo | stdlib | 30 | 33 | 91 | 66 | 165 | 0.909 | 0.330 | 0.455 | 0.182 |
+| **median (all)** | | | | | | | **0.829** | **0.492** | **0.525** | **0.337** |
 | **median (compression, n=4)** | | | | | | | **0.764** | **0.466** | **0.473** | **0.321** |
 | **median (labeled, n=4)** | | | | | | | **0.651** | **0.461** | **0.554** | **0.366** |
 | **median (parity, n=8)** | | | | | | | **0.871** | **0.569** | **0.612** | **0.361** |
+| **median (stdlib, n=5)** | | | | | | | **0.929** | **0.448** | **0.525** | **0.190** |
 
 ## Token density — tokenizer: `o200k_base`
 
@@ -57,8 +64,14 @@ A ratio < 1.0 means VOL is denser (fewer tokens) under that tokenizer.
 | 14-pipeline-stats | compression | 67 | 81 | 152 | 153 | 225 | 0.827 | 0.441 | 0.438 | 0.298 |
 | 15-band-counts | compression | 73 | 110 | 145 | 159 | 244 | 0.664 | 0.503 | 0.459 | 0.299 |
 | 16-map-filter | compression | 58 | 68 | 118 | 119 | 169 | 0.853 | 0.492 | 0.487 | 0.343 |
-| **median (all)** | | | | | | | **0.804** | **0.497** | **0.536** | **0.345** |
+| 17-strings-ops | stdlib | 44 | 47 | 66 | 58 | 239 | 0.936 | 0.667 | 0.759 | 0.184 |
+| 18-path-parts | stdlib | 52 | 73 | 80 | 99 | 157 | 0.712 | 0.650 | 0.525 | 0.331 |
+| 19-env-default | stdlib | 47 | 48 | 105 | 87 | 147 | 0.979 | 0.448 | 0.540 | 0.320 |
+| 20-json-fields | stdlib | 40 | 42 | 108 | 216 | 206 | 0.952 | 0.370 | 0.185 | 0.194 |
+| 21-process-echo | stdlib | 30 | 33 | 93 | 66 | 165 | 0.909 | 0.323 | 0.455 | 0.182 |
+| **median (all)** | | | | | | | **0.829** | **0.492** | **0.525** | **0.337** |
 | **median (compression, n=4)** | | | | | | | **0.764** | **0.466** | **0.473** | **0.321** |
 | **median (labeled, n=4)** | | | | | | | **0.651** | **0.461** | **0.554** | **0.366** |
 | **median (parity, n=8)** | | | | | | | **0.871** | **0.567** | **0.612** | **0.357** |
+| **median (stdlib, n=5)** | | | | | | | **0.936** | **0.448** | **0.525** | **0.194** |
 

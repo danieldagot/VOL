@@ -78,23 +78,26 @@ CORE_TASKS = [
     "13-temperatures",
 ]
 # Intent-ops + real workflows only (no hello/fib parity). Prefer for language-use claims.
+# SF-3: includes @std strings/json + dict (17, 20) so vol_v3 card surface is exercised.
 INTENT_TASKS = [
     "06-where-sum",
     "14-pipeline-stats",
     "16-map-filter",
+    "17-strings-ops",
+    "20-json-fields",
     "08-strings-assert",
     "11-leaderboard",
 ]
 
-# Cards bound to product surface freezes (SPEC.md §0). Next VOL bump is SF-2+.
+# Cards bound to product surface freezes (SPEC.md §0). Next VOL bump is SF-4+.
 # Default workflow baseline is Python (interpreted peer); Go remains optional.
 LANG_META = {
     "vol": {
-        "card": "vol_v2.md",
+        "card": "vol_v3.md",
         "label": "VOL",
         "ext": ".vol",
         "prompt_lang": "VOL",
-        "freeze": "SF-2",
+        "freeze": "SF-3",
     },
     "python": {
         "card": "python_v0.md",
@@ -378,7 +381,12 @@ def judge(
     if rc != 0:
         return "diag_error", None
     if stdout != expected:
-        return "wrong_output", None
+        return (
+            "wrong_output",
+            "stdout did not match expected.\n\n"
+            f"Expected:\n{expected}"
+            f"Got:\n{stdout}",
+        )
     for pattern in source_checks:
         if not re.search(pattern, source, re.MULTILINE):
             return "source_check_failed", f"Required source pattern was not found: {pattern}"
@@ -1145,7 +1153,7 @@ def main() -> None:
         "--suite",
         choices=["smoke", "core", "intent"],
         default="smoke",
-        help="smoke=wiring; core=published core_v2 (includes parity); intent=filter/map/count + repair/mod",
+        help="smoke=wiring; core=published core_v2 (includes parity); intent=filter/map/count + @std + repair/mod",
     )
     parser.add_argument(
         "--langs",

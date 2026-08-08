@@ -1,8 +1,0 @@
-{
-  "kind": "generation",
-  "source_checks": {
-    "vol": ["\\bif\\b"],
-    "go": ["\\bif\\b"],
-    "python": ["\\bif\\b"]
-  }
-}

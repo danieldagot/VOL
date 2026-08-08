@@ -1,0 +1,13 @@
+// @std/fs and @std/path (SF-3). Text files + path helpers.
+
+import "@std/fs"
+import "@std/path"
+import "@std/env"
+
+root := get("TMPDIR") ?? "/tmp"
+file := join(root, "vol_sf3_note.txt")
+write(file, "hello from fs")?
+print read(file)?
+print exists(file)
+print base(file)
+print ext(file)

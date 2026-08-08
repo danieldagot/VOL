@@ -1,0 +1,4 @@
+reports/2026/q1.json
+q1.json
+reports/2026
+.json

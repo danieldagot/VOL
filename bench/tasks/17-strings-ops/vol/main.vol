@@ -1,0 +1,6 @@
+import "@std/strings"
+
+print trim("  vol  ")
+print join(split("a,b,c", ","), "-")
+print has("vocabulary", "cab")
+print replace("a-a-a", "-", "+")

@@ -1,0 +1,6 @@
+// dict runtime (SF-3): dict() / dict("k", v, …); string-key index; .keys().
+
+d := dict("name", "VOL", "n", 3)
+print d["name"]
+print d.len
+print d.keys()

@@ -46,6 +46,16 @@ func RunFile(entryPath string, output io.Writer, options ExecuteOptions) *Diagno
 	exports := map[string]map[string]any{}
 	importSymbols := map[string]map[string]symbol{}
 	for _, file := range order {
+		if isStdModulePath(file) {
+			mod, d := loadStdModule(stdImportFromPath(file))
+			if d != nil {
+				d.File = file
+				return d
+			}
+			exports[file] = mod.exports
+			importSymbols[file] = stdSymbols(mod)
+			continue
+		}
 		unit := units[file]
 		importedValues := map[string]any{}
 		importedSyms := map[string]symbol{}
@@ -140,6 +150,9 @@ func loadModuleGraph(entryAbs string, ctx projectContext) (map[string]*moduleUni
 		if units[fileAbs] != nil && containsString(order, fileAbs) {
 			return nil
 		}
+		if isStdModulePath(fileAbs) && containsString(order, fileAbs) {
+			return nil
+		}
 		if visitingSet[fileAbs] {
 			cycle := append(append([]string{}, visiting...), fileAbs)
 			return &Diagnostic{
@@ -147,6 +160,17 @@ func loadModuleGraph(entryAbs string, ctx projectContext) (map[string]*moduleUni
 				Message: "Import cycle: " + strings.Join(displayPaths(cycle, ctx.ProjectRoot), " -> ") + ".",
 				File:    fileAbs,
 			}
+		}
+		if isStdModulePath(fileAbs) {
+			if _, d := loadStdModule(stdImportFromPath(fileAbs)); d != nil {
+				d.File = fileAbs
+				return d
+			}
+			if !containsString(order, fileAbs) {
+				order = append(order, fileAbs)
+			}
+			units[fileAbs] = &moduleUnit{File: fileAbs, Program: &Program{File: fileAbs}, ImportPos: map[string]Position{}}
+			return nil
 		}
 		visitingSet[fileAbs] = true
 		visiting = append(visiting, fileAbs)
@@ -193,6 +217,14 @@ func loadModuleGraph(entryAbs string, ctx projectContext) (map[string]*moduleUni
 }
 
 func resolveImportPath(importPath string, pos Position, fromFile string, ctx projectContext) (string, *Diagnostic) {
+	if isReservedStdImport(importPath) {
+		if _, d := loadStdModule(importPath); d != nil {
+			d.File = fromFile
+			d.Pos = pos
+			return "", d
+		}
+		return stdModulePath(importPath), nil
+	}
 	expanded := expandAlias(importPath, ctx.Aliases)
 	if expanded == "" {
 		return "", &Diagnostic{
@@ -298,6 +330,8 @@ func symbolFromValue(value any) symbol {
 		return symbol{kind: "struct", arity: -1}
 	case *builtinFunction:
 		return symbol{kind: "builtin", arity: -1}
+	case *dictValue, *nativeHandle, *httpReplyValue:
+		return symbol{kind: "value", arity: -1}
 	default:
 		return symbol{kind: "value", arity: -1}
 	}
