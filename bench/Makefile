@@ -9,11 +9,13 @@
 #   make check   — verify all implementations produce the correct stdout
 #   make count   — count tokens and write results/density*.csv + density.md
 #   make bench   — run both in sequence
-#   make llm-dry    — validate LLM harness runners with reference solutions (not a benchmark)
-#   make llm-ollama — live 2-task smoke suite using local Ollama
-#   make llm-core   — live 5-task core suite with 3 replicates
+#   make llm-dry       — validate LLM harness (smoke reference solutions)
+#   make llm-dry-intent — validate intent_v1 reference solutions
+#   make llm-ollama    — live 2-task smoke suite using local Ollama
+#   make llm-core      — live core_v2 (includes parity toys; historical tables)
+#   make llm-intent    — live intent_v1 (filter/map/count + repair/mod)
 
-.PHONY: bench check count sync llm-dry llm-ollama llm-core
+.PHONY: bench check count sync llm-dry llm-dry-intent llm-ollama llm-core llm-intent
 
 bench: check count
 
@@ -29,6 +31,9 @@ count: sync
 llm-dry: sync
 	uv run python llm/harness/run_generate_repair.py --dry-run --suite smoke
 
+llm-dry-intent: sync
+	uv run python llm/harness/run_generate_repair.py --dry-run --suite intent --langs vol,python
+
 # Optional overrides:
 #   make llm-ollama MODEL=llama3.1:8b
 #   make llm-ollama TASKS=06-where-sum REQUEST_TIMEOUT=30
@@ -42,3 +47,6 @@ llm-ollama: sync
 LANGS ?= vol,python
 llm-core: sync
 	uv run python llm/harness/run_generate_repair.py --provider ollama --model $(MODEL) --suite core --langs $(LANGS) --replicates 3 --tasks "$(TASKS)" $(if $(REQUEST_TIMEOUT),--request-timeout $(REQUEST_TIMEOUT),)
+
+llm-intent: sync
+	uv run python llm/harness/run_generate_repair.py --provider ollama --model $(MODEL) --suite intent --langs $(LANGS) --replicates 3 --tasks "$(TASKS)" $(if $(REQUEST_TIMEOUT),--request-timeout $(REQUEST_TIMEOUT),)

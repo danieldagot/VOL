@@ -1,0 +1,5 @@
+nums := [3, 8, 1, 12, 5, 9, 4, 15, 2, 11]
+print nums.count(_ > 5)
+print nums.where(_ > 5).sum()
+print nums.where(_ > 5).map(_ * 2).sum()
+print nums.count(_ < 5)

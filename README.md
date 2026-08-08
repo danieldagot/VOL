@@ -313,15 +313,17 @@ bench            source token density benchmark (VOL vs Python/Go/Rust/Zig)
 
 ## Source Token Density Benchmark
 
-On 13 equivalent small programs, VOL currently uses about:
+On 16 equivalent small programs, VOL currently uses about:
 
-- **~13% fewer tokens than Python**
-- **~43% fewer tokens than Go**
+- **~13% fewer tokens than Python** (all-suite median)
+- **~17% fewer than Python** on the **compression** tier (filter/map/count/sum,
+  bare numeric output — best read for semantic density)
+- **~47% fewer tokens than Go**
 - **~39% fewer tokens than Rust**
 - **~62% fewer tokens than Zig**
 
-(median across the suite; nearly the same under both `cl100k_base` and
-`o200k_base`)
+(medians; nearly the same under both `cl100k_base` and `o200k_base`. Reports also
+split **labeled** vs **parity** tiers — see [`bench/README.md`](bench/README.md).)
 
 That is source size only — hand-written programs that print the same output. It
 does **not** measure whether an LLM generates correct VOL more easily, or how

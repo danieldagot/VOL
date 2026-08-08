@@ -98,7 +98,7 @@ must not be mixed into v1.1 tables.
 
 Smoke validates wiring. It is not sufficient evidence for a language claim.
 
-### 4.2 Core suite (5 tasks)
+### 4.2 Core suite (5 tasks) — `core_v2` (published continuity)
 
 | ID | Workflow | Intent exercised |
 | --- | --- | --- |
@@ -107,6 +107,22 @@ Smoke validates wiring. It is not sufficient evidence for a language claim.
 | `10-fibonacci` | generation | loop, mutable state, iterative computation |
 | `11-leaderboard` | modification | preserve and extend a working program |
 | `13-temperatures` | generation | aggregation, categories, multiple invariants |
+
+Includes parity-style tasks (fibonacci, arrays). Keep for continuity with
+published Gemini tables. For “does the LLM use VOL intent ops?” prefer §4.2b.
+
+### 4.2b Intent suite (5 tasks) — `intent_v1` (language-use claims)
+
+| ID | Workflow | Intent exercised |
+| --- | --- | --- |
+| `06-where-sum` | generation | filter + sum |
+| `14-pipeline-stats` | generation | count / where / map / sum pipeline |
+| `16-map-filter` | generation | map then count/sum |
+| `08-strings-assert` | diagnostic repair | fix seeded failure using real runner diagnostics |
+| `11-leaderboard` | modification | preserve and extend a working program |
+
+Harness: `--suite intent`. Do not merge `intent_v1` rows into `core_v2` result
+tables. Optional compression add-on: `15-band-counts` via `--tasks`.
 
 Run each `(task, language)` at least three times. Report results separately by
 workflow kind as well as in aggregate.

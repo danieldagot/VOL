@@ -1,0 +1,6 @@
+vals := [22, 18, 25, 31, 29, 17, 24, 28, 20, 26]
+print vals.len
+print vals.sum() / vals.len
+print vals.count(_ >= 28)
+print vals.count(_ >= 20 and _ < 28)
+print vals.count(_ < 20)

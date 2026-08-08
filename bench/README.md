@@ -39,7 +39,9 @@ Those require a generate/repair harness. Protocol:
 ```sh
 make llm-dry                      # reference solutions only — not an LLM result
 make llm-ollama                   # live 2-task smoke via local Ollama
-make llm-core                     # live 5-task core, 3 replicates
+make llm-core                     # live core_v2 (includes parity toys)
+make llm-intent                   # live intent_v1 (filter/map/count + repair/mod)
+make llm-dry-intent               # dry-run intent reference solutions
 make llm-ollama MODEL=llama3.1:8b
 # run one task, failing a model request after 30 seconds:
 make llm-ollama MODEL=llama3.1:8b TASKS=06-where-sum REQUEST_TIMEOUT=30
@@ -52,20 +54,21 @@ uv run python llm/harness/run_generate_repair.py --provider ollama --model llama
 uv run python llm/harness/run_generate_repair.py --provider gemini --suite smoke
 ```
 
-The workflow benchmark has a 2-task `smoke` suite for wiring checks and a
-5-task `core` suite (`core_v2`, protocol v1.1) for reported comparisons. Core
-covers generation, diagnostic-seeded repair, and modification, and defaults to
-three replicates. Default languages are `vol,python` (interpreter baseline);
-pass `--langs vol,go` or `--langs vol,python,go` for Go. Summaries report prompt
-vs completion and cold vs warm (card-amortized) totals:
+The workflow benchmark has:
+
+- `smoke` (`smoke_v1`) — wiring only
+- `core` (`core_v2`) — published continuity (includes fib/arrays parity)
+- **`intent` (`intent_v1`)** — prefer for language-use claims (filter/map/count
+  pipelines + repair + modification; no hello/fib toys)
+
+Default languages are `vol,python`. Summaries report prompt vs completion and
+cold vs warm (card-amortized) totals:
 
 ```sh
+# Prefer for “how does an LLM use VOL?”
+uv run python llm/harness/run_generate_repair.py --provider gemini --suite intent
+# Historical core_v2 shape only when comparing to published tables:
 uv run python llm/harness/run_generate_repair.py --provider gemini --suite core
-# VOL-only + merge frozen Python rows from a prior JSONL (same model/suite):
-uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol \
-  --baseline-jsonl llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.jsonl
-# optional compiled baseline:
-uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol,go
 ```
 
 **When to re-run Python:** only if the Python card, suite tasks, protocol, model,
@@ -73,8 +76,8 @@ temperature, or harness scoring change. VOL card tweaks, Fix-text diagnostics,
 source-check hygiene, and SF-1 surface polish can use `--langs vol` with
 `--baseline-jsonl` so the published JSONL/summary stays self-contained.
 
-The separate static-density benchmark below still contains 13 tasks. Those 13
-are not the LLM workflow suite.
+The separate static-density benchmark below has its own 16-task tiered suite.
+Those density tasks are not the LLM workflow suite.
 
 The published protocol-v1.1 (`core_v2`) Gemini run with the default Python
 baseline and `vol_v1` is
@@ -173,20 +176,35 @@ toolchain to be installed.
 
 ## Task suite
 
-All 13 tasks use only VOL features that are currently implemented in the
-interpreter (as of the VOL prototype). Each task has five equivalent
-implementations producing identical stdout.
+All tasks use only VOL features that are currently implemented in the
+interpreter. Each task has five equivalent implementations producing identical
+stdout. Tasks are tagged into tiers so print-label glue is not mistaken for
+semantic-density wins (see `harness/count_tokens.py` and reports).
 
-| ID | Intent | VOL features exercised |
-|----|--------|------------------------|
-| 01-hello | print variables | literals, `print`, `string()` |
-| 02-arithmetic | compute and print | `:=`, `=`, `+`, `*`, `-` |
-| 03-conditions | branch on bool + int | `if`/`else`, `and` |
-| 04-loops | countdown + fixed repeats | `while`, `repeat` |
-| 05-arrays-each | index, length, iterate | arrays, `.len`, `.each` |
-| 06-where-sum | filter + aggregate | `.where`, `.sum()`, `assert` |
-| 07-functions | two named functions | `fn`, `return` |
-| 08-strings-assert | string ops + assertion | `.len`, `+`, `assert` |
+| Tier | Role |
+|------|------|
+| **parity** | Control surface near Python (hello, loops, fib, …) |
+| **labeled** | Report-style string labels — sensitive to `print` / `string()` glue |
+| **compression** | Bare numeric output; filter / map / count / sum intent |
+
+| ID | Tier | Intent | VOL features exercised |
+|----|------|--------|------------------------|
+| 01-hello | parity | print variables | literals, `print`, `string()` |
+| 02-arithmetic | parity | compute and print | `:=`, `+`, `*`, `-` |
+| 03-conditions | parity | branch on bool + int | `? :`, `and` |
+| 04-loops | parity | countdown + fixed repeats | `while`, `repeat` |
+| 05-arrays-each | parity | index, length, iterate | arrays, `.len`, `.where`, `.each` |
+| 06-where-sum | compression | filter + aggregate | `.where`, `.sum()`, `assert` |
+| 07-functions | parity | two named functions | expression-body `fn` |
+| 08-strings-assert | parity | string ops + assertion | `.len`, `+`, `assert` |
+| 09-grade-report | labeled | multi-bucket report | `.count`, `.sum` |
+| 10-fibonacci | parity | sequence | `repeat`, multi-assign |
+| 11-leaderboard | labeled | compare aggregates | `.sum`, `.count`, `? :` |
+| 12-revenue | labeled | filter + sum report | `.where`, `.count`, `.sum` |
+| 13-temperatures | labeled | band report + asserts | `.count` |
+| 14-pipeline-stats | compression | count/sum/map pipeline | `.count`, `.where`, `.map`, `.sum` |
+| 15-band-counts | compression | bands, bare numbers | `.count`, `.sum`, `.len` |
+| 16-map-filter | compression | map then count/sum | `.map`, `.count`, `.where` |
 
 ### Equivalence rules
 
@@ -202,16 +220,20 @@ implementations producing identical stdout.
 
 ## Interpreting results
 
-A ratio below 1.0 on task 06-where-sum reflects VOL's `.where(...).sum()`
-compression compared with list comprehensions in Python, explicit filter loops
-in Go/Zig, or iterator chains in Rust.
+Reports include **median (all)** plus tier medians:
 
-Tasks 01–04 and 07–08 exercise constructs that are syntactically similar across
-languages. Differences there reflect keyword weight, required boilerplate
-(`fn main`, `package main`, `println!`, etc.), and type annotation requirements.
+- **median (compression)** — best read on VOL collection intent vs loops/comprehensions.
+- **median (labeled)** — moves a lot if `print` / string coercion changes; do not
+  treat as pure semantic-density proof.
+- **median (parity)** — control floor; often near Python.
 
-Do not generalize from 13 tasks. This suite exists to anchor the "denser syntax"
-claim to measured numbers, not to prove overall LLM workflow superiority.
+A ratio below 1.0 on compression tasks reflects `.where` / `.map` / `.count` /
+`.sum` versus list comprehensions (Python), explicit loops (Go/Zig), or iterator
+chains (Rust).
+
+Do not generalize from this small suite. It anchors the "denser syntax" claim to
+measured numbers, not LLM workflow superiority. See also
+[`TOKEN_EFFICIENCY.md`](../TOKEN_EFFICIENCY.md).
 
 ---
 

@@ -1,0 +1,8 @@
+{
+  "kind": "generation",
+  "source_checks": {
+    "vol": ["\\.(?:where|count|map)\\s*\\(", "\\.sum\\s*\\("],
+    "go": ["\\brange\\b"],
+    "python": ["\\bfor\\b|\\bsum\\s*\\(|\\blen\\s*\\("]
+  }
+}

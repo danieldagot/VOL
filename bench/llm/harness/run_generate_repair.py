@@ -69,12 +69,21 @@ PROMPTS_DIR = LLM_ROOT / "tasks"
 RESULTS_DIR = LLM_ROOT / "results"
 
 SMOKE_TASKS = ["01-hello", "07-functions"]
+# Historical / published tables — includes parity toys (fib, arrays). Keep frozen.
 CORE_TASKS = [
     "05-arrays-each",
     "08-strings-assert",
     "10-fibonacci",
     "11-leaderboard",
     "13-temperatures",
+]
+# Intent-ops + real workflows only (no hello/fib parity). Prefer for language-use claims.
+INTENT_TASKS = [
+    "06-where-sum",
+    "14-pipeline-stats",
+    "16-map-filter",
+    "08-strings-assert",
+    "11-leaderboard",
 ]
 
 # Cards bound to product surface freezes (SPEC.md §0). Next VOL bump is SF-2+.
@@ -1073,6 +1082,8 @@ def resolve_tasks(suite: str, only: list[str] | None) -> list[str]:
         tasks = list(SMOKE_TASKS)
     elif suite == "core":
         tasks = list(CORE_TASKS)
+    elif suite == "intent":
+        tasks = list(INTENT_TASKS)
     else:
         die(f"unknown suite: {suite}")
     if only:
@@ -1083,6 +1094,14 @@ def resolve_tasks(suite: str, only: list[str] | None) -> list[str]:
             if not (TASKS_DIR / t / "expected.txt").exists():
                 die(f"no expected.txt for task {t}")
     return tasks
+
+
+def suite_freeze_name(suite: str) -> str:
+    return {
+        "smoke": "smoke_v1",
+        "core": "core_v2",
+        "intent": "intent_v1",
+    }.get(suite, suite)
 
 
 def resolve_endpoint(provider: str, model_arg: str | None) -> tuple[str, str, str, float]:
@@ -1122,7 +1141,12 @@ def resolve_endpoint(provider: str, model_arg: str | None) -> tuple[str, str, st
 def main() -> None:
     load_environment()
     parser = argparse.ArgumentParser(description="VOL LLM workflow benchmark harness")
-    parser.add_argument("--suite", choices=["smoke", "core"], default="smoke")
+    parser.add_argument(
+        "--suite",
+        choices=["smoke", "core", "intent"],
+        default="smoke",
+        help="smoke=wiring; core=published core_v2 (includes parity); intent=filter/map/count + repair/mod",
+    )
     parser.add_argument(
         "--langs",
         default="vol,python",
@@ -1181,8 +1205,8 @@ def main() -> None:
 
     only = [t.strip() for t in args.tasks.split(",") if t.strip()] or None
     tasks = resolve_tasks(args.suite, only)
-    # core_v2: diagnostic-seeded repair + cold/warm summary (protocol v1.1)
-    suite_name = "smoke_v1" if args.suite == "smoke" else "core_v2"
+    # Freeze ids for result tables (protocol v1.1). Do not rename published core_v2.
+    suite_name = suite_freeze_name(args.suite)
 
     if args.dry_run:
         base_url, api_key, model_name, request_timeout = "", None, "dry-run/reference", 120.0

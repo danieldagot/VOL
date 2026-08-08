@@ -26,45 +26,22 @@ glyphs, `=>`, dual-return sugar, etc.).
 
 ## Current scoreboard (source density)
 
-Suite: 13 tasks × VOL / Python / Go / Rust / Zig. Regenerated after densifying
-VOL idioms (`.count`, `repeat`, expression-body `fn`, ternary, fewer temps) and
-adding Python baselines.
+Suite: **16 tasks** × VOL / Python / Go / Rust / Zig, with tiers:
 
-Median ratios (`cl100k_base` ≈ `o200k_base`):
+| Tier | Tasks | Use when judging… |
+| --- | --- | --- |
+| **compression** | 06, 14, 15, 16 | collection intent (prefer this for density claims) |
+| **labeled** | 09, 11, 12, 13 | report glue / future print·coercion impact |
+| **parity** | 01–05, 07–08, 10 | control near-Python floor |
 
-| Baseline | VOL / baseline | ≈ fewer tokens |
-| --- | ---: | ---: |
-| Python | **0.868** | **~13%** |
-| Go | **0.566** | **~43%** |
-| Rust | **0.610** | **~39%** |
-| Zig | **0.384** | **~62%** |
+Re-run `cd bench && make count` and read tier medians in
+[`bench/results/density.md`](bench/results/density.md). Headline README %s use
+**median (all)**; quote **median (compression)** when claiming semantic density.
 
-Full tables: [`bench/results/density.md`](bench/results/density.md).
-
-### Per-task VOL/Python (why 50% is hard)
-
-| Task | VOL/Python | Notes |
-| --- | ---: | --- |
-| 01-hello | 1.000 | Tied — label + concat tax |
-| 04-loops | 1.000 | Tied |
-| 05-arrays-each | 0.982 | Near tie |
-| 10-fibonacci | 0.938 | Already `repeat` + multi-assign |
-| 13-temperatures | 0.876 | Labels dominate |
-| 03-conditions | 0.868 | |
-| 07-functions | 0.878 | |
-| 11-leaderboard | 0.778 | |
-| 06-where-sum | 0.754 | Collection win |
-| 08-strings-assert | 0.711 | |
-| 12-revenue | 0.711 | |
-| 02-arithmetic | 0.676 | |
-| 09-grade-report | **0.619** | Best — `.count` pipelines |
-
-**Target “50% fewer than Python” (ratio 0.5) on this suite is not realistic**
-without either (a) strong display/print dynamics + suite rebalance, or
-(b) unfair golf. Zero tasks are at ≤0.5 today; best is 0.619.
-
-Realistic near-term vs Python after dynamics: **~20–35% fewer** on a
-compression-heavy mix — not 50% on the current 13.
+**Target “50% fewer than Python” (ratio 0.5) on median (all) is not realistic**
+without print/coercion dynamics + more compression tasks. Prefer improving
+**median (compression)** first; do not juice labeled tasks alone and call it a
+language win.
 
 ---
 
@@ -82,6 +59,90 @@ For workflow ROI (no new language features):
 4. Re-measure after every card cut; keep first-try %.
 
 ---
+
+## Really measure how an LLM uses VOL
+
+Density (`make count`) answers: “how short is good VOL a human already wrote?”  
+It does **not** answer: “what does a model emit, break, and repair?”
+
+Use [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md) + `bench/llm/harness/run_generate_repair.py`.
+
+### What to watch
+
+| Signal | Meaning |
+| --- | --- |
+| **First-try %** | Model can write runnable VOL from card + task |
+| **Success @ K** | Diagnostics + repair close the gap |
+| **Completion tokens** | How verbose the model’s VOL is |
+| **Cold total** | Full cost including re-sent language card |
+| **Warm total** | Cost if the card is amortized / cached |
+| **Failure mix** | parse / R0xx / wrong stdout / `source_check_failed` |
+| **Idioms emitted** | `.count` vs `.where.len` vs loops — does the card stick? |
+
+Protocol always gives a **matched language card** (not full `SPEC.md`). That is
+the fair “LLM without memorizing VOL” setup: task + compact card only.
+
+### Commands
+
+```sh
+cd bench
+
+# Wiring only (no API) — reference solutions must pass
+make llm-dry
+
+# Live smoke (2 tasks) — cheap sanity
+uv run python llm/harness/run_generate_repair.py \
+  --provider gemini --suite smoke --langs vol,python --replicates 1
+
+# Prefer intent_v1 for “how does an LLM use VOL?” (no fib/hello toys)
+uv run python llm/harness/run_generate_repair.py \
+  --provider gemini --suite intent --langs vol,python --replicates 3
+
+# Historical published table shape (includes parity — keep for continuity only)
+uv run python llm/harness/run_generate_repair.py \
+  --provider gemini --suite core --langs vol,python --replicates 3
+
+# Dry-run intent reference solutions (no API)
+make llm-dry-intent
+```
+
+Needs `GEMINI_API_KEY` (or another provider) in env / `.env`. Results land under
+`bench/llm/results/`.
+
+### Suites
+
+| Suite | Freeze id | Use for |
+| --- | --- | --- |
+| `smoke` | `smoke_v1` | Wiring only |
+| `core` | `core_v2` | Published continuity (includes fib / arrays parity) |
+| **`intent`** | **`intent_v1`** | **Real language-use claims** |
+
+`intent_v1` tasks:
+
+| ID | Kind | Why it is here |
+| --- | --- | --- |
+| `06-where-sum` | generation | filter + aggregate |
+| `14-pipeline-stats` | generation | count / where / map / sum pipeline |
+| `16-map-filter` | generation | map then count/sum |
+| `08-strings-assert` | repair | diagnostic repair workflow |
+| `11-leaderboard` | modification | edit a working program |
+
+Optional add-on (not in default intent): `15-band-counts` via `--tasks`.
+Do **not** mix `intent_v1` rows into `core_v2` tables.
+
+### Second model before claiming a win
+
+One Gemini flash-lite table is not enough. Re-run the same suite/protocol on ≥1
+other model before treating VOL vs Python workflow deltas as stable.
+
+### Decision rule
+
+> Ship language or card changes only if **first-try % stays high** and
+> **cold or warm tokens to success** drop vs the previous published JSONL —
+> not because hand-written density looked better.
+
+---
+
 
 ## Strategy: radical dynamics (not radical syntax)
 
@@ -173,18 +234,25 @@ are measured:
 
 - [ ] Cut `vol_v1` card; re-run `core_v2` (`--langs vol` + baseline JSONL).
 - [ ] Finish `vol fmt` rewriter with canonical table.
-- [ ] Publish ≥1 other model on `core_v2` before further sugar.
+- [ ] Publish ≥1 model on **`intent_v1`** (prefer over `core_v2` for language-use claims).
+- [ ] Publish ≥1 other model before treating workflow deltas as stable.
 
-### C. Suite (optional, honest)
+### C. Suite (honest measurement)
 
-- [ ] Add compression-heavy tasks (multi-filter reports) if claiming vs-Python density.
-- [ ] Keep a small “parity” set (hello/loops) so ties stay visible.
+- [x] Add compression-heavy tasks (`14-pipeline-stats`, `15-band-counts`, `16-map-filter`).
+- [x] Tier reporting in `count_tokens.py` (compression / labeled / parity).
+- [x] Keep parity set (hello/loops/fib) so ties stay visible.
+- [ ] After D1/D2 land, re-densify **labeled** VOL tasks and compare labeled median.
 
 ### D. Measurement hygiene
 
-- [ ] Always report tokenizer name + median + per-task.
+- [x] Report tokenizer name + median (all) + tier medians + per-task.
 - [ ] Always split density vs workflow; cold vs warm for LLM runs.
-- [ ] Never claim 50% vs Python until a measured median ≤ 0.50 on a documented suite.
+- [ ] Never claim 50% vs Python until a measured **median (compression)** ≤ 0.50
+      on a documented suite (not labeled-only).
+- [x] Lang tests lock current `print` / `string` / `R013` / `R029` so D1–D2 must
+      update SPEC + tests deliberately (`TestPrintDisplayForms`,
+      `TestStringConcatTypeMismatches`, `TestPrintRejectsNothing`).
 
 ---
 

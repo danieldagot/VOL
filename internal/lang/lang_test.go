@@ -244,6 +244,51 @@ func TestImprovedRuntimeTypeMessage(t *testing.T) {
 	}
 }
 
+func TestPrintDisplayForms(t *testing.T) {
+	output, diagnostic := run(t, `
+print 42
+print true
+print "hi"
+print [1, 2]
+print "n=" + string(7)
+print "ok" + "ay"
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	want := "42\ntrue\nhi\n[1, 2]\nn=7\nokay\n"
+	if output != want {
+		t.Fatalf("got %q want %q", output, want)
+	}
+}
+
+func TestPrintRejectsNothing(t *testing.T) {
+	_, diagnostic := run(t, `
+fn sink() {}
+print sink()
+`)
+	if diagnostic == nil || diagnostic.Code != "R029" {
+		t.Fatalf("got %#v", diagnostic)
+	}
+}
+
+func TestStringConcatTypeMismatches(t *testing.T) {
+	cases := []struct {
+		source string
+		frag   string
+	}{
+		{`print "count: " + 2`, "string and integer"},
+		{`print 2 + "count"`, "integer and string"},
+		{`print "flag: " + true`, "string and Boolean"},
+	}
+	for _, tc := range cases {
+		_, diagnostic := run(t, tc.source)
+		if diagnostic == nil || diagnostic.Code != "R013" || !strings.Contains(diagnostic.Message, tc.frag) {
+			t.Errorf("source %q: got %#v", tc.source, diagnostic)
+		}
+	}
+}
+
 func TestBuiltinArityIsResolved(t *testing.T) {
 	for _, source := range []string{"input(1, 2)", "assert()", "string()"} {
 		_, diagnostic := run(t, source)
