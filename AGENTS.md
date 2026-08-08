@@ -350,7 +350,7 @@ Current layout:
 cmd/vol          CLI entry point
 internal/lang    lexer, parser, AST, resolver, interpreter, diagnostics
 examples         executable VOL programs
-bench            source token density benchmark (VOL vs Go/Rust/Zig)
+bench            source token density benchmark (VOL vs Python/Go/Rust/Zig)
 ```
 
 Aspirational layout as the project grows:

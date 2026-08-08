@@ -308,16 +308,17 @@ Executable samples live under [`examples/`](examples/) — see
 cmd/vol          command-line entry point
 internal/lang    lexer, parser, AST, diagnostics, and interpreter
 examples         example VOL programs (basics, features, projects)
-bench            source token density benchmark (VOL vs Go/Rust/Zig)
+bench            source token density benchmark (VOL vs Python/Go/Rust/Zig)
 ```
 
 ## Source Token Density Benchmark
 
 On 13 equivalent small programs, VOL currently uses about:
 
-- **~36% fewer tokens than Go**
-- **~25% fewer tokens than Rust**
-- **~53% fewer tokens than Zig**
+- **~13% fewer tokens than Python**
+- **~43% fewer tokens than Go**
+- **~39% fewer tokens than Rust**
+- **~62% fewer tokens than Zig**
 
 (median across the suite; nearly the same under both `cl100k_base` and
 `o200k_base`)
@@ -329,6 +330,7 @@ workflow proof or as evidence that SF-1 is “LLM optimized.”
 
 Full per-task numbers: [`bench/results/density.md`](bench/results/density.md).
 How to run / regenerate: [`bench/README.md`](bench/README.md).
+Working preset to push density further (dynamics-first): [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md).
 
 ```text
 cd bench && uv sync && uv run python harness/count_tokens.py
@@ -341,9 +343,9 @@ prototype). Go remains an optional compiled baseline (`--langs vol,go`).
 
 One protocol-v1.1 (`core_v2`) run is published for `gemini-3.5-flash-lite`,
 temperature 0, three replicates, and at most two repair rounds — **VOL
-(`vol_v1` / SF-1-bound `core_v2` task card) vs Python**. VOL rows are a fresh
-live run; Python rows are reused from the prior frozen artifact via
-`--baseline-jsonl`. The suite has five tasks covering generation,
+(`vol_v1` / SF-1-bound `core_v2` task card) vs Python**. The published JSONL is
+self-contained (VOL live + frozen Python rows from the prior same-model run).
+The suite has five tasks covering generation,
 diagnostic-seeded repair, and modification. Summaries split prompt vs completion
 and report cold totals (card re-sent every request) plus warm totals (estimated
 language-card cost amortized away).
@@ -356,10 +358,7 @@ language-card cost amortized away).
 VOL matched Python on **first-try** and **success @ K**, used about **11.2% more
 cold** workflow tokens, and about **3.3% fewer warm** tokens once the card is
 amortized. Completions were about 18.7% smaller; prompts about 17.7% larger.
-Card size is ~436 tokens (`vol_v1`) vs Python ~336. An earlier table
-(`20260808-040028`) is **superseded**: it required `\.where(` while the card
-taught `.count`, which forced fake repair rounds and poisoned first-try / token
-totals.
+Card size is ~436 tokens (`vol_v1`) vs Python ~336.
 
 This small synthetic run still does **not** prove real-world LLM superiority or
 runtime performance. A second model on `core_v2` is needed before treating

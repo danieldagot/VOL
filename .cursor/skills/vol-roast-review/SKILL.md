@@ -27,7 +27,7 @@ anymore—those were merged into `SPEC.md`.
 | `internal/lang/` | Lexer, parser, AST, resolver, interpreter, diagnostics, tests |
 | `examples/*.vol` | Executable examples claimed by README |
 | `cmd/vol/` | CLI (`vol run`, `--json` diagnostics) |
-| `bench/` | Source token density benchmark (VOL vs Go/Rust/Zig; not LLM generate/repair) |
+| `bench/` | Source token density benchmark (VOL vs Python/Go/Rust/Zig; not LLM generate/repair) |
 
 Optional / may be absent (note if missing when relevant):
 
@@ -52,7 +52,7 @@ Use this snapshot before roasting—do not pretend the repo is still pre-`SPEC.m
   conformance examples, **§11 Decided** core rules (mutability default, overflow,
   purity intent, `if` vs `? :`, permanent `while`, etc.).
 - **Partially evidenced LLM claim:** `bench/` measures **source token density**
-  on 13 equivalent tasks (~36% fewer tokens than Go median, etc.)—not task success,
+  on 13 equivalent tasks (~13% fewer than Python / ~43% fewer than Go median, etc.)—not task success,
   compile failures, or repair cost.
 - **Still missing / vision-only:** static types, ownership/borrow, structs, modules,
   generics, native backend, formatter, `LLM_BENCHMARK.md`, enforced `.where` purity

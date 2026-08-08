@@ -1,5 +1,3 @@
-numbers := [4, 7, 2, 9, 12]
-large := numbers.where(_ > 5)
-total := large.sum()
+total := [4, 7, 2, 9, 12].where(_ > 5).sum()
 print "Sum: " + string(total)
-assert(total == 28, "Unexpected collection total.")
+assert(total == 28, "sum")

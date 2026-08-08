@@ -40,9 +40,11 @@ TASKS_DIR = REPO_ROOT / "tasks"
 RESULTS_DIR = REPO_ROOT / "results"
 
 TOKENIZERS = ["cl100k_base", "o200k_base"]
-LANGS = ["vol", "go", "rust", "zig"]
+LANGS = ["vol", "python", "go", "rust", "zig"]
+BASELINES = ["python", "go", "rust", "zig"]
 SOURCES = {
     "vol": "main.vol",
+    "python": "main.py",
     "go": "main.go",
     "rust": "main.rs",
     "zig": "main.zig",
@@ -60,27 +62,35 @@ def fmt_ratio(r: float) -> str:
 def build_table(rows: list[dict], tok_name: str) -> str:
     header = (
         f"## Token density — tokenizer: `{tok_name}`\n\n"
-        "| Task | VOL | Go | Rust | Zig | VOL/Go | VOL/Rust | VOL/Zig |\n"
-        "|------|-----|----|------|-----|--------|----------|---------|\n"
+        "| Task | VOL | Python | Go | Rust | Zig "
+        "| VOL/Python | VOL/Go | VOL/Rust | VOL/Zig |\n"
+        "|------|-----|--------|----|------|-----"
+        "|------------|--------|----------|---------|\n"
     )
     body_lines = []
     for r in rows:
         body_lines.append(
             f"| {r['task']} "
             f"| {r['vol']} "
+            f"| {r['python']} "
             f"| {r['go']} "
             f"| {r['rust']} "
             f"| {r['zig']} "
+            f"| {fmt_ratio(r['vol/python'])} "
             f"| {fmt_ratio(r['vol/go'])} "
             f"| {fmt_ratio(r['vol/rust'])} "
             f"| {fmt_ratio(r['vol/zig'])} |"
         )
-    med_go = statistics.median(r["vol/go"] for r in rows)
-    med_rust = statistics.median(r["vol/rust"] for r in rows)
-    med_zig = statistics.median(r["vol/zig"] for r in rows)
+    medians = {
+        baseline: statistics.median(r[f"vol/{baseline}"] for r in rows)
+        for baseline in BASELINES
+    }
     body_lines.append(
-        f"| **median** | | | | | **{fmt_ratio(med_go)}** "
-        f"| **{fmt_ratio(med_rust)}** | **{fmt_ratio(med_zig)}** |"
+        "| **median** | | | | | "
+        f"| **{fmt_ratio(medians['python'])}** "
+        f"| **{fmt_ratio(medians['go'])}** "
+        f"| **{fmt_ratio(medians['rust'])}** "
+        f"| **{fmt_ratio(medians['zig'])}** |"
     )
     return header + "\n".join(body_lines) + "\n"
 
@@ -95,7 +105,7 @@ def main() -> None:
 
     combined_sections: list[str] = [
         "# VOL Source Token Density\n",
-        "Measures how many tokens equivalent VOL programs use relative to Go, Rust, and Zig.",
+        "Measures how many tokens equivalent VOL programs use relative to Python, Go, Rust, and Zig.",
         "A ratio < 1.0 means VOL is denser (fewer tokens) under that tokenizer.\n",
         "> **What this measures:** source token density of hand-written equivalent programs.",
         "> **What this does not measure:** LLM task-success rate or generate/repair cost.",
@@ -114,14 +124,14 @@ def main() -> None:
                 src = task / lang / SOURCES[lang]
                 text = src.read_text()
                 row[lang] = count_tokens(text, enc)
-            for baseline in ("go", "rust", "zig"):
+            for baseline in BASELINES:
                 row[f"vol/{baseline}"] = row["vol"] / row[baseline]
             rows.append(row)
 
         # CSV
         csv_path = RESULTS_DIR / f"density_{tok_name}.csv"
-        fieldnames = ["task"] + LANGS + ["vol/go", "vol/rust", "vol/zig"]
-        with open(csv_path, "w", newline="") as f:
+        fieldnames = ["task"] + LANGS + [f"vol/{b}" for b in BASELINES]
+        with csv_path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             for r in rows:
@@ -129,28 +139,33 @@ def main() -> None:
                     {
                         "task": r["task"],
                         **{lang: r[lang] for lang in LANGS},
-                        "vol/go": fmt_ratio(r["vol/go"]),
-                        "vol/rust": fmt_ratio(r["vol/rust"]),
-                        "vol/zig": fmt_ratio(r["vol/zig"]),
+                        **{f"vol/{b}": fmt_ratio(r[f"vol/{b}"]) for b in BASELINES},
                     }
                 )
 
         # Per-tokenizer markdown
         table_md = build_table(rows, tok_name)
         md_path = RESULTS_DIR / f"density_{tok_name}.md"
-        md_path.write_text(table_md)
+        md_path.write_text(table_md, encoding="utf-8")
 
         combined_sections.append(table_md)
 
-        med_go = statistics.median(r["vol/go"] for r in rows)
-        med_rust = statistics.median(r["vol/rust"] for r in rows)
-        med_zig = statistics.median(r["vol/zig"] for r in rows)
-        print(f"[{tok_name}]  median VOL/Go={fmt_ratio(med_go)}  VOL/Rust={fmt_ratio(med_rust)}  VOL/Zig={fmt_ratio(med_zig)}")
+        medians = {
+            baseline: statistics.median(r[f"vol/{baseline}"] for r in rows)
+            for baseline in BASELINES
+        }
+        print(
+            f"[{tok_name}]  median"
+            f" VOL/Python={fmt_ratio(medians['python'])}"
+            f"  VOL/Go={fmt_ratio(medians['go'])}"
+            f"  VOL/Rust={fmt_ratio(medians['rust'])}"
+            f"  VOL/Zig={fmt_ratio(medians['zig'])}"
+        )
         print(f"  Wrote {csv_path.relative_to(REPO_ROOT)}")
         print(f"  Wrote {md_path.relative_to(REPO_ROOT)}")
 
     combined_path = RESULTS_DIR / "density.md"
-    combined_path.write_text("\n".join(combined_sections) + "\n")
+    combined_path.write_text("\n".join(combined_sections) + "\n", encoding="utf-8")
     print(f"\nCombined report: {combined_path.relative_to(REPO_ROOT)}")
 
 

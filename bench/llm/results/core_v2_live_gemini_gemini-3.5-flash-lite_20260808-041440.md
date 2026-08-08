@@ -10,7 +10,7 @@
 - Surface freeze: Python=SF-0, VOL=SF-1
 - Cards: `python_v0.md` (SF-0), `vol_v1.md` (SF-1)
 - Card tokens (est. `cl100k_base`): Python=336, VOL=436
-- Baseline reuse: live langs=[vol]; frozen rows from `bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.jsonl`
+- Baseline reuse: live langs=[vol]; frozen Python rows merged from the prior live run (same model/suite)
 
 > Live API run. Recompute from committed JSONL if numbers are quoted.
 

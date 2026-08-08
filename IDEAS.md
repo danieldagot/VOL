@@ -46,7 +46,7 @@ Immediate documentation and design work:
 - [x] Publish frozen `core_v2` with default Python baseline (`--langs vol,python`).
 - [ ] Publish ≥1 other model on `core_v2` before treating LLM results as stable.
 - [x] Re-run / publish against `vol_v1` after source-check hygiene (`.count`/`.where`);
-      published `20260808-041440` (`…040028` superseded); second model still needed.
+      published `20260808-041440`; second model still needed.
 - [x] **Density / unwrap surface (in SF-1)** — `.map` / `.count`, if-let /
       `??` / `?` shipped in SPEC. Shipped surface ≠ proven LLM workflow win;
       measure before further sugar (`LLM_BENCHMARK.md`).
@@ -573,10 +573,15 @@ tiny suite — not a broad LLM claim. Do not treat SF-1 itself as proven
 optimization.
 
 **Static source token density** (step 1 — implemented) is measured in
-[`bench/`](bench/README.md): hand-written equivalent programs in VOL, Go, Rust,
-and Zig are compared by token count under named OpenAI tokenizers
+[`bench/`](bench/README.md): hand-written equivalent programs in VOL, Python, Go,
+Rust, and Zig are compared by token count under named OpenAI tokenizers
 (`cl100k_base`, `o200k_base`). That benchmark measures source density only —
 not LLM task-success efficiency. Never cite density ratios as workflow proof.
+
+**Working preset (continue here):** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) —
+maximize density + workflow via radical dynamics (coercion, multi-arg `print`,
+collection intent) rather than radical new syntax; ranked next actions and
+realistic vs-Python targets.
 
 ## Open Design Questions
 

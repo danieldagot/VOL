@@ -1,9 +1,7 @@
 revenue := [240, 175, 289, 150, 225, 199, 180, 178]
-
-high_value := revenue.where(_ >= 200)
-budget := revenue.where(_ < 200)
+premium := revenue.where(_ >= 200)
 
 print "Total revenue: " + string(revenue.sum())
-print "Premium orders (200+): " + string(high_value.len)
-print "Premium revenue: " + string(high_value.sum())
-print "Budget orders: " + string(budget.len)
+print "Premium orders (200+): " + string(premium.len)
+print "Premium revenue: " + string(premium.sum())
+print "Budget orders: " + string(revenue.count(_ < 200))

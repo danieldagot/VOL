@@ -449,8 +449,7 @@ cannot be recomputed from committed JSONL.
 - [x] Surface Freeze SF-1; `vol_v1.md` = `core_v2` task card (SF-1-bound subset)
 - [ ] Publish ≥1 other model on `core_v2` before further syntax optimization
 - [x] Re-run / publish `core_v2` against `vol_v1`
-      (`20260808-041440`; Python via `--baseline-jsonl` from `…040028`;
-      `…040028` VOL numbers poisoned by `.where`-only source checks — superseded)
+      (`20260808-041440`; includes frozen Python rows from the prior live run)
 - [x] `11-leaderboard` / `13-temperatures` source checks accept `.count` or `.where`
 - [x] Harness `--baseline-jsonl` for VOL-only republish with frozen Python rows
 

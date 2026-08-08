@@ -76,6 +76,21 @@ def check_task(
     elif stdout != expected:
         errors.append(f"vol: stdout mismatch\n    got:      {stdout!r}\n    expected: {expected!r}")
 
+    # Python
+    if available["python"]:
+        stdout, stderr, rc = run(
+            [sys.executable, str(task_dir / "python" / "main.py")]
+        )
+        if rc != 0:
+            detail = stderr.strip().splitlines()[0] if stderr.strip() else "(no output)"
+            errors.append(f"python: exit {rc} — {detail}")
+        elif stdout != expected:
+            errors.append(
+                f"python: stdout mismatch\n    got:      {stdout!r}\n    expected: {expected!r}"
+            )
+    else:
+        errors.append("python: toolchain not found (skipped)")
+
     # Go
     if available["go"]:
         stdout, stderr, rc = run(["go", "run", str(task_dir / "go" / "main.go")])
@@ -125,6 +140,7 @@ def check_task(
 def main() -> None:
     vol_prefix, vol_cwd = get_vol_runner()
     available = {
+        "python": sys.version_info >= (3, 11),
         "go": tool_available("go"),
         "rust": tool_available("rustc"),
         "zig": tool_available("zig"),

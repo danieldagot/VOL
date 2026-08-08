@@ -1,8 +1,3 @@
 temperature := 24
 sunny := true
-
-if temperature >= 20 and sunny {
-    print "Good weather for a walk."
-} else {
-    print "Stay inside and write VOL."
-}
+print temperature >= 20 and sunny ? "Good weather for a walk." : "Stay inside and write VOL."

@@ -7,9 +7,9 @@ living inside the VOL repository at `bench/`.
 contains no `.go` files. Python artifacts (`.venv/`, `__pycache__/`) are
 listed in the root `.gitignore`.
 
-Measures how many tokens equivalent VOL programs use relative to Go, Rust, and
-Zig under named OpenAI tokenizers. Ratios are computed per task and summarized
-as a median across the suite.
+Measures how many tokens equivalent VOL programs use relative to Python, Go,
+Rust, and Zig under named OpenAI tokenizers. Ratios are computed per task and
+summarized as a median across the suite.
 
 ---
 
@@ -63,7 +63,7 @@ vs completion and cold vs warm (card-amortized) totals:
 uv run python llm/harness/run_generate_repair.py --provider gemini --suite core
 # VOL-only + merge frozen Python rows from a prior JSONL (same model/suite):
 uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol \
-  --baseline-jsonl llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-040028.jsonl
+  --baseline-jsonl llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.jsonl
 # optional compiled baseline:
 uv run python llm/harness/run_generate_repair.py --provider gemini --suite core --langs vol,go
 ```
@@ -78,10 +78,9 @@ are not the LLM workflow suite.
 
 The published protocol-v1.1 (`core_v2`) Gemini run with the default Python
 baseline and `vol_v1` is
-[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md)
-(Python rows reused from `…040028.jsonl`). Both languages reached 100% first-try
-and success @ K; VOL was about +11.2% cold / −3.3% warm vs Python (card ~436 vs
-~336). The earlier `…040028` table is superseded (source-check mismatch).
+[`llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md).
+Both languages reached 100% first-try and success @ K; VOL was about +11.2% cold
+/ −3.3% warm vs Python (card ~436 vs ~336).
 
 `--tasks` accepts a comma-separated list of task IDs (for example,
 `01-hello,07-functions`). `--request-timeout SECONDS` caps each model API
@@ -175,7 +174,7 @@ toolchain to be installed.
 ## Task suite
 
 All 13 tasks use only VOL features that are currently implemented in the
-interpreter (as of the VOL prototype). Each task has four equivalent
+interpreter (as of the VOL prototype). Each task has five equivalent
 implementations producing identical stdout.
 
 | ID | Intent | VOL features exercised |
@@ -194,6 +193,7 @@ implementations producing identical stdout.
 - Same observable stdout (and exit 0).
 - Required language boilerplate only — no golfing, no artificial padding.
 - Idiomatic style in each language.
+- Python: single-file `main.py` with `python3` (stdlib only).
 - Rust: single-file `main.rs` with `rustc` (no Cargo.toml boilerplate).
 - Zig: single-file `main.zig` with `zig run`.
 - Go: `go run main.go` (no external modules, only `fmt`).
@@ -203,13 +203,12 @@ implementations producing identical stdout.
 ## Interpreting results
 
 A ratio below 1.0 on task 06-where-sum reflects VOL's `.where(...).sum()`
-compression compared with explicit filter loops in Go/Zig or iterator chains in
-Rust.
+compression compared with list comprehensions in Python, explicit filter loops
+in Go/Zig, or iterator chains in Rust.
 
 Tasks 01–04 and 07–08 exercise constructs that are syntactically similar across
-all four languages. Differences there reflect keyword weight, required
-boilerplate (`fn main`, `package main`, `println!`, etc.), and type annotation
-requirements.
+languages. Differences there reflect keyword weight, required boilerplate
+(`fn main`, `package main`, `println!`, etc.), and type annotation requirements.
 
 Do not generalize from 13 tasks. This suite exists to anchor the "denser syntax"
 claim to measured numbers, not to prove overall LLM workflow superiority.

@@ -1,8 +1,5 @@
 temps = [22, 18, 25, 31, 29, 17, 24, 28, 20, 26]
-total = 0
-hot = 0
-mild = 0
-cold = 0
+total = hot = mild = cold = 0
 for t in temps:
     total += t
     if t >= 28:
@@ -12,8 +9,7 @@ for t in temps:
     else:
         cold += 1
 avg = total // len(temps)
-if hot + mild + cold != len(temps) or avg != 24:
-    raise AssertionError("invalid temperature report")
+assert hot + mild + cold == len(temps) and avg == 24, "invalid temperature report"
 print("Days measured: " + str(len(temps)))
 print("Average: " + str(avg))
 print("Hot days (28+): " + str(hot))

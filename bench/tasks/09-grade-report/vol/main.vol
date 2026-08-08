@@ -1,13 +1,7 @@
 scores := [85, 72, 91, 60, 78, 95, 55, 68, 88, 74]
 
-a_grades := scores.where(_ >= 90)
-b_grades := scores.where(_ >= 80).where(_ < 90)
-passing := scores.where(_ >= 60)
-failing := scores.where(_ < 60)
-avg := scores.sum() / scores.len
-
-print "Class average: " + string(avg)
-print "A grades: " + string(a_grades.len)
-print "B grades: " + string(b_grades.len)
-print "Passing: " + string(passing.len)
-print "Failing: " + string(failing.len)
+print "Class average: " + string(scores.sum() / scores.len)
+print "A grades: " + string(scores.count(_ >= 90))
+print "B grades: " + string(scores.count(_ >= 80 and _ < 90))
+print "Passing: " + string(scores.count(_ >= 60))
+print "Failing: " + string(scores.count(_ < 60))
