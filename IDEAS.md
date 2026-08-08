@@ -45,8 +45,9 @@ Immediate documentation and design work:
 - [ ] Publish ≥1 other model on `core_v2` before treating LLM results as stable.
 - [x] Re-run / publish against `vol_v1` / SF-1 (`core_v2` Gemini 20260808-040028);
       second model still needed before treating numbers as stable.
-- [x] **Token-efficient syntax (in SF-1)** — see [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md)
-      (unwrap redesign + density sugar shipped; measure before further sugar).
+- [x] **Token-efficient syntax (in SF-1)** — unwrap redesign + density sugar
+      (`.map` / `.count`, if-let / `??` / `?`) shipped in SPEC; measure before
+      further sugar (`LLM_BENCHMARK.md`).
 
 ## Near-Term Foundation
 

@@ -20,7 +20,6 @@ Related docs:
 | [`README.md`](README.md) | Project status and examples |
 | [`IDEAS.md`](IDEAS.md) | Planned features and open questions |
 | [`AGENTS.md`](AGENTS.md) | Project vision and contribution rules |
-| [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) | Token-efficiency notes (SF-1 unwrap + density sugar) |
 | [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | LLM language card for SF-1 (current) |
 | [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | LLM language card for SF-0 (historical `core_v2` tables) |
 

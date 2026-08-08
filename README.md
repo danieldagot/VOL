@@ -118,8 +118,7 @@ in [`IDEAS.md`](IDEAS.md).
 
 See [`SPEC.md`](SPEC.md) for vocabulary, syntax, and formal behavior of the
 current interpreter, and [`IDEAS.md`](IDEAS.md) for future work and open design
-questions. Token-efficiency notes (unwrap + density sugar in SF-1) are in
-[`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md).
+questions.
 
 ## Supported Examples
 
