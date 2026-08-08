@@ -20,14 +20,14 @@ print value.where(_ == value[0]).len }`)
 		t.Fatalf("statement = %#v", program.Statements[0])
 	}
 	printStatement := block.Body.Statements[1].(*PrintStatement)
-	outerIndex, ok := printStatement.Value.(*Index)
+	outerIndex, ok := printStatement.Values[0].(*Index)
 	if !ok {
-		t.Fatalf("print expression = %T", printStatement.Value)
+		t.Fatalf("print expression = %T", printStatement.Values[0])
 	}
 	if _, ok := outerIndex.Collection.(*Index); !ok {
 		t.Fatalf("nested index collection = %T", outerIndex.Collection)
 	}
-	property := block.Body.Statements[2].(*PrintStatement).Value.(*Property)
+	property := block.Body.Statements[2].(*PrintStatement).Values[0].(*Property)
 	if property.Name.Lexeme != "len" {
 		t.Fatalf("property name = %q", property.Name.Lexeme)
 	}
@@ -41,7 +41,7 @@ func TestParserOperatorPrecedence(t *testing.T) {
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
 	}
-	expression := program.Statements[0].(*PrintStatement).Value
+	expression := program.Statements[0].(*PrintStatement).Values[0]
 	or, ok := expression.(*Binary)
 	if !ok || or.Operator.Kind != TokenOr {
 		t.Fatalf("root = %#v", expression)
@@ -65,7 +65,7 @@ func TestParserNotBindsAfterComparison(t *testing.T) {
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
 	}
-	expression := program.Statements[0].(*PrintStatement).Value
+	expression := program.Statements[0].(*PrintStatement).Values[0]
 	not, ok := expression.(*Unary)
 	if !ok || not.Operator.Kind != TokenNot {
 		t.Fatalf("root = %#v", expression)

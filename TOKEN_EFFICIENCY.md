@@ -26,37 +26,35 @@ glyphs, `=>`, dual-return sugar, etc.).
 
 ## Current scoreboard (source density)
 
-Suite: **16 tasks** × VOL / Python / Go / Rust / Zig, with tiers:
+Suite: **16 tasks** × VOL / Python / Go / Rust / Zig (SF-2 densified VOL), tiers:
 
 | Tier | Tasks | Use when judging… |
 | --- | --- | --- |
 | **compression** | 06, 14, 15, 16 | collection intent (prefer this for density claims) |
-| **labeled** | 09, 11, 12, 13 | report glue / future print·coercion impact |
+| **labeled** | 09, 11, 12, 13 | report glue (multi-arg `print` / coercion) |
 | **parity** | 01–05, 07–08, 10 | control near-Python floor |
 
-Re-run `cd bench && make count` and read tier medians in
-[`bench/results/density.md`](bench/results/density.md). Headline README %s use
-**median (all)**; quote **median (compression)** when claiming semantic density.
+Post-SF-2 medians (`cl100k_base`): all VOL/Python **0.805** (~20% fewer);
+compression **0.799**; labeled **0.651** (~35% fewer). See
+[`bench/results/density.md`](bench/results/density.md).
 
-**Target “50% fewer than Python” (ratio 0.5) on median (all) is not realistic**
-without print/coercion dynamics + more compression tasks. Prefer improving
-**median (compression)** first; do not juice labeled tasks alone and call it a
-language win.
+**Target “50% fewer than Python” (ratio 0.5) on median (all) is still hard**;
+prefer improving **median (compression)** further without unfair golf.
 
 ---
 
 ## LLM workflow (separate track)
 
-Published Gemini `core_v2` (`vol_v1` vs Python): 100% first-try / success @ K;
-completions ~18.7% smaller; **cold** ~+11% (card tax); **warm** ~−3.3%.
-Card ~436 vs Python ~336.
+Historical Gemini `core_v2` (`vol_v1` / SF-1 vs Python): 100% first-try /
+success @ K; completions ~18.7% smaller; **cold** ~+11%; **warm** ~−3.3%.
+Harness default is now `vol_v2` / SF-2 — re-run `intent_v1` before quoting wins.
 
-For workflow ROI (no new language features):
+For workflow ROI under SF-2:
 
-1. Shrink `bench/llm/cards/vol_v1.md` toward ≤ Python card size.
+1. Keep `vol_v2` lean (≤ Python card when possible).
 2. Ship `vol fmt` with one canonical form per intent (`_` in collection ops).
 3. Move “don’t write X” from card → diagnostic `fix`.
-4. Re-measure after every card cut; keep first-try %.
+4. Re-measure `intent_v1` after card cuts; keep first-try %.
 
 ---
 
@@ -148,46 +146,32 @@ other model before treating VOL vs Python workflow deltas as stable.
 
 Same look; change **what you can omit** and **how values flow**.
 
-### D1 — Coercion in string context (highest language ROI)
-
-Today: `"a" + 1` → `R013`; pay `string(...)`.
-
-Desired dynamic:
+### D1 — Coercion in string context ✓ SF-2
 
 ```vol
 print "Sum: " + total    // string + displayable → concat
 ```
 
-Keep `1 + "a"` / ambiguous numeric+string rejected if needed.
-Still need `string(v)` for explicit convert in non-concat contexts.
+`1 + "a"` stays `R013`. Keep `string(v)` for non-concat contexts.
 
-Simulated “strip `string(...)`” on current suite only moved median
-~0.868 → ~0.83 — necessary but not sufficient alone.
-
-### D2 — Multi-arg `print` (biggest label killer)
-
-Today: `print expression` (one value, one newline).
-
-Desired dynamic (familiar, not new glyphs):
+### D2 — Multi-arg `print` ✓ SF-2
 
 ```vol
 print "Class average:", avg
 print "A grades:", scores.count(_ >= 90)
 ```
 
-Space-join args, one trailing newline. Removes most `"…" + string(x)` glue
-without inventing interpolation syntax.
+Space-join args, one trailing newline.
 
-### D3 — Collection intent ops (already shipping; lean harder)
+### D3 — Collection intent ops (+ `.count()` length) ✓ SF-2
 
-Keep / teach as canonical:
+Canonical:
 
-- `.where(_)` / `.map(_)` / `.count(_)` / `.sum()`
+- `.where(_)` / `.map(_)` / `.count(_)` / `.sum()` / `.count()` (= `.len`)
 - Prefer `.count(pred)` over `.where(pred).len`
 - Chain filters; use `.each` only for effects
 
 Future **fusion** (single-pass chains) is runtime — does not cut source tokens.
-Source wins come from expressing more in one chain (already strong on 09).
 
 ### D4 — Suite dynamics (honest scoreboard)
 
@@ -198,7 +182,7 @@ If median vs Python is the goal, **what you measure** matters:
 
 Do not fake 50% by padding Python or stripping VOL assert messages.
 
-### D5 — Canon + tooling (SF-1 leftovers, density + workflow)
+### D5 — Canon + tooling (SF-2 leftovers, density + workflow)
 
 - `vol fmt`: prefer `_` over `fn` in collection ops; one bind/loop/value style.
 - Examples emit formatter output only.
@@ -208,8 +192,8 @@ Do not fake 50% by padding Python or stripping VOL assert messages.
 
 ## Explicit non-goals for this preset
 
-Do **not** pursue these *for density juice* until D1–D2 + card work land and
-are measured:
+Do **not** pursue these *for density juice* until SF-2 workflow re-measure
+lands:
 
 - `|>` pipelines
 - `?T` Option sugar
@@ -222,19 +206,20 @@ are measured:
 
 ## Ranked next actions
 
-### A. Language dynamics (SF-2 candidate — specify before ship)
+### A. Language dynamics (SF-2) ✓
 
-- [ ] Spec draft: string `+` coercion rules + failure cases (what stays `R013`).
-- [ ] Spec draft: multi-arg `print` (separator, newline, `nothing` handling).
-- [ ] Implement + tests + examples; bump freeze only when SPEC/tests/docs agree.
-- [ ] Rewrite density VOL tasks with new dynamics; `make check && make count`.
-- [ ] Update README density bullets from new medians.
+- [x] Spec + implement string `+` coercion (`1 + "a"` stays `R013`).
+- [x] Spec + implement multi-arg `print` (space-join, `R029` on `nothing`).
+- [x] `.count()` ≡ `.len`; SF-2 / `vol_v2` card.
+- [x] Rewrite density VOL tasks; `make check && make count`.
+- [x] Update README density bullets from new medians (~20% vs Python all-suite;
+      labeled ~35%).
 
-### B. Workflow tokens (can do under SF-1)
+### B. Workflow tokens (under SF-2)
 
-- [ ] Cut `vol_v1` card; re-run `core_v2` (`--langs vol` + baseline JSONL).
+- [ ] Tighten `vol_v2` card; re-run **`intent_v1`** (`--langs vol` + baseline JSONL).
 - [ ] Finish `vol fmt` rewriter with canonical table.
-- [ ] Publish ≥1 model on **`intent_v1`** (prefer over `core_v2` for language-use claims).
+- [ ] Publish ≥1 model on **`intent_v1`** with `vol_v2` (prefer over `core_v2`).
 - [ ] Publish ≥1 other model before treating workflow deltas as stable.
 
 ### C. Suite (honest measurement)
@@ -242,7 +227,7 @@ are measured:
 - [x] Add compression-heavy tasks (`14-pipeline-stats`, `15-band-counts`, `16-map-filter`).
 - [x] Tier reporting in `count_tokens.py` (compression / labeled / parity).
 - [x] Keep parity set (hello/loops/fib) so ties stay visible.
-- [ ] After D1/D2 land, re-densify **labeled** VOL tasks and compare labeled median.
+- [x] Re-densify **labeled** VOL tasks after D1/D2 (labeled median ~0.651).
 
 ### D. Measurement hygiene
 
@@ -250,9 +235,7 @@ are measured:
 - [ ] Always split density vs workflow; cold vs warm for LLM runs.
 - [ ] Never claim 50% vs Python until a measured **median (compression)** ≤ 0.50
       on a documented suite (not labeled-only).
-- [x] Lang tests lock current `print` / `string` / `R013` / `R029` so D1–D2 must
-      update SPEC + tests deliberately (`TestPrintDisplayForms`,
-      `TestStringConcatTypeMismatches`, `TestPrintRejectsNothing`).
+- [x] Lang tests cover SF-2 `print` / coercion / `.count()` / `R013` / `R029`.
 
 ---
 

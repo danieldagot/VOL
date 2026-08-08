@@ -8,18 +8,19 @@ specified and tested.
 
 ## Near-Term Priority: Precise Core Before New Features
 
-**Surface Freeze SF-1 is active** (see [`SPEC.md`](SPEC.md) §0). The vision-aligned
-Supported surface is frozen. Harness card `bench/llm/cards/vol_v1.md` is the
-`core_v2` task card (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
-`vol_v0` remains for historical harness tables. Do not expand the language until
-foundations justify SF-2.
+**Surface Freeze SF-2 is active** (see [`SPEC.md`](SPEC.md) §0). Supported surface
+includes SF-1 plus density dynamics (multi-arg `print`, string `+` coercion,
+`.count()` length). Default harness card: `bench/llm/cards/vol_v2.md`. SF-1 /
+`vol_v1` and SF-0 / `vol_v0` remain for historical harness tables. Do not expand
+further until foundations justify SF-3.
 
-Frozen core (do not grow under SF-1 without a bump):
+Frozen core (do not grow under SF-2 without a bump):
 
 - values, variables (including multi-assign), named/anonymous/expression-body `fn`,
   product structs (named + positional literals)
 - `if` / `elif` / `else`, if-let, `repeat`, `while`, `? :`, Option `??`, Result `?`
-- arrays, `.each`, `.where`, `.map`, `.count`, `.sum()`, `some` / `none`, `ok` / `err`
+- arrays, `.each`, `.where`, `.map`, `.count` / `.count()`, `.sum()`, `some` / `none`, `ok` / `err`
+- multi-arg `print`; string `+` displayable coercion
 - `import` / `export` with `vol.config.json` discovery
 - built-ins already accepted by the interpreter (ambient tiny core)
 - `match` is Rejected (`E153`)
@@ -31,6 +32,7 @@ Immediate documentation and design work:
       functions, control flow, and failure behavior for the implemented core.
 - [x] Declare Surface Freeze SF-0 (SPEC + `vol_v0` language card).
 - [x] Declare Surface Freeze SF-1 (vision-aligned surface; `vol_v1` = `core_v2` task card).
+- [x] Declare Surface Freeze SF-2 (density dynamics; `vol_v2` card).
 - [ ] Keep `SPEC.md` synchronized whenever interpreter behavior changes.
 - [x] Error/result model — **Result values + if-let / `?` implemented** (SF-1);
       dual-return still Planned.
@@ -578,10 +580,9 @@ Rust, and Zig are compared by token count under named OpenAI tokenizers
 (`cl100k_base`, `o200k_base`). That benchmark measures source density only —
 not LLM task-success efficiency. Never cite density ratios as workflow proof.
 
-**Working preset (continue here):** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) —
-maximize density + workflow via radical dynamics (coercion, multi-arg `print`,
-collection intent) rather than radical new syntax; ranked next actions and
-realistic vs-Python targets.
+**Working preset:** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) — SF-2 shipped
+density dynamics (coercion, multi-arg `print`, `.count()`); continue with card
+hygiene, `vol fmt`, and workflow re-measure rather than radical new syntax.
 
 ## Open Design Questions
 

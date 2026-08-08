@@ -1,6 +1,6 @@
-# VOL Language Specification (Prototype v0 / SF-1)
+# VOL Language Specification (Prototype v0 / SF-2)
 
-> Status: **Surface Freeze SF-1** (vision-aligned prototype; harness card `vol_v1` = `core_v2` subset)
+> Status: **Surface Freeze SF-2** (density dynamics; harness card `vol_v2`)
 > Audience: humans and LLMs
 
 > Source of truth for behavior: this file plus the tests in `internal/lang`
@@ -20,7 +20,8 @@ Related docs:
 | [`README.md`](README.md) | Project status and examples |
 | [`IDEAS.md`](IDEAS.md) | Planned features and open questions |
 | [`AGENTS.md`](AGENTS.md) | Project vision and contribution rules |
-| [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | `core_v2` task card (SF-1-bound subset; not a full SF-1 tour) |
+| [`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md) | Default harness card (SF-2; density dynamics) |
+| [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | Historical SF-1 / `core_v2` task card |
 | [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | Historical `core_v2` card (SF-0) |
 
 This file is the single source for implemented syntax, vocabulary, and semantics.
@@ -59,17 +60,14 @@ Notation:
 **Supported** means implemented and covered by tests. **Provisional** means
 implemented and tested, but spelling or meaning may change.
 
-### Surface freeze SF-1
+### Surface freeze SF-2
 
-**SF-1** freezes the Supported / Provisional surface in this document and §11.
-It is the **vision-aligned** prototype pin: Option/Result (if-let, `??`, postfix
-`?`; `match` rejected), modules, product structs, anonymous and expression-body
-`fn`, multi-assign, `.map` / `.count`, and the rest of the Implemented core.
-The harness card for published `core_v2` runs is
-[`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md): an SF-1-bound **task
-card** for that suite (collections / control / `fn`), not a full SF-1 product
-tour of Option/Result/structs/`import`. Do not treat card size as the whole
-freeze.
+**SF-2** freezes the Supported / Provisional surface in this document and §11.
+It includes the SF-1 vision-aligned surface plus **token-density dynamics**:
+multi-arg `print`, string-context `+` coercion, and zero-arg `.count()` as
+length. The default harness card is
+[`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md). Historical published
+`core_v2` / `intent_v1` tables that cite SF-1 / `vol_v1` stay tied to that card.
 
 **Product freezes** (use these in status docs and LLM result tables; do not mix
 freeze IDs in one table):
@@ -77,20 +75,21 @@ freeze IDs in one table):
 | Freeze | Card | Meaning |
 | --- | --- | --- |
 | SF-0 | `vol_v0.md` | First pin (historical `core_v2` results) |
-| SF-1 | `vol_v1.md` | Vision-aligned language surface; card is `core_v2`-scoped |
-| SF-2+ | `vol_v2.md` (when shipped) | Next real expansion (`|>`, enums, dual-return, …) |
+| SF-1 | `vol_v1.md` | Vision-aligned surface before density dynamics |
+| SF-2 | `vol_v2.md` | Density dynamics (multi-arg `print`, string `+` coercion, `.count()`) |
+| SF-3+ | (when shipped) | Next expansion (`|>`, enums, dual-return, …) |
 
 Only keep cards for product freezes that have (or will have) published harness
 runs. Intermediate implementation drafts are not cards.
 
-| Allowed under SF-1 | Requires bumping to SF-2 (or later) |
+| Allowed under SF-2 | Requires bumping to SF-3 (or later) |
 | --- | --- |
-| Bug fixes that restore documented behavior | New keywords or operators beyond SF-1 |
+| Bug fixes that restore documented behavior | New keywords or operators beyond SF-2 |
 | Clearer diagnostics / `fix` text for existing codes | `|>` pipelines, `=>`, dual-return sugar, lazy views |
 | Tests, examples, and doc sync for existing forms | Enums/tagged unions, ownership, parallel |
 | Card wording edits that do **not** add features | Any form that expands the Supported vocabulary further |
 
-During SF-1, do **not** implement further Planned syntax from [`IDEAS.md`](IDEAS.md)
+During SF-2, do **not** implement further Planned syntax from [`IDEAS.md`](IDEAS.md)
 without a freeze bump, SPEC updates, tests, and a new card version.
 
 ### Syntax principles
@@ -130,7 +129,7 @@ do not claim identical implementation.
 | `not` | Boolean negation | C `!`, Python `not` | Supported |
 | `ok` | Successful Result value (`ok(x)`) | `Ok(x)` | Supported |
 | `or` | Either Boolean side true | C logical or, Python `or` | Supported |
-| `print` | Write a value | `println` | Supported |
+| `print` | Write one or more values (space-joined) | `println` | Supported |
 | `repeat` | Run body N times | counting `for` | Supported |
 | `return` | Exit function with value | `return` | Supported |
 | `some` | Present Option value (`some(x)`) | `Some(x)` | Supported |
@@ -149,7 +148,7 @@ do not claim identical implementation.
 | `array.deep_copy()` | Recursive deep clone of an array | deep clone | Supported |
 | `items.where(condition)` | Eager filter; `_` is current item | eager `filter` | Supported |
 | `items.map(transform)` | Eager map; `_` is current item | eager `map` | Supported |
-| `items.count(condition)` | Eager count of matches; `_` is item | filter + length | Supported |
+| `items.count()` / `items.count(condition)` | Length, or eager count of matches | `len` / filter + length | Supported |
 | `items.sum()` | Left-fold `+` from integer `0` | `sum` / `reduce` | Supported |
 | `input()` / `input(prompt)` | Read one line | stdin / `readLine` | Supported |
 | `assert(cond)` / `assert(cond, msg)` | Fail when false | assertion | Supported |
@@ -325,11 +324,14 @@ There is no static type checker yet. Type mistakes are usually runtime errors
 ### 3.2 Strings
 
 - Strings are immutable values.
-- `+` concatenates two strings.
-- `"a" + 1` is a runtime error (`R013`).
+- `+` concatenates two strings, or a string and a displayable right-hand value
+  (`"n=" + 7` → `"n=7"`) using the same display rules as `print` / `string()`.
+- Non-string left + string right (for example `1 + "a"`) is a runtime error
+  (`R013`). Either side `nothing` is `R029`.
 - **String `.len` (decided):** counts Unicode scalar values (same idea as Go
   runes), not UTF-8 bytes and not grapheme clusters. The short spelling `.len`
   is canonical; `.length` is rejected with `R007` and a `fix` suggesting `.len`.
+  Zero-arg `.count()` is also Supported as a length call (same result as `.len`).
 - **`.byte_len`** returns the UTF-8 byte count of a string as an integer. For
   ASCII strings this equals `.len`; for multi-byte Unicode it is larger.
   Useful for systems I/O that measures bytes, not characters.
@@ -588,7 +590,9 @@ Known properties:
 | `array.sum()` | left fold of `+` starting from integer `0` |
 | `array.where(condition)` | eager filter; see below |
 | `array.map(transform)` | eager map; see below |
+| `array.count()` | element count (same as `.len`) |
 | `array.count(condition)` | eager count of matches; see below |
+| `string.count()` | Unicode scalar count (same as `.len`) |
 
 Unknown properties are `R007`. Using `.length` instead of `.len` is `R007` with
 a `fix` pointing at `.len`. Using `.each` as a property or call (for example
@@ -660,19 +664,30 @@ Semantics:
 #### `.count`
 
 ```vol
+items.count()
 items.count(_ > 2)
 ```
 
 Semantics:
 
+**Zero arguments** (length):
+
+1. Evaluate the receiver; it must be an array or string (`R021`).
+2. Return the same integer as `.len` (array element count or string Unicode
+   scalars).
+
+**One argument** (match count):
+
 1. Evaluate `items`; it must be an array (`R021`).
-2. Require exactly one argument (`R020`).
-3. For each element in order:
+2. For each element in order:
    - bind `_` to that element in a fresh scope
    - evaluate the condition (must be Boolean — `R022`, with the same `_`
      expression `fix` as `.where` when the value is not Boolean)
    - if true, increment a counter
-4. Return the count as an integer.
+3. Return the count as an integer.
+
+Other arities are `S003` / `R020` (`0 or 1` arguments). `.len` remains the
+canonical length **property**; `.count()` is the zero-arg call form.
 
 `.where` / `.map` / `.count` / `.sum()` are not parallel and not lazy in this
 prototype. Future fusion or parallelization of collection pipelines depends on
@@ -718,7 +733,7 @@ struct-decl = "struct" identifier "{" identifier+ "}"
 import-stmt = "import" string
 repeat-stmt = "repeat" expression block
 while-stmt  = "while" expression block
-print-stmt  = "print" expression
+print-stmt  = "print" expression ("," expression)*
 return-stmt = "return" expression
 function-decl = "fn" identifier "(" params? ")" (block | expression)
 export-stmt = "export" identifier ("," identifier)*
@@ -843,11 +858,13 @@ effects. Purity of `.where` predicates is Planned guidance — see §4.4.
 
 ```vol
 print expression
+print "label:", value
 ```
 
-Writes the display form of the value followed by a newline.
+Writes one or more values, space-joined, followed by a newline. Arguments are
+evaluated left to right; each must be a value (`R029` rejects `nothing`).
 
-Display rules:
+Display rules (per argument):
 
 - integers, floats, Booleans, strings: ordinary text
 - arrays: `[a, b, c]` with recursive display
@@ -855,6 +872,9 @@ Display rules:
 - results: `ok(…)` or `err(…)`
 - structs: `Type { field: …, … }` in field-declaration order
 - no quotes are added around strings in display
+
+Prefer `print "A grades:", n` over `"A grades: " + string(n)` when labels are
+needed.
 
 ### 5.8 Functions
 
@@ -1187,7 +1207,7 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `R018` | wrong function argument count |
 | `R019` | `.sum()` on non-array |
 | `R020` | `.where` / `.map` / `.count` wrong arity |
-| `R021` | `.where` / `.map` / `.count` on non-array |
+| `R021` | `.where` / `.map` / `.count(pred)` on non-array; `.count()` on non-array/non-string |
 | `R022` | `.where` / `.count` condition not Boolean (`fix`: use `_` expression) |
 | `R023` | `input` prompt not string |
 | `R024` | input read failure |
@@ -1247,6 +1267,8 @@ print large // [7, 9, 12]
 print large.sum() // 28
 print numbers.map(_ * 2) // [8, 14, 4, 18, 24]
 print numbers.count(_ > 5) // 3
+print numbers.count() // 5
+print "Sum:", large.sum() // Sum: 28
 ```
 
 ### 9.4 Functions
@@ -1398,11 +1420,15 @@ and Planned work in [`IDEAS.md`](IDEAS.md).
   `.where` / `.map` / `.count` unchanged. Pipeline `|>` remains Planned.
 - **Multi-assign (§5.2):** `a, b := …` / `a, b = …` Supported (RHS evaluated
   before assigns).
-- **Collection map/count (§4.4):** `.map(_)` and `.count(_)` Supported.
+- **Collection map/count (§4.4):** `.map(_)` and `.count(_)` Supported;
+  `.count()` (0 args) is length (same as `.len`) on arrays and strings (SF-2).
+- **Multi-arg `print` (§5.7):** `print a, b` space-joins display forms (SF-2).
+- **String `+` coercion (§3.2):** `string + displayable` concatenates via
+  display rules; `non-string + string` stays `R013` (SF-2).
 - **Structs (§3.6):** product `struct` with named and positional literals
-  Supported (SF-1). Tagged unions/enums and methods remain Planned.
-- **Modules (§5.11):** `import` + `vol.config.json` discovery/aliases Supported
-  (SF-1); ambient tiny core; explicit path for everything else.
+  Supported. Tagged unions/enums and methods remain Planned.
+- **Modules (§5.11):** `import` + `vol.config.json` discovery/aliases Supported;
+  ambient tiny core; explicit path for everything else.
 - **Ownership / allocation direction (Planned):** local escape analysis first;
   API contracts later; allocation unspecified — do not claim inference.
 - **Parallel direction (Planned):** `parallel` stays Planned; no guarantees
@@ -1450,7 +1476,7 @@ Details live in [`IDEAS.md`](IDEAS.md).
 When changing language behavior:
 
 1. If the change adds, removes, or renames Supported surface, **bump the surface
-   freeze** (SF-1 → SF-2, …), add a new language card (`vol_v2.md`, …), and note
+   freeze** (SF-2 → SF-3, …), add a new language card (`vol_v3.md`, …), and note
    the bump in [`IDEAS.md`](IDEAS.md) / README. Pure bugfixes and doc sync stay
    on the active freeze without a bump. Do not keep intermediate draft cards.
 2. Update this specification (including the quick vocabulary tables when forms change).

@@ -36,8 +36,8 @@ If the feature is still an open question in IDEAS, stop and run Phase 2 of
 
 ## Scope rules
 
-- **One coherent SF slice** per bump (active freeze is SF-1 / card `vol_v1`; next
-  is SF-2 / `vol_v2`). Do not boil the ocean (ownership + parallel + stdlib in one pass).
+- **One coherent SF slice** per bump (active freeze is SF-2 / card `vol_v2`; next
+  is SF-3 / `vol_v3`). Do not boil the ocean (ownership + parallel + stdlib in one pass).
 - Prefer the IDEAS **recommended / direction decided** spelling. Do not invent a
   competing form without asking.
 - Docs-only directions that cannot run yet (allocation “unspecified”, parallel

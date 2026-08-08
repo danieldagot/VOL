@@ -238,8 +238,8 @@ func TestAssertFailureUsesMessage(t *testing.T) {
 }
 
 func TestImprovedRuntimeTypeMessage(t *testing.T) {
-	_, diagnostic := run(t, `print "count: " + 2`)
-	if diagnostic == nil || diagnostic.Code != "R013" || !strings.Contains(diagnostic.Message, "string and integer") {
+	_, diagnostic := run(t, `print 2 + "count"`)
+	if diagnostic == nil || diagnostic.Code != "R013" || !strings.Contains(diagnostic.Message, "integer and string") {
 		t.Fatalf("got %#v", diagnostic)
 	}
 }
@@ -250,13 +250,15 @@ print 42
 print true
 print "hi"
 print [1, 2]
-print "n=" + string(7)
+print "n=" + 7
 print "ok" + "ay"
+print "A grades:", 3
+print "flag:", true
 `)
 	if diagnostic != nil {
 		t.Fatal(diagnostic)
 	}
-	want := "42\ntrue\nhi\n[1, 2]\nn=7\nokay\n"
+	want := "42\ntrue\nhi\n[1, 2]\nn=7\nokay\nA grades: 3\nflag: true\n"
 	if output != want {
 		t.Fatalf("got %q want %q", output, want)
 	}
@@ -270,22 +272,51 @@ print sink()
 	if diagnostic == nil || diagnostic.Code != "R029" {
 		t.Fatalf("got %#v", diagnostic)
 	}
+	_, diagnostic = run(t, `
+fn sink() {}
+print "x", sink()
+`)
+	if diagnostic == nil || diagnostic.Code != "R029" {
+		t.Fatalf("multi-arg nothing: got %#v", diagnostic)
+	}
+}
+
+func TestStringConcatCoercion(t *testing.T) {
+	output, diagnostic := run(t, `
+print "count: " + 2
+print "flag: " + true
+print "xs: " + [1, 2]
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	want := "count: 2\nflag: true\nxs: [1, 2]\n"
+	if output != want {
+		t.Fatalf("got %q want %q", output, want)
+	}
 }
 
 func TestStringConcatTypeMismatches(t *testing.T) {
-	cases := []struct {
-		source string
-		frag   string
-	}{
-		{`print "count: " + 2`, "string and integer"},
-		{`print 2 + "count"`, "integer and string"},
-		{`print "flag: " + true`, "string and Boolean"},
+	_, diagnostic := run(t, `print 2 + "count"`)
+	if diagnostic == nil || diagnostic.Code != "R013" || !strings.Contains(diagnostic.Message, "integer and string") {
+		t.Fatalf("got %#v", diagnostic)
 	}
-	for _, tc := range cases {
-		_, diagnostic := run(t, tc.source)
-		if diagnostic == nil || diagnostic.Code != "R013" || !strings.Contains(diagnostic.Message, tc.frag) {
-			t.Errorf("source %q: got %#v", tc.source, diagnostic)
-		}
+}
+
+func TestCountZeroArgIsLen(t *testing.T) {
+	output, diagnostic := run(t, `
+nums := [3, 8, 1]
+print nums.count()
+print nums.where(_ > 5).count()
+print "hi".count()
+print nums.count(_ > 5)
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	want := "3\n1\n2\n1\n"
+	if output != want {
+		t.Fatalf("got %q want %q", output, want)
 	}
 }
 

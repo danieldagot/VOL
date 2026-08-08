@@ -2,4 +2,4 @@ language := "VOL"
 version := 1
 
 print "Hello from " + language
-print "Prototype version " + string(version)
+print "Prototype version", version

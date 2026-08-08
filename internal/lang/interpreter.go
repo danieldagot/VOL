@@ -296,14 +296,18 @@ func (i *interpreter) execute(statement Statement) *Diagnostic {
 			instance.fields[target.Name.Lexeme] = value
 		}
 	case *PrintStatement:
-		value, d := i.evaluate(node.Value)
-		if d != nil {
-			return d
+		parts := make([]string, 0, len(node.Values))
+		for _, expr := range node.Values {
+			value, d := i.evaluate(expr)
+			if d != nil {
+				return d
+			}
+			if d := i.requireValue(value, expr.Position()); d != nil {
+				return d
+			}
+			parts = append(parts, display(value))
 		}
-		if d := i.requireValue(value, node.Value.Position()); d != nil {
-			return d
-		}
-		fmt.Fprintln(i.output, display(value))
+		fmt.Fprintln(i.output, strings.Join(parts, " "))
 	case *ExpressionStatement:
 		// Discarding a call result is allowed, including `nothing` from a missing return.
 		_, d := i.evaluate(node.Value)
@@ -864,12 +868,21 @@ func (i *interpreter) evaluateCount(property *Property, arguments []Expression) 
 	if d := i.requireValue(value, property.Object.Position()); d != nil {
 		return nil, d
 	}
+	if len(arguments) == 0 {
+		if array, ok := value.([]any); ok {
+			return int64(len(array)), nil
+		}
+		if text, ok := value.(string); ok {
+			return int64(len([]rune(text))), nil
+		}
+		return nil, i.runtime(property.Position(), "R021", "`.count` requires an array or string.")
+	}
+	if len(arguments) != 1 {
+		return nil, i.runtime(property.Name.Pos, "R020", "`.count` expects 0 or 1 arguments.")
+	}
 	array, ok := value.([]any)
 	if !ok {
 		return nil, i.runtime(property.Position(), "R021", "`.count` requires an array.")
-	}
-	if len(arguments) != 1 {
-		return nil, i.runtime(property.Name.Pos, "R020", "`.count` expects exactly 1 argument.")
 	}
 	var n int64
 	for _, item := range array {
@@ -1029,6 +1042,8 @@ func (i *interpreter) evaluateBinaryValues(operator Token, left, right any) (any
 			if b, ok := right.(string); ok {
 				return a + b, nil
 			}
+			// String-context coercion: string + displayable → concat.
+			return a + display(right), nil
 		}
 	}
 	if a, ok := left.(int64); ok {

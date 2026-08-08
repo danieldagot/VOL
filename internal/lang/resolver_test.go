@@ -79,6 +79,7 @@ func TestResolverChecksKnownCallArities(t *testing.T) {
 		{name: "assert too many", source: "assert(true, \"x\", \"y\")", message: "expects one or two arguments, got 3"},
 		{name: "where none", source: "[1].where()", message: "expects 1 arguments, got 0"},
 		{name: "where many", source: "[1].where(true, false)", message: "expects 1 arguments, got 2"},
+		{name: "count many", source: "[1].count(true, false)", message: "expects 0 or 1 arguments, got 2"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

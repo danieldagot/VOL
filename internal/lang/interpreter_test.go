@@ -314,7 +314,7 @@ func TestRuntimeDiagnosticsFromSource(t *testing.T) {
 		{name: "or left wrong type", source: "print 1 or false", code: "R011", message: "Boolean"},
 		{name: "and right wrong type", source: "print true and 1", code: "R012", message: "Boolean"},
 		{name: "or right wrong type", source: "print false or 1", code: "R012", message: "Boolean"},
-		{name: "operator types", source: `print "x" + 1`, code: "R013", message: "string and integer"},
+		{name: "operator types", source: `print 1 + "x"`, code: "R013", message: "integer and string"},
 		{name: "sum item type", source: `print [1, "x"].sum()`, code: "R013", message: "integer and string"},
 		{name: "integer division zero", source: "print 1 / 0", code: "R014", message: "Division by zero"},
 		{name: "float division zero", source: "print 1.0 / 0.0", code: "R014", message: "Division by zero"},

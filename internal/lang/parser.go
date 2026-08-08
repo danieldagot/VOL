@@ -107,7 +107,15 @@ func (p *parser) statement() (Statement, *Diagnostic) {
 		if d != nil {
 			return nil, d
 		}
-		return &PrintStatement{Keyword: keyword, Value: value}, nil
+		values := []Expression{value}
+		for p.match(TokenComma) {
+			next, d := p.expression()
+			if d != nil {
+				return nil, d
+			}
+			values = append(values, next)
+		}
+		return &PrintStatement{Keyword: keyword, Values: values}, nil
 	}
 	if p.match(TokenIf) {
 		return p.ifStatement(p.previous())

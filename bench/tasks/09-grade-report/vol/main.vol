@@ -1,7 +1,7 @@
 scores := [85, 72, 91, 60, 78, 95, 55, 68, 88, 74]
 
-print "Class average: " + string(scores.sum() / scores.len)
-print "A grades: " + string(scores.count(_ >= 90))
-print "B grades: " + string(scores.count(_ >= 80 and _ < 90))
-print "Passing: " + string(scores.count(_ >= 60))
-print "Failing: " + string(scores.count(_ < 60))
+print "Class average:", scores.sum() / scores.len
+print "A grades:", scores.count(_ >= 90)
+print "B grades:", scores.count(_ >= 80 and _ < 90)
+print "Passing:", scores.count(_ >= 60)
+print "Failing:", scores.count(_ < 60)

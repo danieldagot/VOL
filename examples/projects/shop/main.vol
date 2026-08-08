@@ -4,12 +4,12 @@ import "examples/projects/shop/cart"
 
 fn pay(items) {
     amount := checkout(items)?
-    return ok("charged " + string(amount))
+    return ok("charged " + amount)
 }
 
 cart := [Item { name: "mug", price: 12, qty: 2 }, Item { name: "sticker", price: 3, qty: 5 }]
 
-print "Subtotal: " + string(cart_total(cart))
+print "Subtotal:", cart_total(cart)
 
 if ok msg := pay(cart) {
     print msg

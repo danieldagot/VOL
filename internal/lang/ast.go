@@ -192,7 +192,7 @@ func (n *Assignment) Position() Position { return n.Equal.Pos }
 
 type PrintStatement struct {
 	Keyword Token
-	Value   Expression
+	Values  []Expression
 }
 
 func (*PrintStatement) statement()           {}

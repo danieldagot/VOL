@@ -52,11 +52,11 @@ Use this snapshot before roasting—do not pretend the repo is still pre-`SPEC.m
   conformance examples, **§11 Decided** core rules (mutability default, overflow,
   purity intent, `if` vs `? :`, permanent `while`, etc.).
 - **Partially evidenced LLM claim:** `bench/` measures **source token density**
-  on 16 equivalent tasks (tiered; ~13% fewer than Python all-suite / ~47% vs Go, etc.)—not task success,
+  on 16 equivalent tasks (tiered; ~20% fewer than Python all-suite after SF-2, etc.)—not task success,
   compile failures, or repair cost.
-- **Still missing / vision-only:** static types, ownership/borrow, structs, modules,
-  generics, native backend, formatter, `LLM_BENCHMARK.md`, enforced `.where` purity
-  at runtime, parallel/lazy collection fusion.
+- **Still missing / vision-only:** static types, ownership/borrow, generics, native
+  backend, formatter rewriter, enforced `.where` purity at runtime,
+  parallel/lazy collection fusion. (Structs/modules/LLM harness exist — verify before roasting.)
 
 Identity is **Vocabulary Optimized Language** in README and AGENTS.md. Do not
 roast stale “Vector-Oriented” / “Vibe-Oriented” naming unless it reappears in

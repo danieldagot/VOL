@@ -1,0 +1,4 @@
+scores := [85, 91, 72]
+print "A grades:", scores.count(_ >= 90)
+print "Sum: " + scores.where(_ >= 80).sum()
+print "Count:", scores.count()

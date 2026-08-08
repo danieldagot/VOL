@@ -4,5 +4,5 @@ player2 := [7, 8, 6, 9, 8, 8]
 p1_total := player1.sum()
 p2_total := player2.sum()
 
-print "Player 1 total: " + string(p1_total)
-print "Player 2 total: " + string(p2_total)
+print "Player 1 total:", p1_total
+print "Player 2 total:", p2_total

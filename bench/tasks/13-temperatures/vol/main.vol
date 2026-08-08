@@ -4,8 +4,8 @@ avg := temps.sum() / temps.len
 assert(hot + mild + cold == temps.len, "cover")
 assert(avg == 24, "avg")
 
-print "Days measured: " + string(temps.len)
-print "Average: " + string(avg)
-print "Hot days (28+): " + string(hot)
-print "Mild days: " + string(mild)
-print "Cold days (<20): " + string(cold)
+print "Days measured:", temps.len
+print "Average:", avg
+print "Hot days (28+):", hot
+print "Mild days:", mild
+print "Cold days (<20):", cold

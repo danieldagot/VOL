@@ -152,7 +152,12 @@ func (r *resolver) statement(statement Statement) *Diagnostic {
 	case *ReturnStatement:
 		return r.expression(node.Value)
 	case *PrintStatement:
-		return r.expression(node.Value)
+		for _, value := range node.Values {
+			if d := r.expression(value); d != nil {
+				return d
+			}
+		}
+		return nil
 	case *ExpressionStatement:
 		return r.expression(node.Value)
 	case *IfStatement:
@@ -308,12 +313,27 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 	case *Call:
 		if property, ok := node.Callee.(*Property); ok {
 			switch property.Name.Lexeme {
-			case "where", "map", "count":
+			case "where", "map":
 				if d := r.expression(property.Object); d != nil {
 					return d
 				}
 				if len(node.Arguments) != 1 {
 					return r.arity(property.Name, "."+property.Name.Lexeme, 1, len(node.Arguments))
+				}
+				r.begin()
+				r.scopes[len(r.scopes)-1]["_"] = symbol{kind: "value", arity: -1}
+				d := r.expression(node.Arguments[0])
+				r.end()
+				return d
+			case "count":
+				if d := r.expression(property.Object); d != nil {
+					return d
+				}
+				if len(node.Arguments) > 1 {
+					return r.rangeArity(property.Name, ".count", "0 or 1", len(node.Arguments))
+				}
+				if len(node.Arguments) == 0 {
+					return nil
 				}
 				r.begin()
 				r.scopes[len(r.scopes)-1]["_"] = symbol{kind: "value", arity: -1}

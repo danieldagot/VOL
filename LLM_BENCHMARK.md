@@ -194,20 +194,19 @@ Target **≤ ~400 tokens** each (measure with the same tokenizer used for scorin
 or the API’s tokenizer). Cards must only describe **currently Supported** VOL
 features from [`SPEC.md`](SPEC.md) / README “What Actually Works.”
 
-VOL `core_v2` card (`vol_v1`) must include at least:
+Default VOL card (`vol_v2` / SF-2) must include at least:
 
 - no `main`; top-level statements run
 - `:=` / `=` / opt-in `const`
 - `if` / `elif` / `else` (statement); `? :` for values
 - `repeat`, `while`, `.each`
-- arrays, `.len`, `.where(_ …)` / `.count(_ …)`, `.sum()`
+- arrays, `.len`, `.count()` / `.count(_ …)`, `.where(_ …)`, `.sum()`
 - `fn` / `return`; missing return is `nothing` (do not assign it)
-- `print`, `string()`, `assert`
+- `print` / multi-arg `print`; string `+` coercion; `string()`, `assert`
 - integer overflow traps
 
-It is a **task card** for `core_v2`, bound to SF-1 Supported syntax, not a full
-SF-1 product tour. Omit Option/Result/structs/`import` until a suite exercises
-them (a fuller card is a separate, deliberate revision).
+It is a **task card**, not a full SF-2 product tour. Omit Option/Result/structs/
+`import` until a suite exercises them.
 
 Python card: equivalently dense stdlib-only reminders (`print`, lists, `for`,
 `assert`), not a tour of the standard library.
@@ -218,18 +217,18 @@ slices, `for`), not a tour of Effective Go.
 Store frozen cards under:
 
 ```text
-bench/llm/cards/vol_v1.md      # core_v2 task card (SF-1-bound; harness default)
-bench/llm/cards/vol_v0.md      # SF-0 (historical core_v2 tables; do not mix freeze IDs)
+bench/llm/cards/vol_v2.md      # SF-2 harness default (density dynamics)
+bench/llm/cards/vol_v1.md      # SF-1 historical (published core_v2 / intent_v1)
+bench/llm/cards/vol_v0.md      # SF-0 (historical; do not mix freeze IDs)
 bench/llm/cards/python_v0.md   # matched Python baseline (default)
 bench/llm/cards/go_v0.md       # matched Go baseline (optional)
 ```
 
 Cards are **bound to** a product surface freeze ([`SPEC.md`](SPEC.md) §0) but
-need not enumerate every Supported form. SF-0 → `vol_v0`; SF-1 → `vol_v1`
-(`core_v2` subset). Do not keep intermediate draft cards for unfinished
-surfaces. Bump the VOL card version suffix with a freeze bump (next: SF-2 →
-`vol_v2.md`) or a deliberate card-only revision that does not add language
-features. Never silently edit a card used in a published result table without
+need not enumerate every Supported form. SF-0 → `vol_v0`; SF-1 → `vol_v1`;
+SF-2 → `vol_v2`. Do not keep intermediate draft cards. Bump the VOL card with
+the next freeze (SF-3 → `vol_v3.md`) or a deliberate card-only revision.
+Never silently edit a card used in a published result table without
 republishing; published summaries must name the freeze and card versions.
 Source checks must accept every form the card teaches for the same intent
 (e.g. `.count` and `.where` for counting).
@@ -463,7 +462,9 @@ cannot be recomputed from committed JSONL.
 - [x] Bind cards to Surface Freeze SF-0 (`SPEC.md` §0; `vol_v0` / `python_v0` / `go_v0`)
 - [x] Publish frozen `core_v2` live run with default `--langs vol,python` (Gemini)
 - [x] Surface Freeze SF-1; `vol_v1.md` = `core_v2` task card (SF-1-bound subset)
-- [ ] Publish ≥1 other model on `core_v2` before further syntax optimization
+- [x] Surface Freeze SF-2; `vol_v2.md` harness default (density dynamics)
+- [ ] Re-run / publish `intent_v1` against `vol_v2` (prefer over `core_v2`)
+- [ ] Publish ≥1 other model before treating workflow deltas as stable
 - [x] Re-run / publish `core_v2` against `vol_v1`
       (`20260808-041440`; includes frozen Python rows from the prior live run)
 - [x] `11-leaderboard` / `13-temperatures` source checks accept `.count` or `.where`

@@ -3,8 +3,8 @@ player2 := [7, 8, 6, 9, 8, 8]
 p1 := player1.sum()
 p2 := player2.sum()
 
-print "Player 1 total: " + string(p1)
-print "Player 2 total: " + string(p2)
-print "Winner: " + (p1 > p2 ? "Player 1" : "Player 2")
-print "P1 rounds 8+: " + string(player1.count(_ >= 8))
-print "P2 rounds 8+: " + string(player2.count(_ >= 8))
+print "Player 1 total:", p1
+print "Player 2 total:", p2
+print "Winner:", p1 > p2 ? "Player 1" : "Player 2"
+print "P1 rounds 8+:", player1.count(_ >= 8)
+print "P2 rounds 8+:", player2.count(_ >= 8)

@@ -1,6 +1,6 @@
 scores := [72, 95, 81, 64]
-print "Students: " + string(scores.len)
+print "Students:", scores.len
 scores[3] = 70
 scores.where(_ >= 80).each score {
-    print "High score: " + string(score)
+    print "High score:", score
 }

@@ -1,6 +1,6 @@
 # VOL Examples
 
-Executable programs for the Supported SF-1 surface. Run any entry file with:
+Executable programs for the Supported SF-2 surface. Run any entry file with:
 
 ```text
 go run ./cmd/vol run ./examples/<path>.vol
@@ -46,6 +46,7 @@ go run ./cmd/vol run ./examples/basics/arguments.vol -- apple banana
 | `features/struct.vol` | Product structs, named + positional literals |
 | `features/struct_nested.vol` | Nested structs and shared identity |
 | `features/const_struct.vol` | Shallow `const` on struct bindings |
+| `features/print_multi.vol` | Multi-arg `print`, string `+` coercion, `.count()` |
 | `features/modules/main.vol` | `import` + `export` |
 | `features/modules/import_struct.vol` | Importing a struct type |
 | `features/modules/aliases/main.vol` | `@lib` path alias via local `vol.config.json` |

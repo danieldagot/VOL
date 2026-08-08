@@ -90,11 +90,11 @@ INTENT_TASKS = [
 # Default workflow baseline is Python (interpreted peer); Go remains optional.
 LANG_META = {
     "vol": {
-        "card": "vol_v1.md",
+        "card": "vol_v2.md",
         "label": "VOL",
         "ext": ".vol",
         "prompt_lang": "VOL",
-        "freeze": "SF-1",
+        "freeze": "SF-2",
     },
     "python": {
         "card": "python_v0.md",

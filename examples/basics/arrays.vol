@@ -1,13 +1,13 @@
 scores := [72, 95, 81, 64]
 
 print scores
-print "Students: " + string(scores.len)
+print "Students:", scores.len
 
 scores[3] = 70
 
 scores.each score {
     if score >= 80 {
-        print "High score: " + string(score)
+        print "High score:", score
     }
 }
 

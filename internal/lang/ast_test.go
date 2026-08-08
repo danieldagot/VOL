@@ -19,7 +19,7 @@ func TestEveryASTNodeReportsItsSourcePosition(t *testing.T) {
 		&FunctionDeclaration{Keyword: token, Name: token, Body: block},
 		&ReturnStatement{Keyword: token, Value: literal},
 		&Assignment{Target: literal, Equal: token, Value: literal},
-		&PrintStatement{Keyword: token, Value: literal},
+		&PrintStatement{Keyword: token, Values: []Expression{literal}},
 		&ExpressionStatement{Value: literal},
 		&IfStatement{Keyword: token, Condition: literal, Then: block},
 		&IfLetStatement{Keyword: token, Tag: token, Name: token, Value: literal, Then: block, Else: block},

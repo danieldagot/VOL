@@ -15,7 +15,7 @@ VOL asks what a systems programming language should look like when LLMs are firs
 Its primary goal is to maximize **semantic density**: express more intent with fewer tokens while preserving deterministic structure, readability, safety, and native performance. The language should be efficient for an LLM to generate, understand, review, modify, and debug.
 
 That goal is a research direction, not a measured property of the current
-prototype. SF-1 freezes Supported syntax; it does **not** prove LLM optimization.
+prototype. SF-2 freezes Supported syntax; it does **not** prove LLM optimization.
 Hand-written source-density benches are not generate/repair evidence. Token
 counts also depend on each model's tokenizer, so “fewer tokens” alone is not a
 success metric. The intended long-term measure is task success relative to total
@@ -47,14 +47,14 @@ This README separates **what works today** from **long-term design targets**. Tr
 
 ### What Actually Works
 
-**Surface Freeze SF-1:** vision-aligned Supported syntax in [`SPEC.md`](SPEC.md)
-— Option/Result (if-let, `??`, postfix `?`; `match` removed), modules, product
-structs, anonymous and expression-body `fn`, multi-assign, `.map`/`.count`, and
-the rest of the Implemented core. Further vocabulary (`|>`, enums, dual-return
-sugar, …) waits for an SF-2 bump. Harness card
-[`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) is the `core_v2` **task
-card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
-[`vol_v0`](bench/llm/cards/vol_v0.md) remains for historical tables.
+**Surface Freeze SF-2:** Supported syntax in [`SPEC.md`](SPEC.md) — SF-1 surface
+plus density dynamics: multi-arg `print`, string `+` coercion, and `.count()` as
+length. Option/Result, modules, structs, anonymous/`fn`, multi-assign,
+`.map`/`.count`, and the rest of the Implemented core remain. Further vocabulary
+(`|>`, enums, dual-return sugar, …) waits for SF-3. Default harness card:
+[`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md). Historical
+[`vol_v1`](bench/llm/cards/vol_v1.md) / [`vol_v0`](bench/llm/cards/vol_v0.md)
+remain for published SF-1 / SF-0 tables.
 
 - integer, floating-point, Boolean, and string literals
 - inferred variable declarations with `:=` (including multi-declare `a, b := …`)
@@ -72,12 +72,13 @@ card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
 - indexed array assignment (assignment and arguments share array identity; use `.copy()` for a shallow clone or `.deep_copy()` for a recursive clone)
 - array `.len` and string `.len` (Unicode scalar values) and string `.byte_len` (UTF-8 byte count)
 - array iteration with `.each` (imperative / side effects)
-- collection filtering with `.where(...)`, mapping with `.map(...)`, counting with `.count(...)`, and numeric aggregation with `.sum()` (prefer side-effect-free predicates; purity checks Planned)
+- collection filtering with `.where(...)`, mapping with `.map(...)`, counting with `.count(...)` or length via `.count()`, and numeric aggregation with `.sum()` (prefer side-effect-free predicates; purity checks Planned)
 - Option values with `some(value)` / `none`; unwrap with if-let and `??` (`match` rejected)
 - Result values with `ok(value)` / `err(value)`; unwrap with if-let and postfix `?` in functions (bugs still trap)
 - product `struct` types, named and positional construction, and field get/set
 - `import "path"` / project-local aliases via nearest `vol.config.json`; live `export` across modules (see `examples/features/modules/aliases/` for `@lib`; future `@std` spelling is vision-only in [`IDEAS.md`](IDEAS.md), not a shipped stdlib)
-- `print`
+- `print` with one or more values (space-joined display forms)
+- string `+` coercion (`"n=" + 7`); keep `string(value)` for explicit convert
 - interactive text input with `input()` or `input(prompt)`
 - runtime checks with `assert(condition)` or `assert(condition, message)`
 - value-to-string conversion with `string(value)`
@@ -95,7 +96,7 @@ card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
 - static type checking
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter rewriter (`vol fmt` CLI stub parses only today)
-- a published compatibility policy and versioned conformance corpus (SF-0 / SF-1 pins)
+- a published compatibility policy and versioned conformance corpus (SF-0 / SF-1 / SF-2 pins)
 - broader LLM workflow results across more models and realistic backend tasks
 - initial language-server support
 
@@ -123,9 +124,9 @@ card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
 - optional `?T` sugar for Option (canonical form is `some`/`none`)
 - C and LLVM backend details
 
-Near-term priority is to keep SF-1 precise and finish foundations (`vol fmt`
+Near-term priority is to keep SF-2 precise and finish foundations (`vol fmt`
 rewriter; richer std **behind imports** when designed — not ambient growth)
-before an SF-2 feature bump. Remaining directions live in [`IDEAS.md`](IDEAS.md).
+before an SF-3 feature bump. Remaining directions live in [`IDEAS.md`](IDEAS.md).
 
 See [`SPEC.md`](SPEC.md) for vocabulary, syntax, and formal behavior of the
 current interpreter, and [`IDEAS.md`](IDEAS.md) for future work and open design
@@ -313,14 +314,14 @@ bench            source token density benchmark (VOL vs Python/Go/Rust/Zig)
 
 ## Source Token Density Benchmark
 
-On 16 equivalent small programs, VOL currently uses about:
+On 16 equivalent small programs (after SF-2 density dynamics), VOL currently uses about:
 
-- **~13% fewer tokens than Python** (all-suite median)
-- **~17% fewer than Python** on the **compression** tier (filter/map/count/sum,
-  bare numeric output — best read for semantic density)
-- **~47% fewer tokens than Go**
-- **~39% fewer tokens than Rust**
-- **~62% fewer tokens than Zig**
+- **~20% fewer tokens than Python** (all-suite median)
+- **~20% fewer than Python** on the **compression** tier (filter/map/count/sum)
+- **~35% fewer than Python** on the **labeled** tier (multi-arg `print` / coercion)
+- **~49% fewer tokens than Go**
+- **~46% fewer tokens than Rust**
+- **~64% fewer tokens than Zig**
 
 (medians; nearly the same under both `cl100k_base` and `o200k_base`. Reports also
 split **labeled** vs **parity** tiers — see [`bench/README.md`](bench/README.md).)
@@ -328,7 +329,7 @@ split **labeled** vs **parity** tiers — see [`bench/README.md`](bench/README.m
 That is source size only — hand-written programs that print the same output. It
 does **not** measure whether an LLM generates correct VOL more easily, or how
 many tokens generate/repair workflows consume. Do not cite these ratios as
-workflow proof or as evidence that SF-1 is “LLM optimized.”
+workflow proof or as evidence that SF-2 is “LLM optimized.”
 
 Full per-task numbers: [`bench/results/density.md`](bench/results/density.md).
 How to run / regenerate: [`bench/README.md`](bench/README.md).
@@ -343,29 +344,25 @@ cd bench && uv sync && uv run python harness/count_tokens.py
 The default workflow baseline is **Python** (interpreted peer for the current
 prototype). Go remains an optional compiled baseline (`--langs vol,go`).
 
-One protocol-v1.1 (`core_v2`) run is published for `gemini-3.5-flash-lite`,
-temperature 0, three replicates, and at most two repair rounds — **VOL
-(`vol_v1` / SF-1-bound `core_v2` task card) vs Python**. The published JSONL is
-self-contained (VOL live + frozen Python rows from the prior same-model run).
-The suite has five tasks covering generation,
-diagnostic-seeded repair, and modification. Summaries split prompt vs completion
-and report cold totals (card re-sent every request) plus warm totals (estimated
-language-card cost amortized away).
+Published protocol-v1.1 runs below used **`vol_v1` / SF-1** (historical). The
+harness default is now **`vol_v2` / SF-2**; re-run `intent_v1` before claiming
+workflow wins from density dynamics.
+
+One `core_v2` Gemini flash-lite table (`vol_v1`):
 
 | Language | First-try | Success @ K | Mean cold | Mean warm | Mean completion |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Python | 100% | 100% | 762.9 | 426.9 | 135.1 |
-| VOL | 100% | 100% | 848.6 | 412.6 | 109.9 |
+| VOL (SF-1) | 100% | 100% | 848.6 | 412.6 | 109.9 |
 
-VOL matched Python on **first-try** and **success @ K**, used about **11.2% more
-cold** workflow tokens, and about **3.3% fewer warm** tokens once the card is
-amortized. Completions were about 18.7% smaller; prompts about 17.7% larger.
-Card size is ~436 tokens (`vol_v1`) vs Python ~336.
+That SF-1 run matched Python on **first-try** / **success @ K**, used about
+**11.2% more cold** / **3.3% fewer warm** tokens. Card ~436 (`vol_v1`) vs
+Python ~336. This does **not** prove SF-2 workflow superiority.
 
-This small synthetic run still does **not** prove real-world LLM superiority or
-runtime performance. A second model on `core_v2` is needed before treating
-results as stable. Do not mix these workflow numbers with the hand-written
-density table above.
+An early `intent_v1` SF-1 run showed VOL first-try 80% (all misses:
+`.count()` arity) with 100% success @ K — see
+[`bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-045310.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-045310.md).
+SF-2 makes zero-arg `.count()` legal; re-measure before quoting new %.
 
 Full result: [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md).
 Protocol and limitations: [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md).
