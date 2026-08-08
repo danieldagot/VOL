@@ -5,4 +5,5 @@ total := large.sum()
 
 print large
 print "Sum:", total
+print "Count over 5:", numbers.count(_ > 5)
 assert(total == 28, "Unexpected collection total.")

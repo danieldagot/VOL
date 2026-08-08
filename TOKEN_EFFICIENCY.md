@@ -1,9 +1,9 @@
 # VOL Token Efficiency — Working Preset
 
 > Continuation doc for maximizing VOL token efficiency.
-> Last updated: 2026-08-08.
+> Last updated: 2026-08-08 (SF-2 exhausted for this loop).
 > Related: [`bench/`](bench/README.md), [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md),
-> [`IDEAS.md`](IDEAS.md), [`SPEC.md`](SPEC.md) §0 / SF-1.
+> [`IDEAS.md`](IDEAS.md), [`SPEC.md`](SPEC.md) §0 / SF-2.
 
 ## Goal
 
@@ -34,27 +34,78 @@ Suite: **16 tasks** × VOL / Python / Go / Rust / Zig (SF-2 densified VOL), tier
 | **labeled** | 09, 11, 12, 13 | report glue (multi-arg `print` / coercion) |
 | **parity** | 01–05, 07–08, 10 | control near-Python floor |
 
-Post-SF-2 medians (`cl100k_base`): all VOL/Python **0.805** (~20% fewer);
-compression **0.799**; labeled **0.651** (~35% fewer). See
+Post-loop medians (`cl100k_base`): all VOL/Python **0.804** (~20% fewer);
+compression **0.764** (~24% fewer); labeled **0.651** (~35% fewer). See
 [`bench/results/density.md`](bench/results/density.md).
 
-**Target “50% fewer than Python” (ratio 0.5) on median (all) is still hard**;
-prefer improving **median (compression)** further without unfair golf.
+**Target “50% fewer than Python” (ratio 0.5) on median (all) is still hard**
+without suite skew or SF-3 surface; prefer honest compression gains and
+workflow wins over labeled-only golf.
 
 ---
 
 ## LLM workflow (separate track)
 
-Historical Gemini `core_v2` (`vol_v1` / SF-1 vs Python): 100% first-try /
-success @ K; completions ~18.7% smaller; **cold** ~+11%; **warm** ~−3.3%.
-Harness default is now `vol_v2` / SF-2 — re-run `intent_v1` before quoting wins.
+Published Gemini `intent_v1` (`vol_v2` / SF-2 vs Python, `gemini-3.5-flash-lite`):
 
-For workflow ROI under SF-2:
+| Metric | VOL | Python |
+| --- | ---: | ---: |
+| First-try / success @ K | 100% / 100% | 100% / 100% |
+| Mean cold | 685.5 | 761.3 (−10.0%) |
+| Mean warm | 369.5 | 425.3 (−13.1%) |
+| Mean completion | 85.7 | 134.5 (−36.3%) |
+| Card est. (`cl100k_base`) | 316 | 336 |
 
-1. Keep `vol_v2` lean (≤ Python card when possible).
-2. Ship `vol fmt` with one canonical form per intent (`_` in collection ops).
-3. Move “don’t write X” from card → diagnostic `fix`.
-4. Re-measure `intent_v1` after card cuts; keep first-try %.
+Summary:
+[`bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md).
+
+Historical SF-1 `intent_v1` (`vol_v1`): first-try **80%** (all misses: zero-arg
+`.count()` before SF-2) — see `…045310.md`. Historical `core_v2` SF-1: 100%
+success with ~+11% cold / ~−3% warm vs Python.
+
+Still need ≥1 other model before treating deltas as stable.
+
+---
+
+## Iteration log (this loop)
+
+| Step | What failed / gap | Change | Density | Workflow | Keep? |
+| --- | --- | --- | --- | --- | --- |
+| Baseline SF-2 | SF-1 had 80% FT on `.count()` | (already shipped SF-2 surface) | all 0.805 / comp 0.799 / lab 0.651 | FT 93.3%, cold 908.7, warm 426.6 (`…051110`) | baseline |
+| Footgun | `16-map-filter` rep3: `.sum(pred)` → S003 | S003 Fix: use `.where(condition).sum()` | — | (repair aid) | **keep** |
+| Card v1 | FT not 100%; card 452 | Clarify `.sum()` 0-arg; cut fluff → 421 | — | FT 100%, cold 808.3, warm 387.3 (`…051408`) | superseded |
+| Card v2 | Cold still +card tax | Lean `vol_v2` → **316** (≤ Python 336) | — | FT 100%, cold **685.5**, warm **369.5** (`…051437`) | **keep** |
+| Densify | 14/16 repeat pipelines | Bind shared `.where` / `.map` | all **0.804**, comp **0.764**, lab 0.651 | n/a (benches only) | **keep** |
+
+**Rejected / not pursued for juice:** `.sum(pred)` sugar (would be new surface /
+SF-3), further card cuts below ~316 (risk first-try), `|>` / `=>` / enums /
+dual-return, unfair Python padding.
+
+---
+
+## SF-2 exhausted — rationale
+
+Stop criteria met for this model + `intent_v1`:
+
+1. VOL first-try **100%** and success @ K **100%**.
+2. Cold and warm means **below** prior SF-2 JSONL (`…051110` / `…051408`) and
+   **below Python** on both cold and warm (not merely “card tax excuse”).
+3. Remaining SF-2-legal levers were tried or ruled out:
+   - **Diagnostics:** `.sum` arity Fix shipped; no other high-frequency repair
+     footguns in the latest JSONL (all first-try).
+   - **Card:** already **≤ Python** while holding 100% first-try; further cuts
+     are predicted to hurt first-try more than they save cold tokens.
+   - **Bench densify:** labeled/compression already use multi-arg `print`,
+     coercion, `.count()` / `.count(pred)`, and shared binds; further shaves are
+     micro-golf or need new collection sugar.
+   - **In-freeze semantics:** accepting `.sum(pred)` would expand Supported
+     call shapes beyond the SF-2 pin spirit → defer to SF-3 if ever measured
+     necessary.
+4. Further gains need **non-SF-2** work:
+   - **`vol fmt`** rewriter (canonical `_` / bind style → smaller completions)
+   - **Prompt caching / warm serving** (infrastructure, not language)
+   - **Second model** confirmation
+   - **SF-3** only if a measured footgun demands new surface (not for density theater)
 
 ---
 
@@ -77,61 +128,24 @@ Use [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md) + `bench/llm/harness/run_generate_rep
 | **Failure mix** | parse / R0xx / wrong stdout / `source_check_failed` |
 | **Idioms emitted** | `.count` vs `.where.len` vs loops — does the card stick? |
 
-Protocol always gives a **matched language card** (not full `SPEC.md`). That is
-the fair “LLM without memorizing VOL” setup: task + compact card only.
-
 ### Commands
 
 ```sh
 cd bench
 
-# Wiring only (no API) — reference solutions must pass
-make llm-dry
+make check && make count
 
-# Live smoke (2 tasks) — cheap sanity
-uv run python llm/harness/run_generate_repair.py \
-  --provider gemini --suite smoke --langs vol,python --replicates 1
-
-# Prefer intent_v1 for “how does an LLM use VOL?” (no fib/hello toys)
+# Prefer intent_v1 for “how does an LLM use VOL?”
 uv run python llm/harness/run_generate_repair.py \
   --provider gemini --suite intent --langs vol,python --replicates 3
 
-# Historical published table shape (includes parity — keep for continuity only)
+# VOL-only iteration against frozen Python rows
 uv run python llm/harness/run_generate_repair.py \
-  --provider gemini --suite core --langs vol,python --replicates 3
-
-# Dry-run intent reference solutions (no API)
-make llm-dry-intent
+  --provider gemini --suite intent --langs vol --replicates 3 \
+  --baseline-jsonl llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051110.jsonl
 ```
 
-Needs `GEMINI_API_KEY` (or another provider) in env / `.env`. Results land under
-`bench/llm/results/`.
-
-### Suites
-
-| Suite | Freeze id | Use for |
-| --- | --- | --- |
-| `smoke` | `smoke_v1` | Wiring only |
-| `core` | `core_v2` | Published continuity (includes fib / arrays parity) |
-| **`intent`** | **`intent_v1`** | **Real language-use claims** |
-
-`intent_v1` tasks:
-
-| ID | Kind | Why it is here |
-| --- | --- | --- |
-| `06-where-sum` | generation | filter + aggregate |
-| `14-pipeline-stats` | generation | count / where / map / sum pipeline |
-| `16-map-filter` | generation | map then count/sum |
-| `08-strings-assert` | repair | diagnostic repair workflow |
-| `11-leaderboard` | modification | edit a working program |
-
-Optional add-on (not in default intent): `15-band-counts` via `--tasks`.
-Do **not** mix `intent_v1` rows into `core_v2` tables.
-
-### Second model before claiming a win
-
-One Gemini flash-lite table is not enough. Re-run the same suite/protocol on ≥1
-other model before treating VOL vs Python workflow deltas as stable.
+Needs `GEMINI_API_KEY` (or another provider) in env / `.env`.
 
 ### Decision rule
 
@@ -141,157 +155,76 @@ other model before treating VOL vs Python workflow deltas as stable.
 
 ---
 
-
 ## Strategy: radical dynamics (not radical syntax)
 
-Same look; change **what you can omit** and **how values flow**.
+### D1–D3 — SF-2 density dynamics ✓
 
-### D1 — Coercion in string context ✓ SF-2
-
-```vol
-print "Sum: " + total    // string + displayable → concat
-```
-
-`1 + "a"` stays `R013`. Keep `string(v)` for non-concat contexts.
-
-### D2 — Multi-arg `print` ✓ SF-2
-
-```vol
-print "Class average:", avg
-print "A grades:", scores.count(_ >= 90)
-```
-
-Space-join args, one trailing newline.
-
-### D3 — Collection intent ops (+ `.count()` length) ✓ SF-2
-
-Canonical:
-
-- `.where(_)` / `.map(_)` / `.count(_)` / `.sum()` / `.count()` (= `.len`)
-- Prefer `.count(pred)` over `.where(pred).len`
-- Chain filters; use `.each` only for effects
-
-Future **fusion** (single-pass chains) is runtime — does not cut source tokens.
+- string `+` coercion (`"n=" + 7`); `1 + "a"` stays `R013`
+- multi-arg `print` (space-join)
+- `.count()` ≡ `.len`; `.count(pred)` for filtered counts; `.sum()` remains 0-arg
+  (filter with `.where` first — taught by card + S003 Fix)
 
 ### D4 — Suite dynamics (honest scoreboard)
 
-If median vs Python is the goal, **what you measure** matters:
-
-- More filter / aggregate / report tasks → VOL pulls ahead.
-- More hello / while / fib → ties Python.
-
 Do not fake 50% by padding Python or stripping VOL assert messages.
 
-### D5 — Canon + tooling (SF-2 leftovers, density + workflow)
+### D5 — Canon + tooling (next, outside SF-2 language juice)
 
-- `vol fmt`: prefer `_` over `fn` in collection ops; one bind/loop/value style.
-- Examples emit formatter output only.
-- Rejected aliases stay rejected (`.length` → `fix` for `.len`).
+- `vol fmt`: prefer `_` over `fn` in collection ops; one bind/loop/value style
+- Move remaining “don’t write X” from card → diagnostic `Fix` when new footguns appear
+- Prompt caching for cold totals in real deployments
 
 ---
 
-## Explicit non-goals for this preset
+## Explicit non-goals for density juice
 
-Do **not** pursue these *for density juice* until SF-2 workflow re-measure
-lands:
+Do **not** pursue these *for density/workflow juice* until a measured SF-3 need:
 
-- `|>` pipelines
-- `?T` Option sugar
-- `=>` arrows
-- Dual-return sugar
-- Parallel / ownership inference (not source-token wins today)
+- `|>` pipelines, `?T` Option sugar, `=>` arrows, dual-return sugar
+- Parallel / ownership inference
 - Renaming keywords for 1-token shaves that grow the card
+- `.sum(pred)` unless a multi-model footgun proves card+Fix insufficient
 
 ---
 
 ## Ranked next actions
 
-### A. Language dynamics (SF-2) ✓
+### A. Language dynamics (SF-2) ✓ exhausted for this loop
 
-- [x] Spec + implement string `+` coercion (`1 + "a"` stays `R013`).
-- [x] Spec + implement multi-arg `print` (space-join, `R029` on `nothing`).
-- [x] `.count()` ≡ `.len`; SF-2 / `vol_v2` card.
-- [x] Rewrite density VOL tasks; `make check && make count`.
-- [x] Update README density bullets from new medians (~20% vs Python all-suite;
-      labeled ~35%).
+- [x] String `+` coercion; multi-arg `print`; `.count()` length; densified benches
+- [x] S003 Fix for `.sum(pred)` → `.where(condition).sum()`
+- [x] Lean `vol_v2` card (316 ≤ Python 336) with explicit `.sum()` 0-arg rule
+- [x] Bind shared pipelines in compression tasks 14/16
 
-### B. Workflow tokens (under SF-2)
+### B. Workflow / tooling (beyond SF-2 surface)
 
-- [ ] Tighten `vol_v2` card; re-run **`intent_v1`** (`--langs vol` + baseline JSONL).
-- [ ] Finish `vol fmt` rewriter with canonical table.
-- [ ] Publish ≥1 model on **`intent_v1`** with `vol_v2` (prefer over `core_v2`).
-- [ ] Publish ≥1 other model before treating workflow deltas as stable.
+- [ ] Finish `vol fmt` rewriter with canonical table
+- [ ] Publish ≥1 other model on `intent_v1` + `vol_v2`
+- [ ] Optional: prompt-cache accounting experiments (warm ≈ production)
 
-### C. Suite (honest measurement)
+### C. Suite / hygiene
 
-- [x] Add compression-heavy tasks (`14-pipeline-stats`, `15-band-counts`, `16-map-filter`).
-- [x] Tier reporting in `count_tokens.py` (compression / labeled / parity).
-- [x] Keep parity set (hello/loops/fib) so ties stay visible.
-- [x] Re-densify **labeled** VOL tasks after D1/D2 (labeled median ~0.651).
-
-### D. Measurement hygiene
-
-- [x] Report tokenizer name + median (all) + tier medians + per-task.
-- [ ] Always split density vs workflow; cold vs warm for LLM runs.
-- [ ] Never claim 50% vs Python until a measured **median (compression)** ≤ 0.50
-      on a documented suite (not labeled-only).
-- [x] Lang tests cover SF-2 `print` / coercion / `.count()` / `R013` / `R029`.
+- [x] Compression + labeled + parity tier reporting
+- [x] Split density vs workflow; cold vs warm in README
+- [ ] Never claim 50% vs Python until median (compression) ≤ 0.50 on a
+      documented suite (not labeled-only)
 
 ---
 
-## Idioms already used in densified `bench/tasks/*/vol`
-
-Use these as the hand-written / formatter target style:
+## Idioms (hand-written / formatter target)
 
 ```vol
-// arithmetic — print expressions, no dead temps
 print a + b
-
-// value choice
 print cond ? "yes" : "no"
-
-// fixed repeats over while+counter
 repeat 8 { … }
-
-// expression-body functions
 fn square(n) n * n
-
-// count over where.len
 scores.count(_ >= 90)
-
-// chain
-[4, 7, 2, 9, 12].where(_ > 5).sum()
-
-// effects after filter
-scores.where(_ >= 80).each score { print "High score: " + string(score) }
-```
-
-After D1/D2, prefer:
-
-```vol
-print "High score:", score
+g := nums.where(_ > 5)
+print g.count()
+print g.sum()
 print "Sum:", total
+print "High score:", score
 ```
-
----
-
-## How to resume
-
-```sh
-# Source density
-cd bench && make check && make count
-# → bench/results/density.md
-
-# LLM workflow (after card edits)
-cd bench
-uv run python llm/harness/run_generate_repair.py --provider gemini --suite core \
-  --langs vol --baseline-jsonl llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.jsonl
-```
-
-Decision rule for any change:
-
-> Does it reduce **total tokens to success** (or source tokens without growing
-> the card / repair rate)? If it only shortens hand-written golf, skip it.
 
 ---
 

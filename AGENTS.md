@@ -336,10 +336,11 @@ ratios.
 **Generate/repair workflow** protocol is in [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md)
 (task success vs total tokens across generation, diagnostics, and repair). Early
 published `core_v2` runs exist; they do **not** establish VOL superiority. The
-published Gemini tables (`vol_v1` / SF-1) match Python on first-try / success
-@ K with modest cold overhead after source-check hygiene. Meaning per Token
-(MPT) remains undefined as a single scalar. More models and realistic tasks are
-required before treating results as stable.
+published Gemini `intent_v1` (`vol_v2` / SF-2) matches Python on first-try /
+success @ K with lower cold and warm means on that one-model table; historical
+`core_v2` / `vol_v1` rows remain SF-1. Meaning per Token (MPT) remains undefined
+as a single scalar. More models and realistic tasks are required before treating
+results as stable.
 
 ---
 

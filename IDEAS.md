@@ -580,9 +580,10 @@ Rust, and Zig are compared by token count under named OpenAI tokenizers
 (`cl100k_base`, `o200k_base`). That benchmark measures source density only —
 not LLM task-success efficiency. Never cite density ratios as workflow proof.
 
-**Working preset:** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) — SF-2 shipped
-density dynamics (coercion, multi-arg `print`, `.count()`); continue with card
-hygiene, `vol fmt`, and workflow re-measure rather than radical new syntax.
+**Working preset:** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) — SF-2 density
+dynamics + lean `vol_v2` + `.sum` Fix shipped; `intent_v1` Gemini first-try 100%
+with cold/warm below Python. Further juice → `vol fmt`, second model, or SF-3
+only if measured necessary (not glyph theater).
 
 ## Open Design Questions
 

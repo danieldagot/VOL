@@ -3,7 +3,7 @@
 found := some("VOL")
 print found
 if some name := found {
-    print "Hello, " + name
+    print "Hello,", name
 } else {
     print "missing"
 }

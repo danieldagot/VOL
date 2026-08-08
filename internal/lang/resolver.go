@@ -349,7 +349,13 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 					return d
 				}
 				if len(node.Arguments) != 0 {
-					return r.arity(property.Name, "."+property.Name.Lexeme, 0, len(node.Arguments))
+					fix := "Pass the required number of arguments."
+					if property.Name.Lexeme == "sum" {
+						fix = "`.sum()` takes no filter; use `.where(condition).sum()`."
+					}
+					return r.error(property.Name, "S003",
+						fmt.Sprintf("`.%s` expects %d arguments, got %d.", property.Name.Lexeme, 0, len(node.Arguments)),
+						fix)
 				}
 				return nil
 			}

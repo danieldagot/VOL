@@ -1,4 +1,4 @@
-// Option (optional data) vs Result (operational success/failure).
+// Option = optional data. Result = operational success / failure.
 
 fn find(name) {
     if name == "" {
@@ -15,25 +15,25 @@ fn parse_positive(n) {
 }
 
 if some s := find("VOL") {
-    print s
+    print "found:", s
 } else {
     print "empty name"
 }
 
 if some s := find("") {
-    print s
+    print "found:", s
 } else {
     print "empty name"
 }
 
 if ok v := parse_positive(3) {
-    print v
+    print "positive:", v
 } else err e {
-    print e
+    print "error:", e
 }
 
 if ok v := parse_positive(-1) {
-    print v
+    print "positive:", v
 } else err e {
-    print e
+    print "error:", e
 }

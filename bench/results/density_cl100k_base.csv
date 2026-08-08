@@ -12,6 +12,6 @@ task,tier,vol,python,go,rust,zig,vol/python,vol/go,vol/rust,vol/zig
 11-leaderboard,labeled,131,185,277,218,337,0.708,0.473,0.601,0.389
 12-revenue,labeled,76,128,169,150,222,0.594,0.450,0.507,0.342
 13-temperatures,labeled,139,178,228,177,267,0.781,0.610,0.785,0.521
-14-pipeline-stats,compression,74,81,152,153,225,0.914,0.487,0.484,0.329
+14-pipeline-stats,compression,67,81,152,153,225,0.827,0.441,0.438,0.298
 15-band-counts,compression,73,110,145,159,244,0.664,0.503,0.459,0.299
-16-map-filter,compression,61,68,118,119,169,0.897,0.517,0.513,0.361
+16-map-filter,compression,58,68,118,119,169,0.853,0.492,0.487,0.343

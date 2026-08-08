@@ -73,8 +73,8 @@ remain for published SF-1 / SF-0 tables.
 - array `.len` and string `.len` (Unicode scalar values) and string `.byte_len` (UTF-8 byte count)
 - array iteration with `.each` (imperative / side effects)
 - collection filtering with `.where(...)`, mapping with `.map(...)`, counting with `.count(...)` or length via `.count()`, and numeric aggregation with `.sum()` (prefer side-effect-free predicates; purity checks Planned)
-- Option values with `some(value)` / `none`; unwrap with if-let and `??` (`match` rejected)
-- Result values with `ok(value)` / `err(value)`; unwrap with if-let and postfix `?` in functions (bugs still trap)
+- Option values with `some(value)` / `none`; unwrap with if-let and `??` (`match` rejected) — see `examples/features/option.vol`
+- Result error handling with `ok(value)` / `err(value)`, if-let, and postfix `?` in functions (bugs still trap) — see `examples/features/errors.vol` and `examples/projects/shop/`
 - product `struct` types, named and positional construction, and field get/set
 - `import "path"` / project-local aliases via nearest `vol.config.json`; live `export` across modules (see `examples/features/modules/aliases/` for `@lib`; future `@std` spelling is vision-only in [`IDEAS.md`](IDEAS.md), not a shipped stdlib)
 - `print` with one or more values (space-joined display forms)
@@ -316,12 +316,12 @@ bench            source token density benchmark (VOL vs Python/Go/Rust/Zig)
 
 On 16 equivalent small programs (after SF-2 density dynamics), VOL currently uses about:
 
-- **~20% fewer tokens than Python** (all-suite median)
-- **~20% fewer than Python** on the **compression** tier (filter/map/count/sum)
-- **~35% fewer than Python** on the **labeled** tier (multi-arg `print` / coercion)
-- **~49% fewer tokens than Go**
+- **~20% fewer tokens than Python** (all-suite median; ratio **0.804**)
+- **~24% fewer than Python** on the **compression** tier (filter/map/count/sum; **0.764**)
+- **~35% fewer than Python** on the **labeled** tier (multi-arg `print` / coercion; **0.651**)
+- **~50% fewer tokens than Go**
 - **~46% fewer tokens than Rust**
-- **~64% fewer tokens than Zig**
+- **~65% fewer tokens than Zig**
 
 (medians; nearly the same under both `cl100k_base` and `o200k_base`. Reports also
 split **labeled** vs **parity** tiers — see [`bench/README.md`](bench/README.md).)
@@ -344,27 +344,26 @@ cd bench && uv sync && uv run python harness/count_tokens.py
 The default workflow baseline is **Python** (interpreted peer for the current
 prototype). Go remains an optional compiled baseline (`--langs vol,go`).
 
-Published protocol-v1.1 runs below used **`vol_v1` / SF-1** (historical). The
-harness default is now **`vol_v2` / SF-2**; re-run `intent_v1` before claiming
-workflow wins from density dynamics.
-
-One `core_v2` Gemini flash-lite table (`vol_v1`):
+Primary language-use table: **`intent_v1`** with **`vol_v2` / SF-2** vs Python
+(`gemini-3.5-flash-lite`, temperature 0, 3 replicates, K=2). Card ~316 tokens
+(`vol_v2`) vs Python ~336.
 
 | Language | First-try | Success @ K | Mean cold | Mean warm | Mean completion |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Python | 100% | 100% | 762.9 | 426.9 | 135.1 |
-| VOL (SF-1) | 100% | 100% | 848.6 | 412.6 | 109.9 |
+| Python | 100% | 100% | 761.3 | 425.3 | 134.5 |
+| VOL (SF-2) | 100% | 100% | 685.5 | 369.5 | 85.7 |
 
-That SF-1 run matched Python on **first-try** / **success @ K**, used about
-**11.2% more cold** / **3.3% fewer warm** tokens. Card ~436 (`vol_v1`) vs
-Python ~336. This does **not** prove SF-2 workflow superiority.
+VOL matched Python on **first-try** / **success @ K**, used about **10.0% fewer
+cold** and **13.1% fewer warm** workflow tokens, with ~36% smaller completions.
+One-model result — do not treat as stable across models. Full summary:
+[`bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-051437.md).
 
-An early `intent_v1` SF-1 run showed VOL first-try 80% (all misses:
-`.count()` arity) with 100% success @ K — see
-[`bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-045310.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-045310.md).
-SF-2 makes zero-arg `.count()` legal; re-measure before quoting new %.
+Historical SF-1 notes (freeze ids unchanged): `core_v2` matched Python on
+success with ~+11% cold / ~−3% warm
+([`…041440.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md));
+early `intent_v1` on `vol_v1` was 80% first-try (all `.count()` arity misses)
+([`…045310.md`](bench/llm/results/intent_v1_live_gemini_gemini-3.5-flash-lite_20260808-045310.md)).
 
-Full result: [`bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md`](bench/llm/results/core_v2_live_gemini_gemini-3.5-flash-lite_20260808-041440.md).
 Protocol and limitations: [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md).
 
 ## Requirements

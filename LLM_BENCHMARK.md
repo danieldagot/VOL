@@ -196,16 +196,17 @@ features from [`SPEC.md`](SPEC.md) / README “What Actually Works.”
 
 Default VOL card (`vol_v2` / SF-2) must include at least:
 
-- no `main`; top-level statements run
-- `:=` / `=` / opt-in `const`
+- no `main`; top-level statements run; newlines separate statements
+- `:=` / `=`
 - `if` / `elif` / `else` (statement); `? :` for values
 - `repeat`, `while`, `.each`
-- arrays, `.len`, `.count()` / `.count(_ …)`, `.where(_ …)`, `.sum()`
-- `fn` / `return`; missing return is `nothing` (do not assign it)
-- `print` / multi-arg `print`; string `+` coercion; `string()`, `assert`
-- integer overflow traps
+- arrays, `.len` / `.count()`, `.where(_ …)`, `.map(_ …)`, `.count(_ …)`,
+  `.sum()` as **0-arg** (filter with `.where` first)
+- `fn` / `return`; missing return is `nothing`
+- `print` / multi-arg `print`; string `+` coercion; `assert`
 
-It is a **task card**, not a full SF-2 product tour. Omit Option/Result/structs/
+It is a **task card**, not a full SF-2 product tour. Prefer ≤ Python card size
+when first-try stays high. Omit `const`, overflow detail, Option/Result/structs/
 `import` until a suite exercises them.
 
 Python card: equivalently dense stdlib-only reminders (`print`, lists, `for`,
@@ -463,7 +464,8 @@ cannot be recomputed from committed JSONL.
 - [x] Publish frozen `core_v2` live run with default `--langs vol,python` (Gemini)
 - [x] Surface Freeze SF-1; `vol_v1.md` = `core_v2` task card (SF-1-bound subset)
 - [x] Surface Freeze SF-2; `vol_v2.md` harness default (density dynamics)
-- [ ] Re-run / publish `intent_v1` against `vol_v2` (prefer over `core_v2`)
+- [x] Publish `intent_v1` against `vol_v2`
+      (`20260808-051437`; VOL live + frozen Python from `20260808-051110`)
 - [ ] Publish ≥1 other model before treating workflow deltas as stable
 - [x] Re-run / publish `core_v2` against `vol_v1`
       (`20260808-041440`; includes frozen Python rows from the prior live run)

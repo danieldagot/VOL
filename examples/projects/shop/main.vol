@@ -12,13 +12,13 @@ cart := [Item { name: "mug", price: 12, qty: 2 }, Item { name: "sticker", price:
 print "Subtotal:", cart_total(cart)
 
 if ok msg := pay(cart) {
-    print msg
+    print "pay:", msg
 } else err e {
-    print e
+    print "pay failed:", e
 }
 
 if ok msg := pay([]) {
-    print msg
+    print "pay:", msg
 } else err e {
-    print e
+    print "pay failed:", e
 }

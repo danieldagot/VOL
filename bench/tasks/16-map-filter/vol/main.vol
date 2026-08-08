@@ -1,3 +1,4 @@
 xs := [1, 2, 3, 4, 5, 6, 7, 8]
-print xs.map(_ * 3).count(_ > 10 and _ < 20)
-print xs.map(_ * 3).where(_ > 10).sum()
+m := xs.map(_ * 3)
+print m.count(_ > 10 and _ < 20)
+print m.where(_ > 10).sum()

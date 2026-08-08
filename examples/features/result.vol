@@ -1,13 +1,15 @@
+// Result values: ok(value) / err(value); unwrap with if-let.
+
 r := ok(7)
 if ok n := r {
-    print n
+    print "ok:", n
 } else err msg {
-    print msg
+    print "err:", msg
 }
 
 e := err("missing")
 if ok n := e {
-    print n
+    print "ok:", n
 } else err msg {
-    print msg
+    print "err:", msg
 }

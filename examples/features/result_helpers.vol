@@ -1,4 +1,4 @@
-// Result from helpers: return ok(...) or err(...), then if-let.
+// Return Result from helpers, then unwrap with if-let.
 
 fn divide(a, b) {
     if b == 0 {
@@ -8,13 +8,13 @@ fn divide(a, b) {
 }
 
 if ok n := divide(10, 2) {
-    print n
+    print "10/2 =", n
 } else err msg {
-    print msg
+    print "error:", msg
 }
 
 if ok n := divide(10, 0) {
-    print n
+    print "10/0 =", n
 } else err msg {
-    print msg
+    print "error:", msg
 }

@@ -52,7 +52,7 @@ Use this snapshot before roasting—do not pretend the repo is still pre-`SPEC.m
   conformance examples, **§11 Decided** core rules (mutability default, overflow,
   purity intent, `if` vs `? :`, permanent `while`, etc.).
 - **Partially evidenced LLM claim:** `bench/` measures **source token density**
-  on 16 equivalent tasks (tiered; ~20% fewer than Python all-suite after SF-2, etc.)—not task success,
+  on 16 equivalent tasks (tiered; ~20% fewer than Python all-suite / ~24% compression after SF-2, etc.)—not task success,
   compile failures, or repair cost.
 - **Still missing / vision-only:** static types, ownership/borrow, generics, native
   backend, formatter rewriter, enforced `.where` purity at runtime,

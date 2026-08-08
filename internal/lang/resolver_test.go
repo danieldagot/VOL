@@ -80,12 +80,16 @@ func TestResolverChecksKnownCallArities(t *testing.T) {
 		{name: "where none", source: "[1].where()", message: "expects 1 arguments, got 0"},
 		{name: "where many", source: "[1].where(true, false)", message: "expects 1 arguments, got 2"},
 		{name: "count many", source: "[1].count(true, false)", message: "expects 0 or 1 arguments, got 2"},
+		{name: "sum with filter", source: "print [1].sum(_ > 0)", message: "expects 0 arguments, got 1"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			_, diagnostic := run(t, test.source)
 			if diagnostic == nil || diagnostic.Code != "S003" || !strings.Contains(diagnostic.Message, test.message) || diagnostic.Fix == "" {
 				t.Fatalf("diagnostic = %#v", diagnostic)
+			}
+			if test.name == "sum with filter" && !strings.Contains(diagnostic.Fix, ".where(condition).sum()") {
+				t.Fatalf("sum arity Fix = %q", diagnostic.Fix)
 			}
 		})
 	}

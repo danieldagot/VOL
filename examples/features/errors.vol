@@ -1,0 +1,60 @@
+// Error handling with Result: ok / err, if-let, and postfix ?.
+// Bugs still trap — Result is for expected failure, not panic recovery.
+
+fn parse_score(n) {
+    if n < 0 or n > 100 {
+        return err("score out of range")
+    }
+    return ok(n)
+}
+
+fn grade(n) {
+    score := parse_score(n)?
+    return ok(score >= 60 ? "pass" : "fail")
+}
+
+fn average(scores) {
+    if scores.len == 0 {
+        return err("empty list")
+    }
+    return ok(scores.sum() / scores.len)
+}
+
+// if-let on ok / err
+if ok n := parse_score(85) {
+    print "parsed:", n
+} else err e {
+    print "parse failed:", e
+}
+
+if ok n := parse_score(150) {
+    print "parsed:", n
+} else err e {
+    print "parse failed:", e
+}
+
+// postfix ? propagates err out of the function
+if ok g := grade(85) {
+    print "grade:", g
+} else err e {
+    print "grade failed:", e
+}
+
+if ok g := grade(-3) {
+    print "grade:", g
+} else err e {
+    print "grade failed:", e
+}
+
+// helpers that return Result
+if ok avg := average([80, 90, 70]) {
+    print "average:", avg
+} else err e {
+    print "average failed:", e
+}
+
+if ok avg := average([]) {
+    print "average:", avg
+} else err e {
+    print "average failed:", e
+}

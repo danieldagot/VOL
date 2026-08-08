@@ -1307,9 +1307,9 @@ print none // none
 ```vol
 r := ok(7)
 if ok n := r {
-    print n // 7
+    print "ok:", n // ok: 7
 } else err msg {
-    print msg
+    print "err:", msg
 }
 
 fn divide(a, b) {
@@ -1323,6 +1323,10 @@ fn twice(a, b) {
     return ok(n * 2)
 }
 ```
+
+Executable tour: [`examples/features/errors.vol`](examples/features/errors.vol)
+(if-let, postfix `?`, labeled failures). Project-sized use:
+[`examples/projects/shop/`](examples/projects/shop/).
 
 ### 9.7 Structs
 

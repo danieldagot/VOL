@@ -18,16 +18,16 @@ go run ./cmd/vol run ./examples/<path>.vol
 
 | File | Demonstrates |
 | --- | --- |
-| `basics/hello.vol` | Values, strings, `print`, `string` |
+| `basics/hello.vol` | Values, strings, multi-arg `print`, string `+` |
 | `basics/first.vol` | `.each` and a running total |
 | `basics/conditions.vol` | `if` / `and` |
 | `basics/loops.vol` | `while`, `repeat` |
 | `basics/arrays.vol` | Indexing, `.len`, `.copy` / `.deep_copy` |
-| `basics/collections.vol` | `.where`, `.sum()`, `assert` |
+| `basics/collections.vol` | `.where`, `.count`, `.sum()`, multi-arg `print`, `assert` |
 | `basics/functions.vol` | Named `fn`, parameters, `return` |
 | `basics/scope.vol` | Lexical scopes and shadowing |
 | `basics/arguments.vol` | Built-in `args` |
-| `basics/interaction.vol` | `input` and `assert` |
+| `basics/interaction.vol` | `input`, multi-arg `print`, `assert` |
 
 ```text
 go run ./cmd/vol run ./examples/basics/first.vol
@@ -42,6 +42,7 @@ go run ./cmd/vol run ./examples/basics/arguments.vol -- apple banana
 | `features/option.vol` | `some` / `none`, if-let, `??` |
 | `features/result.vol` | `ok` / `err`, if-let |
 | `features/result_helpers.vol` | Returning Result from helpers |
+| `features/errors.vol` | **Error handling tour**: if-let, postfix `?`, labeled failures |
 | `features/option_result.vol` | Option vs Result side by side |
 | `features/struct.vol` | Product structs, named + positional literals |
 | `features/struct_nested.vol` | Nested structs and shared identity |
@@ -50,6 +51,11 @@ go run ./cmd/vol run ./examples/basics/arguments.vol -- apple banana
 | `features/modules/main.vol` | `import` + `export` |
 | `features/modules/import_struct.vol` | Importing a struct type |
 | `features/modules/aliases/main.vol` | `@lib` path alias via local `vol.config.json` |
+
+```text
+go run ./cmd/vol run ./examples/features/errors.vol
+go run ./cmd/vol run ./examples/features/print_multi.vol
+```
 
 ## Projects
 
