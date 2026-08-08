@@ -2,6 +2,6 @@ revenue := [240, 175, 289, 150, 225, 199, 180, 178]
 premium := revenue.where(_ >= 200)
 
 print "Total revenue:", revenue.sum()
-print "Premium orders (200+):", premium.count()
+print "Premium orders (200+):", premium.len
 print "Premium revenue:", premium.sum()
 print "Budget orders:", revenue.count(_ < 200)

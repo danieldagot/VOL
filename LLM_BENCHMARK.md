@@ -1,6 +1,6 @@
 # VOL LLM Workflow Benchmark (Protocol v1.1)
 
-> Status: **protocol v1.1 harness implemented; primary published Gemini `intent_v1`/`vol_v3` (SF-3) vs Python; historical `vol_v2`/`vol_v1`; `core_v2` continuity; Go/`core_v1` historical**
+> Status: **protocol v1.1 harness implemented; default card `vol_v3_1` (SF-3.1); focused SF-3.1 gemma slice published (`…081431`); primary full-suite Gemini table remains `intent_v1`/`vol_v3` (SF-3); `vol_v2`/`vol_v1`; `core_v2` continuity**
 > Companion to: [`bench/`](bench/README.md) (source token density only)
 
 This document defines how VOL measures whether it is actually better for
@@ -118,8 +118,10 @@ published Gemini tables. For “does the LLM use VOL intent ops?” prefer §4.2
 | `06-where-sum` | generation | filter + sum |
 | `14-pipeline-stats` | generation | count / where / map / sum pipeline |
 | `16-map-filter` | generation | map then count/sum |
-| `17-strings-ops` | generation | SF-3 `@std/strings` (trim/split/join/has/replace) |
-| `20-json-fields` | generation | SF-3 `@std/json` + `dict("k", v, …)` |
+| `17-strings-ops` | generation | SF-3.1 `@std/strings` (`strings.trim` / …) |
+| `20-json-fields` | generation | SF-3.1 `@std/json` + `dict {…}` |
+| `22-ns-join` | generation | SF-3.1 dual-module `path.join` + `strings.join` |
+| `23-pipeline-multiline` | generation | multiline `.where`/`.map` pipelines; `.len` |
 | `08-strings-assert` | diagnostic repair | fix seeded failure using real runner diagnostics |
 | `11-leaderboard` | modification | preserve and extend a working program |
 
@@ -198,7 +200,7 @@ Target **≤ ~400 tokens** each (measure with the same tokenizer used for scorin
 or the API’s tokenizer). Cards must only describe **currently Supported** VOL
 features from [`SPEC.md`](SPEC.md) / README “What Actually Works.”
 
-Default VOL card (`vol_v3` / SF-3) must include at least:
+Default VOL card (`vol_v3_1` / SF-3.1) must include at least:
 
 - no `main`; top-level statements run; newlines separate statements
 - `:=` / `=`
@@ -223,7 +225,8 @@ slices, `for`), not a tour of Effective Go.
 Store frozen cards under:
 
 ```text
-bench/llm/cards/vol_v3.md      # SF-3 harness default (@std + dict)
+bench/llm/cards/vol_v3_1.md    # SF-3.1 harness default (foundation)
+bench/llm/cards/vol_v3.md      # historical SF-3 (@std + flat imports)
 bench/llm/cards/vol_v2.md      # SF-2 historical (density dynamics; published intent_v1)
 bench/llm/cards/vol_v1.md      # SF-1 historical (published core_v2 / intent_v1)
 bench/llm/cards/vol_v0.md      # SF-0 (historical; do not mix freeze IDs)
@@ -473,6 +476,10 @@ cannot be recomputed from committed JSONL.
 - [x] Surface Freeze SF-1; `vol_v1.md` = `core_v2` task card (SF-1-bound subset)
 - [x] Surface Freeze SF-2; `vol_v2.md` (density dynamics; published `intent_v1`)
 - [x] Surface Freeze SF-3; `vol_v3.md` harness default (`@std` + dict)
+- [x] Surface Freeze SF-3.1; `vol_v3_1.md` harness default (foundation)
+- [x] Publish focused SF-3.1 `intent_v1` slice (`20`/`22`/`23`) vs Python on
+      `gemma-4-31b-it` / `vol_v3_1` (`20260808-081431`; VOL 100% FT)
+- [ ] Publish full 7-task `intent_v1` against `vol_v3_1` (same model or flash)
 - [x] Publish `intent_v1` against `vol_v2`
       (`20260808-051437`; VOL live + frozen Python from `20260808-051110`)
 - [x] Publish `intent_v1` against `vol_v3` (5-task pre-stdlib)

@@ -291,7 +291,7 @@ print string([1, true, ["x"]])`
 func TestIndexResultSuggestsUnwrap(t *testing.T) {
 	_, diagnostic := runVolSource(t, `
 import "@std/json"
-v := parse("{\"n\":1}")
+v := json.parse("{\"n\":1}")
 print v["n"]
 `)
 	if diagnostic == nil || diagnostic.Code != "R003" {

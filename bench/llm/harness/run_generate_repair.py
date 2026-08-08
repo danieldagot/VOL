@@ -78,26 +78,27 @@ CORE_TASKS = [
     "13-temperatures",
 ]
 # Intent-ops + real workflows only (no hello/fib parity). Prefer for language-use claims.
-# SF-3: includes @std strings/json + dict (17, 20) so vol_v3 card surface is exercised.
+# SF-3.1: namespaced @std, dict literals, multiline pipelines (17, 20, 22, 23).
 INTENT_TASKS = [
     "06-where-sum",
     "14-pipeline-stats",
     "16-map-filter",
     "17-strings-ops",
     "20-json-fields",
-    "08-strings-assert",
-    "11-leaderboard",
+    "22-ns-join",
+    "23-pipeline-multiline",
 ]
 
-# Cards bound to product surface freezes (SPEC.md §0). Next VOL bump is SF-4+.
+# Cards bound to product surface freezes (SPEC.md §0). Active: SF-3.1 foundation.
+# Historical vol_v3.md remains for published SF-3 tables. Sugar stays unscheduled.
 # Default workflow baseline is Python (interpreted peer); Go remains optional.
 LANG_META = {
     "vol": {
-        "card": "vol_v3.md",
+        "card": "vol_v3_1.md",
         "label": "VOL",
         "ext": ".vol",
         "prompt_lang": "VOL",
-        "freeze": "SF-3",
+        "freeze": "SF-3.1",
     },
     "python": {
         "card": "python_v0.md",
@@ -116,6 +117,11 @@ LANG_META = {
 }
 
 FENCE_RE = re.compile(r"```(?:[a-zA-Z0-9_+-]*)\n(.*?)```", re.DOTALL)
+# Gemma and some chat models wrap reasoning; strip before treating as source.
+THOUGHT_RE = re.compile(
+    r"<(?:thought|thinking|reasoning)>.*?</(?:thought|thinking|reasoning)>",
+    re.DOTALL | re.IGNORECASE,
+)
 TIMEOUT_SEC = 5.0
 
 DEFAULT_OLLAMA_BASE = "http://localhost:11434/v1"
@@ -256,7 +262,7 @@ def run_cmd(
 
 
 def extract_source(text: str) -> str | None:
-    text = text.strip()
+    text = THOUGHT_RE.sub("", text).strip()
     if not text:
         return None
     blocks = [m.group(1).strip() for m in FENCE_RE.finditer(text)]
@@ -395,8 +401,8 @@ def judge(
 
 SYSTEM_PROMPT = (
     "You are a careful programmer. Write a complete program that prints exactly "
-    "the required stdout. Prefer raw source code with no markdown fences. "
-    "Do not explain."
+    "the required stdout. Prefer raw source code with no markdown fences and no "
+    "<thought> blocks. Do not explain."
 )
 
 
@@ -504,7 +510,32 @@ def chat_completion(
                 flush=True,
             )
             time.sleep(delay)
+        except TimeoutError as exc:
+            if retry >= MAX_API_RETRIES:
+                die(f"API request timed out after {request_timeout}s: {exc}")
+            delay = min(10.0, float(2**retry))
+            print(
+                f"API timeout ({request_timeout}s); retrying in {delay:.1f}s "
+                f"({retry + 1}/{MAX_API_RETRIES})",
+                file=sys.stderr,
+                flush=True,
+            )
+            time.sleep(delay)
         except urllib.error.URLError as exc:
+            reason = exc.reason
+            timed_out = isinstance(reason, TimeoutError) or (
+                isinstance(reason, OSError) and "timed out" in str(reason).lower()
+            )
+            if timed_out and retry < MAX_API_RETRIES:
+                delay = min(10.0, float(2**retry))
+                print(
+                    f"API timeout ({request_timeout}s); retrying in {delay:.1f}s "
+                    f"({retry + 1}/{MAX_API_RETRIES})",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                time.sleep(delay)
+                continue
             die(
                 f"API request failed: {exc}\n"
                 f"  URL: {url}\n"
@@ -1135,14 +1166,14 @@ def resolve_endpoint(provider: str, model_arg: str | None) -> tuple[str, str, st
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             die("OPENAI_API_KEY is required for --provider openai")
-        return base_url, api_key, model, 120.0
+        return base_url, api_key, model, 60.0
     if provider == "gemini":
         base_url = os.environ.get("GEMINI_BASE_URL", DEFAULT_GEMINI_BASE)
         model = model_arg or os.environ.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             die("GEMINI_API_KEY is required for --provider gemini (set it in .env or the shell)")
-        return base_url, api_key, model, 120.0
+        return base_url, api_key, model, 60.0
     die(f"unknown provider: {provider}")
 
 

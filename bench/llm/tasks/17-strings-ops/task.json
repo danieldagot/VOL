@@ -3,10 +3,10 @@
   "source_checks": {
     "vol": [
       "@std/strings",
-      "\\btrim\\s*\\(",
-      "\\b(split|join)\\s*\\(",
-      "\\bhas\\s*\\(",
-      "\\breplace\\s*\\("
+      "strings\\.trim\\s*\\(",
+      "strings\\.(split|join)\\s*\\(",
+      "strings\\.has\\s*\\(",
+      "strings\\.replace\\s*\\("
     ],
     "python": [
       "\\.strip\\s*\\(",

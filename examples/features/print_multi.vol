@@ -1,4 +1,4 @@
-scores := [85, 91, 72]
-print "A grades:", scores.count(_ >= 90)
-print "Sum: " + scores.where(_ >= 80).sum()
-print "Count:", scores.count()
+scores := [90, 80, 70]
+print "Scores:", scores
+print "Count:", scores.len
+print "Sum label:", "total=" + scores.sum()

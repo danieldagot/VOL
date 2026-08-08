@@ -1,6 +1,6 @@
 import "@std/process"
 import "@std/strings"
 
-p := run(["echo", "vol"])?
+p := process.run(["echo", "vol"])?
 print p.status
-print trim(p.stdout)
+print strings.trim(p.stdout)

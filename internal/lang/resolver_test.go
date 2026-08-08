@@ -47,9 +47,10 @@ func TestUndefinedNameHintsStdAliases(t *testing.T) {
 		source string
 		fix    string
 	}{
-		{name: "contains", source: `print contains("a", "a")`, fix: "`has`"},
-		{name: "json module path", source: `print json.parse("{}")`, fix: "flat names"},
-		{name: "stringify", source: `print stringify(1)`, fix: "`dump`"},
+		{name: "contains", source: `print contains("a", "a")`, fix: "strings.has"},
+		{name: "json module path", source: `print json.parse("{}")`, fix: "Import `@std/json`"},
+		{name: "stringify", source: `print stringify(1)`, fix: "json.dump"},
+		{name: "flat trim", source: `print trim(" x ")`, fix: "strings.trim"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -102,7 +103,8 @@ func TestResolverChecksKnownCallArities(t *testing.T) {
 		{name: "assert too many", source: "assert(true, \"x\", \"y\")", message: "expects one or two arguments, got 3"},
 		{name: "where none", source: "[1].where()", message: "expects 1 arguments, got 0"},
 		{name: "where many", source: "[1].where(true, false)", message: "expects 1 arguments, got 2"},
-		{name: "count many", source: "[1].count(true, false)", message: "expects 0 or 1 arguments, got 2"},
+		{name: "count many", source: "[1].count(true, false)", message: "expects 1 arguments, got 2"},
+		{name: "count none", source: "[1].count()", message: "expects 1 arguments, got 0"},
 		{name: "sum with filter", source: "print [1].sum(_ > 0)", message: "expects 0 arguments, got 1"},
 	}
 	for _, test := range tests {

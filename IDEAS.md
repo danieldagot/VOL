@@ -8,23 +8,26 @@ specified and tested.
 
 ## Near-Term Priority: Precise Core Before New Features
 
-**Surface Freeze SF-3 is active** (see [`SPEC.md`](SPEC.md) §0). Supported surface
-keeps SF-2 syntax and adds reserved `@std` plus dict runtime. Default harness
-card: `bench/llm/cards/vol_v3.md`. SF-2 / `vol_v2`, SF-1 / `vol_v1`, and SF-0 /
-`vol_v0` remain for historical harness tables.
+**Surface Freeze SF-3.1 foundation is active** (see [`SPEC.md`](SPEC.md) §0).
+Supported surface keeps SF-3 `@std` + dict, hardened with namespaced imports,
+`dict {…}` literals, multiline chains, and `.len`-only length. Default harness
+card: `bench/llm/cards/vol_v3_1.md`. SF-3 / `vol_v3`, SF-2 / `vol_v2`, SF-1 /
+`vol_v1`, and SF-0 / `vol_v0` remain for historical harness tables. Assignment /
+sharing: [`MEMORY_MODEL.md`](MEMORY_MODEL.md).
 
-**Next product freeze (Planned):** **SF-4+** language sugar (`|>`, enums,
-dual-return, dict literals, …) and later DB/ORM/WebSocket work — see sections
-below. Keep SF-3 syntax frozen (no new keywords/operators) without a bump.
+**Planned sugar (unscheduled):** `|>`, enums, dual-return, `=>`, … and later
+DB/ORM/WebSocket work — see sections below. These are **not** a promised next
+product freeze. Keep SF-3.1 foundation frozen without a bump.
 
-Frozen core (do not grow under SF-3 without a bump):
+Frozen core (do not grow under SF-3.1 without a bump):
 
 - values, variables (including multi-assign), named/anonymous/expression-body `fn`,
   product structs (named + positional literals)
 - `if` / `elif` / `else`, if-let, `repeat`, `while`, `? :`, Option `??`, Result `?`
-- arrays, `.each`, `.where`, `.map`, `.count` / `.count()`, `.sum()`, `some` / `none`, `ok` / `err`
-- multi-arg `print`; string `+` displayable coercion
-- `import` / `export` with `vol.config.json` discovery
+- arrays, `.each`, `.where`, `.map`, `.count(pred)`, `.sum()`, `some` / `none`, `ok` / `err`
+- `.len` only for length (zero-arg `.count()` rejected)
+- multi-arg `print`; string `+` displayable coercion; multiline expression continuation
+- namespaced `import` / `export` with `vol.config.json` discovery; `dict {…}` + ambient `dict()`
 - built-ins already accepted by the interpreter (ambient tiny core)
 - `match` is Rejected (`E153`)
 
@@ -36,16 +39,17 @@ Immediate documentation and design work:
 - [x] Declare Surface Freeze SF-0 (SPEC + `vol_v0` language card).
 - [x] Declare Surface Freeze SF-1 (vision-aligned surface; `vol_v1` = `core_v2` task card).
 - [x] Declare Surface Freeze SF-2 (density dynamics; `vol_v2` card).
-- [x] Decide SF-3 scope: usable `@std` (see section below); syntax sugar → SF-4+.
+- [x] Decide SF-3 scope: usable `@std` (see section below); syntax sugar unscheduled Planned.
+- [x] Decide SF-3.1 foundation: namespaces, `dict {…}`, multiline, `.len`-only — see section below.
 - [ ] Keep `SPEC.md` synchronized whenever interpreter behavior changes.
 - [x] Error/result model — **Result values + if-let / `?` implemented** (SF-1);
-      dual-return still Planned (SF-4+).
+      dual-return still Planned (unscheduled).
 - [x] Option / optional-values — **implemented** (`some`/`none`/if-let/`??`); `?T` still Planned.
 - [x] Modules — **implemented** (config + `path.vol` / `path/mod.vol`; ambient tiny core).
 - [x] Phase-2 design directions #2–#11 (structs/Result/unwrap/density in SF-1;
       remaining ownership/alloc, parallel, build modes, pipelines).
 - [x] Implement SF-3 `@std` (reserved root, modules, dict runtime) — shipped; see section below.
-- [ ] Finish `vol fmt` rewriter (CLI stub + style rules drafted); parallel to SF-3,
+- [ ] Finish `vol fmt` rewriter (CLI stub + style rules drafted); parallel to SF-3.1,
       not freeze-defining.
 - [x] Write `LLM_BENCHMARK.md` with a falsifiable generate/repair protocol;
       harness + Gemini `intent_v1` / `vol_v3` (primary) and `vol_v2` /
@@ -62,24 +66,24 @@ Immediate documentation and design work:
       `??` / `?` shipped in SPEC. Shipped surface ≠ proven LLM workflow win;
       measure before further sugar (`LLM_BENCHMARK.md`).
 
-## Surface Freeze SF-3 (shipped)
+## Surface Freeze SF-3 (historical — shipped)
 
-**Decision:** SF-3 ships a **usable standard library** behind reserved `@std`
+**Decision:** SF-3 shipped a **usable standard library** behind reserved `@std`
 imports so people can write small real services. **No new language keywords or
-operators** in SF-3 (`|>`, enums, dual-return, `=>`, dict literals → **SF-4+**).
-Ambient tiny core stays tiny (`dict()` added); everything else is explicit
-`import`.
+operators** in SF-3 (`|>`, enums, dual-return, `=>` stayed Planned). Ambient
+tiny core stayed tiny (`dict()` added); everything else was explicit `import`.
+SF-3 used **flat** short-name install after import.
 
-**Shipped:** reserved `@std` registry, dict runtime, modules listed below, SPEC
-§3.7 / §5.12, examples under `examples/features/std/`, card `vol_v3`. Active
-freeze is **SF-3**.
+**Shipped (historical):** reserved `@std` registry, dict runtime, modules listed
+below, SPEC §3.7 / §5.12, examples under `examples/features/std/`, card
+`vol_v3`. Superseded as the active freeze by **SF-3.1** (below).
 
 ### Std API design (token-density philosophy)
 
 VOL is a **token-dense** language ([`AGENTS.md`](AGENTS.md) principles). `@std`
 must follow the same rules as core syntax — not a verbose Java/Node-style SDK.
 
-Rules for every SF-3 export:
+Rules for every SF-3 export (historical SF-3 pin; rule 7 inverted under SF-3.1):
 
 1. **Intent names, short verbs** — `read`, `write`, `run`, `fetch`, `listen`,
    `parse`, `dump`, `reply`. One familiar word beats a phrase (`read_text`,
@@ -96,8 +100,8 @@ Rules for every SF-3 export:
    pick the denser trainable name and document it.
 6. **Density ≠ cryptic glyphs** — prefer names models already emit (`fetch`,
    `join`, `query`) over novel abbreviations that raise repair cost.
-7. **Flat imports** — `import "@std/http"` installs short names; no
-   `http.fetch` nesting tax after import.
+7. **Flat imports (SF-3 only)** — `import "@std/http"` installed short names.
+   **SF-3.1 inverted this:** imports bind a module namespace (`http.fetch`).
 8. **Match core vocabulary** — snake_case multi-word only when needed; prefer
    single tokens (`has`, `prefix`, `suffix`) aligned with `.len` / `.where`
    brevity.
@@ -110,13 +114,13 @@ generate/repair tokens, or only shorten characters?* Prefer the former.
 - Reserved prefix `@std` resolved by the runner (native/host registry or shipped
   tree), **not** via each project’s `vol.config.json` `paths`.
 - `@std` cannot be remapped by project aliases.
-- Same flat export install as today: `import "@std/http"`.
+- SF-3: flat export install. SF-3.1: namespaced bind (path basename).
 
 ### Runtime (required for JSON/HTTP; not new surface syntax)
 
 - **dict** values: mutable string-key maps; `d["k"]` get/set; `.len`; `.keys()` →
-  string array; construct via `dict()` / `dict("k", v, …)` / assignment (no
-  `{ k: v }` literals in SF-3).
+  string array; construct via `dict()` / `dict("k", v, …)` / assignment.
+  SF-3 had no `{ k: v }` / `dict {…}` literals; **SF-3.1 adds** `dict {…}`.
 - JSON/YAML `null` → `none` for v1.
 
 ### Modules in SF-3
@@ -167,10 +171,11 @@ listen("0.0.0.0:" + port, handle)
 
 ### Explicitly out of SF-3 (stay in this file as later work)
 
-These are **not** part of the SF-3 pin. Track them here for SF-4+ or later:
+These were **not** part of the SF-3 pin. Namespaces, `dict {…}`, multiline, and
+`.count()` cleanup shipped in **SF-3.1** (below). Remaining items stay
+**Planned (unscheduled)**:
 
-- Language sugar: `|>` pipelines, enums/tagged unions, dual-return, `=>`, `?T`,
-  dict `{ k: v }` literals
+- Language sugar: `|>` pipelines, enums/tagged unions, dual-return, `=>`, `?T`
 - **Postgres / MySQL** drivers (SF-3 DB is SQLite only)
 - **ORM** / migrations frameworks
 - **WebSockets**
@@ -191,6 +196,26 @@ These are **not** part of the SF-3 pin. Track them here for SF-4+ or later:
 7. process, db (SQLite)
 8. examples, SPEC std section, freeze bump, `vol_v3` card
    (card must show dense `@std` spellings, not verbose SDK prose)
+
+## Surface Freeze SF-3.1 (foundation — active)
+
+**Decision:** SF-3.1 is a **foundation** freeze, not language sugar. It hardens
+the SF-3 `@std` + dict surface for agents and long-term semantics.
+
+Vs SF-3:
+
+- **Namespaced imports** — `import "@std/json"` binds `json`; call `json.parse(...)`.
+  Inverts SF-3 density rule #7 (flat short-name install removed).
+- **Dict literals** — `dict { key: value, ... }` (ambient `dict()` / `dict("k", v)` kept)
+- **Multiline** expression continuation (postfix `.`, calls, commas, binary ops)
+- **`.len` only** for length; zero-arg `.count()` rejected (`.count(pred)` kept)
+- Richer agent-oriented diagnostic fields alongside `Fix`
+
+Default card: `bench/llm/cards/vol_v3_1.md`. See [`SPEC.md`](SPEC.md) §0 and
+[`MEMORY_MODEL.md`](MEMORY_MODEL.md).
+
+**Still unscheduled Planned** (not a promised next freeze): `|>`, enums,
+dual-return, `=>`, Postgres/MySQL, ORM, WebSockets, ownership/parallel/backend.
 
 ## Near-Term Foundation
 
@@ -728,10 +753,12 @@ Rust, and Zig are compared by token count under named OpenAI tokenizers
 (`cl100k_base`, `o200k_base`). That benchmark measures source density only —
 not LLM task-success efficiency. Never cite density ratios as workflow proof.
 
-**Working preset:** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) — SF-3
-`dict("k", v, …)` + `vol_v3` + `@std` intent tasks shipped; `intent_v1` Gemini
-first-try 100% with cold/warm below Python (`…063341`). Further juice →
-`vol fmt`, second model, or SF-4+ only if measured necessary (not glyph theater).
+**Working preset:** [`TOKEN_EFFICIENCY.md`](TOKEN_EFFICIENCY.md) — SF-3 juice
+exhausted (`vol_v3` / `@std` intent); next work is **SF-3.1 foundation**
+(namespaces, `dict {…}`, multiline, `.len`-only), not unscheduled sugar.
+Historical `intent_v1` Gemini first-try 100% with cold/warm below Python
+(`…063341`). Further juice → `vol fmt`, second model, or sugar only if measured
+necessary (not glyph theater).
 
 ## Open Design Questions
 

@@ -1,0 +1,11 @@
+{
+  "kind": "generation",
+  "source_checks": {
+    "vol": [
+      "@std/path",
+      "@std/strings",
+      "path\\.join\\s*\\(",
+      "strings\\.join\\s*\\("
+    ]
+  }
+}

@@ -241,7 +241,12 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 	case *ErrExpression:
 		return r.expression(node.Value)
 	case *StructLiteral:
-		if sym, ok := r.lookup(node.Type.Lexeme); !ok || sym.kind != "struct" {
+		if node.Module != nil {
+			if d := r.expression(node.Module); d != nil {
+				return d
+			}
+			// Qualified `mod.Type { }` — export kind checked at runtime.
+		} else if sym, ok := r.lookup(node.Type.Lexeme); !ok || sym.kind != "struct" {
 			return r.error(node.Type, "S038", "`"+node.Type.Lexeme+"` is not a struct type.", "Declare `struct "+node.Type.Lexeme+" { ... }` before constructing it.")
 		}
 		for _, field := range node.Fields {
@@ -251,6 +256,13 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 		}
 		for _, value := range node.Positional {
 			if d := r.expression(value); d != nil {
+				return d
+			}
+		}
+		return nil
+	case *DictLiteral:
+		for _, entry := range node.Entries {
+			if d := r.expression(entry.Value); d != nil {
 				return d
 			}
 		}
@@ -327,11 +339,10 @@ func (r *resolver) expression(expression Expression) *Diagnostic {
 				if d := r.expression(property.Object); d != nil {
 					return d
 				}
-				if len(node.Arguments) > 1 {
-					return r.rangeArity(property.Name, ".count", "0 or 1", len(node.Arguments))
-				}
-				if len(node.Arguments) == 0 {
-					return nil
+				if len(node.Arguments) != 1 {
+					return r.error(property.Name, "S003",
+						fmt.Sprintf("`.count` expects 1 arguments, got %d.", len(node.Arguments)),
+						"Use `.len` for length, or `.count(condition)` to count matches (e.g. `.count(_ > 5)`).")
 				}
 				r.begin()
 				r.scopes[len(r.scopes)-1]["_"] = symbol{kind: "value", arity: -1}
@@ -428,19 +439,46 @@ func (r *resolver) rangeArity(token Token, name, want string, got int) *Diagnost
 	return r.error(token, "S003", fmt.Sprintf("`%s` expects %s arguments, got %d.", name, want, got), "Pass the required number of arguments.")
 }
 func (r *resolver) error(token Token, code, message, fix string) *Diagnostic {
-	return &Diagnostic{Code: code, Message: message, File: r.file, Pos: token.Pos, Fix: fix}
+	d := &Diagnostic{Code: code, Message: message, File: r.file, Pos: token.Pos, Fix: fix}
+	if fix != "" {
+		d.Repairs = []Repair{{Description: fix}}
+	}
+	if code == "S003" {
+		d.Operation = "arity"
+	}
+	return d
 }
 
 // undefinedNameFix steers common LLM / Python aliases toward Supported @std names.
 func undefinedNameFix(name string) string {
 	switch name {
 	case "contains":
-		return "Use `has` from `@std/strings` (there is no `contains`)."
+		return "Import `@std/strings` and use `strings.has` (there is no `contains`)."
 	case "stringify":
-		return "Use `dump` from `@std/json` or `@std/yaml`."
+		return "Import `@std/json` or `@std/yaml` and use `json.dump` / `yaml.dump`."
 	case "json", "yaml", "http", "fs", "path", "env", "db", "process", "math", "strings", "time", "url":
-		return "Imports install flat names; call exports directly (e.g. `parse`), not `" + name + ".…`."
+		return "Import `@std/" + name + "` then call `" + name + ".…` (imports bind module names)."
+	case "trim", "split", "join", "has", "prefix", "suffix", "replace":
+		return "Import `@std/strings` and call `strings." + name + "(...)` (imports bind module names)."
+	case "parse", "dump":
+		return "Import `@std/json` (or `@std/yaml` / `@std/url`) and call `json." + name + "(...)` (or `yaml.` / `url.`)."
+	case "abs", "min", "max", "clamp", "floor", "ceil", "sqrt", "pow":
+		return "Import `@std/math` and call `math." + name + "(...)`."
+	case "fetch", "listen", "reply":
+		return "Import `@std/http` and call `http." + name + "(...)`."
+	case "read", "write", "list", "exists":
+		return "Import `@std/fs` and call `fs." + name + "(...)`."
+	case "get", "set":
+		return "Import `@std/env` and call `env." + name + "(...)`."
+	case "open", "exec", "query", "close":
+		return "Import `@std/db` and call `db." + name + "(...)`."
+	case "run":
+		return "Import `@std/process` and call `process.run(...)`."
+	case "now", "sleep", "format":
+		return "Import `@std/time` and call `time." + name + "(...)`."
+	case "base", "dir", "ext":
+		return "Import `@std/path` and call `path." + name + "(...)`."
 	default:
-		return "Declare the name before using it."
+		return "Declare the name before using it, or `import` the module that exports it."
 	}
 }

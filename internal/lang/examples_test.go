@@ -34,7 +34,7 @@ func TestExamplesRemainExecutable(t *testing.T) {
 		{file: filepath.Join("features", "struct.vol"), output: "Ada\n37\nUser { name: Ada, age: 37 }\nGrace\n"},
 		{file: filepath.Join("features", "struct_nested.vol"), output: "A\n1\n9\n9\n"},
 		{file: filepath.Join("features", "const_struct.vol"), output: "1\n"},
-		{file: filepath.Join("features", "print_multi.vol"), output: "A grades: 1\nSum: 176\nCount: 3\n"},
+		{file: filepath.Join("features", "print_multi.vol"), output: "Scores: [90, 80, 70]\nCount: 3\nSum label: total=240\n"},
 		{file: filepath.Join("features", "modules", "main.vol"), output: "42\n"},
 		{file: filepath.Join("features", "modules", "import_struct.vol"), output: "Hello, Grace\n40\n"},
 		{file: filepath.Join("features", "modules", "aliases", "main.vol"), output: "42\n"},

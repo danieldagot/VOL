@@ -33,7 +33,12 @@ func TestDiagnosticHumanRenderingWithoutSourceOrFix(t *testing.T) {
 }
 
 func TestDiagnosticJSONIsStableAndMachineReadable(t *testing.T) {
-	diagnostic := &Diagnostic{Code: "E003", Message: "Unexpected character.", File: "bad.vol", Pos: Position{Offset: 4, Line: 2, Column: 3}, Fix: "Remove it."}
+	diagnostic := &Diagnostic{
+		Code: "E003", Message: "Unexpected character.", File: "bad.vol",
+		Pos: Position{Offset: 4, Line: 2, Column: 3}, Fix: "Remove it.",
+		Expected: "valid character", Actual: "unexpected", Operation: "lex",
+		Repairs: []Repair{{Description: "Remove it."}},
+	}
 	encoded, err := json.Marshal(diagnostic)
 	if err != nil {
 		t.Fatal(err)
@@ -44,6 +49,13 @@ func TestDiagnosticJSONIsStableAndMachineReadable(t *testing.T) {
 	}
 	if value["code"] != "E003" || value["message"] != "Unexpected character." || value["file"] != "bad.vol" || value["fix"] != "Remove it." {
 		t.Fatalf("JSON = %s", encoded)
+	}
+	if value["expected"] != "valid character" || value["actual"] != "unexpected" || value["operation"] != "lex" {
+		t.Fatalf("agent fields JSON = %s", encoded)
+	}
+	repairs, ok := value["repairs"].([]any)
+	if !ok || len(repairs) != 1 {
+		t.Fatalf("repairs JSON = %#v", value["repairs"])
 	}
 	position, ok := value["position"].(map[string]any)
 	if !ok || position["Line"] != float64(2) || position["Column"] != float64(3) || position["Offset"] != float64(4) {

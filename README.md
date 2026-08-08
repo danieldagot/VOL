@@ -15,7 +15,7 @@ VOL asks what a systems programming language should look like when LLMs are firs
 Its primary goal is to maximize **semantic density**: express more intent with fewer tokens while preserving deterministic structure, readability, safety, and native performance. The language should be efficient for an LLM to generate, understand, review, modify, and debug.
 
 That goal is a research direction, not a measured property of the current
-prototype. SF-3 freezes Supported syntax plus `@std`; it does **not** prove LLM optimization.
+prototype. SF-3.1 freezes Supported syntax plus `@std`; it does **not** prove LLM optimization.
 Hand-written source-density benches are not generate/repair evidence. Token
 counts also depend on each model's tokenizer, so “fewer tokens” alone is not a
 success metric. The intended long-term measure is task success relative to total
@@ -26,10 +26,13 @@ tokens consumed across generation, diagnostics, and repair — see
 
 **VOL is currently a very early tree-walking interpreter prototype.**
 There is no native compiler, no static type system, no ownership or borrow
-checker, and no native backend. SF-3 ships a reserved `@std` library and dict
-runtime on top of the ambient tiny core. Ownership, vectorization, and
-parallelization are not language semantics today. What exists is a minimal
-interpreter that can execute small programs written in a provisional syntax.
+checker, and no native backend. **Surface Freeze SF-3.1** (card
+`vol_v3_1`) hardens the SF-3 `@std` + dict surface: namespaced imports,
+`dict {…}` literals, multiline chains, and `.len`-only length. Assignment /
+sharing today and future ownership intent: [`MEMORY_MODEL.md`](MEMORY_MODEL.md).
+Ownership, vectorization, and parallelization are not language semantics today.
+What exists is a minimal interpreter that can execute small programs written in
+a provisional syntax.
 
 This README separates **what works today** from **long-term design targets**. Treat vision language as a target, not a shipped reality.
 
@@ -47,15 +50,18 @@ This README separates **what works today** from **long-term design targets**. Tr
 
 ### What Actually Works
 
-**Surface Freeze SF-3:** Supported surface in [`SPEC.md`](SPEC.md) — SF-2 syntax
-plus reserved `@std` (math, strings, fs, path, env, time, url, json, yaml, http,
-process, db/SQLite) and dict runtime (`dict()` / `dict("k", v, …)`, `d["k"]`,
-`.keys()`). No new
-keywords/operators in SF-3. Language sugar (`|>`, enums, dual-return, dict
-literals, …) waits for **SF-4+**. Default harness card:
-[`bench/llm/cards/vol_v3.md`](bench/llm/cards/vol_v3.md). Historical
-[`vol_v2`](bench/llm/cards/vol_v2.md) / [`vol_v1`](bench/llm/cards/vol_v1.md) /
-[`vol_v0`](bench/llm/cards/vol_v0.md) remain for published earlier tables.
+**Surface Freeze SF-3.1** (active foundation): Supported surface in
+[`SPEC.md`](SPEC.md) — SF-3 `@std` (math, strings, fs, path, env, time, url,
+json, yaml, http, process, db/SQLite) plus namespaced imports
+(`import "@std/json"` → `json.parse(...)`), dict literals `dict { key: value }`
+(ambient `dict()` / `dict("k", v, …)` kept), multiline expression continuation,
+and `.len` as the only length form. Default harness card:
+[`bench/llm/cards/vol_v3_1.md`](bench/llm/cards/vol_v3_1.md). Historical
+[`vol_v3`](bench/llm/cards/vol_v3.md) / [`vol_v2`](bench/llm/cards/vol_v2.md) /
+[`vol_v1`](bench/llm/cards/vol_v1.md) / [`vol_v0`](bench/llm/cards/vol_v0.md)
+remain for published earlier tables. Language sugar (`|>`, enums, dual-return,
+…) is **Planned (unscheduled)** in [`IDEAS.md`](IDEAS.md) — not a promised next
+freeze.
 
 - integer, floating-point, Boolean, and string literals
 - inferred variable declarations with `:=` (including multi-declare `a, b := …`)
@@ -73,12 +79,13 @@ literals, …) waits for **SF-4+**. Default harness card:
 - indexed array assignment (assignment and arguments share array identity; use `.copy()` for a shallow clone or `.deep_copy()` for a recursive clone)
 - array `.len` and string `.len` (Unicode scalar values) and string `.byte_len` (UTF-8 byte count)
 - array iteration with `.each` (imperative / side effects)
-- collection filtering with `.where(...)`, mapping with `.map(...)`, counting with `.count(...)` or length via `.count()`, and numeric aggregation with `.sum()` (prefer side-effect-free predicates; purity checks Planned)
+- collection filtering with `.where(...)`, mapping with `.map(...)`, counting with `.count(pred)`, length via `.len` only (zero-arg `.count()` rejected), and numeric aggregation with `.sum()` (prefer side-effect-free predicates; purity checks Planned)
 - Option values with `some(value)` / `none`; unwrap with if-let and `??` (`match` rejected) — see `examples/features/option.vol`
 - Result error handling with `ok(value)` / `err(value)`, if-let, and postfix `?` in functions (bugs still trap) — see `examples/features/errors.vol` and `examples/projects/shop/`
 - product `struct` types, named and positional construction, and field get/set
-- `import "path"` / project-local aliases via nearest `vol.config.json`; live `export` across modules (see `examples/features/modules/aliases/` for `@lib`)
-- reserved `import "@std/…"` standard library (not remappable) and ambient `dict()` / `dict("k", v, …)` — see `examples/features/std/` and `examples/projects/hits/`
+- namespaced `import "path"` / `import "@std/…"` (binds module basename; not remappable for `@std`) plus project-local aliases via nearest `vol.config.json`; live `export` across modules (see `examples/features/modules/aliases/` for `@lib`)
+- dict values via `dict { key: value }`, ambient `dict()` / `dict("k", v, …)`, `d["k"]`, `.keys()` — see `examples/features/std/` and `examples/projects/hits/`
+- multiline expression continuation (postfix `.`, calls, commas, binary ops)
 - `print` with one or more values (space-joined display forms)
 - string `+` coercion (`"n=" + 7`); keep `string(value)` for explicit convert
 - interactive text input with `input()` or `input(prompt)`
@@ -98,7 +105,7 @@ literals, …) waits for **SF-4+**. Default harness card:
 - static type checking
 - richer diagnostic suggestions across more error codes
 - canonical VOL formatter rewriter (`vol fmt` CLI stub parses only today)
-- a published compatibility policy and versioned conformance corpus (SF-0–SF-3 pins)
+- a published compatibility policy and versioned conformance corpus (SF-0–SF-3.1 pins)
 - broader LLM workflow results across more models and realistic backend tasks
 - initial language-server support
 
@@ -126,13 +133,15 @@ literals, …) waits for **SF-4+**. Default harness card:
 - optional `?T` sugar for Option (canonical form is `some`/`none`)
 - C and LLVM backend details
 
-Near-term priority is to keep **SF-3** precise (tests, diagnostics, docs for
-`@std` + dict). `vol fmt` rewriter remains parallel foundation work. Syntax
-sugar and Postgres/MySQL / ORM / WebSockets stay for **SF-4+**.
+Near-term priority is **SF-3.1 foundation** — keep namespaced `@std`, dict
+literals, multiline, and `.len`-only precise (tests, diagnostics, docs).
+`vol fmt` rewriter remains parallel foundation work. Language sugar (`|>`,
+enums, dual-return, …) and Postgres/MySQL / ORM / WebSockets are **Planned
+(unscheduled)** — not the next freeze queue.
 
 See [`SPEC.md`](SPEC.md) for vocabulary, syntax, and formal behavior of the
-current interpreter, and [`IDEAS.md`](IDEAS.md) for future work and open design
-questions.
+current interpreter, [`MEMORY_MODEL.md`](MEMORY_MODEL.md) for assignment /
+sharing, and [`IDEAS.md`](IDEAS.md) for future work and open design questions.
 
 ## Supported Examples
 
@@ -322,8 +331,9 @@ stdlib tasks; `cl100k_base` medians):
 - **~17% fewer tokens than Python** (all-suite median; ratio **0.829**)
 - **~24% fewer than Python** on the **compression** tier (filter/map/count/sum; **0.764**)
 - **~35% fewer than Python** on the **labeled** tier (multi-arg `print` / coercion; **0.651**)
-- **~7% fewer than Python** on the **stdlib** tier (`17`–`21`; **0.929**) after
-  top-level Result `?` and `dict("k", v, …)` pairs (no `{k:v}` literals yet)
+- **~2% fewer than Python** on the **stdlib** tier (`17`–`21`; **0.976**) under
+  SF-3.1 namespaced `@std` + `dict {…}` (namespaces trade density for clarity;
+  historical SF-3 flat-import stdlib median was **0.929**)
 - **~51% fewer tokens than Go** / **~48% fewer than Rust** / **~66% fewer than Zig**
   (all-suite medians)
 

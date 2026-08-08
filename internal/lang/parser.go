@@ -597,6 +597,7 @@ func (p *parser) coalesce() (Expression, *Diagnostic) {
 		return left, nil
 	}
 	op := p.previous()
+	p.skipNewlines()
 	right, d := p.coalesce()
 	if d != nil {
 		return nil, d
@@ -633,6 +634,7 @@ func (p *parser) binary(next func() (Expression, *Diagnostic), kinds ...TokenKin
 	}
 	for p.match(kinds...) {
 		operator := p.previous()
+		p.skipNewlines() // continue after operator: `1 +\n2`
 		right, d := next()
 		if d != nil {
 			return nil, d
@@ -660,8 +662,11 @@ func (p *parser) postfix() (Expression, *Diagnostic) {
 		return nil, d
 	}
 	for {
+		// Same-line call / index (do not cross newlines — that would glue the
+		// next statement's `[` / `(` onto this expression).
 		if p.match(TokenLeftParen) {
 			call := &Call{Callee: expr, Open: p.previous()}
+			p.skipNewlines()
 			if !p.check(TokenRightParen) {
 				for {
 					argument, d := p.expression()
@@ -669,9 +674,11 @@ func (p *parser) postfix() (Expression, *Diagnostic) {
 						return nil, d
 					}
 					call.Arguments = append(call.Arguments, argument)
+					p.skipNewlines()
 					if !p.match(TokenComma) {
 						break
 					}
+					p.skipNewlines()
 				}
 			}
 			if !p.match(TokenRightParen) {
@@ -682,21 +689,44 @@ func (p *parser) postfix() (Expression, *Diagnostic) {
 		}
 		if p.match(TokenLeftBracket) {
 			open := p.previous()
+			p.skipNewlines()
 			at, d := p.expression()
 			if d != nil {
 				return nil, d
 			}
+			p.skipNewlines()
 			if !p.match(TokenRightBracket) {
 				return nil, p.error(p.peek(), "E106", "Expected `]` after array index.")
 			}
 			expr = &Index{Collection: expr, Open: open, At: at}
 			continue
 		}
+		// Multiline method chains: allow newline before `.` only.
+		saved := p.current
+		p.skipNewlines()
 		if p.match(TokenDot) {
 			if !p.check(TokenIdentifier) {
 				return nil, p.error(p.peek(), "E107", "Expected a property name after `.`.")
 			}
 			expr = &Property{Object: expr, Name: p.advance()}
+			continue
+		}
+		p.current = saved
+		if variable, ok := expr.(*Variable); ok && variable.Name.Lexeme == "dict" && p.looksLikeDictLiteral() {
+			literal, d := p.dictLiteral(variable.Name)
+			if d != nil {
+				return nil, d
+			}
+			expr = literal
+			continue
+		}
+		if prop, ok := expr.(*Property); ok && p.looksLikeStructLiteral() {
+			literal, d := p.structLiteral(prop.Name)
+			if d != nil {
+				return nil, d
+			}
+			literal.(*StructLiteral).Module = prop.Object
+			expr = literal
 			continue
 		}
 		if variable, ok := expr.(*Variable); ok && p.looksLikeStructLiteral() {
@@ -888,6 +918,7 @@ func (p *parser) primary() (Expression, *Diagnostic) {
 	}
 	if p.match(TokenLeftBracket) {
 		array := &ArrayLiteral{Open: p.previous()}
+		p.skipNewlines()
 		if !p.check(TokenRightBracket) {
 			for {
 				value, d := p.expression()
@@ -895,9 +926,11 @@ func (p *parser) primary() (Expression, *Diagnostic) {
 					return nil, d
 				}
 				array.Elements = append(array.Elements, value)
+				p.skipNewlines()
 				if !p.match(TokenComma) {
 					break
 				}
+				p.skipNewlines()
 			}
 		}
 		if !p.match(TokenRightBracket) {
@@ -906,6 +939,86 @@ func (p *parser) primary() (Expression, *Diagnostic) {
 		return array, nil
 	}
 	return nil, p.error(p.peek(), "E101", "Expected an expression, found "+p.peek().String()+".")
+}
+
+func (p *parser) isDictKeyToken(kind TokenKind) bool {
+	switch kind {
+	case TokenIdentifier, TokenString,
+		TokenOk, TokenErr, TokenSome, TokenNone, TokenTrue, TokenFalse,
+		TokenFn, TokenIf, TokenElse, TokenElif, TokenWhile, TokenRepeat,
+		TokenReturn, TokenStruct, TokenExport, TokenImport, TokenConst,
+		TokenAnd, TokenOr, TokenNot, TokenPrint:
+		return true
+	default:
+		return false
+	}
+}
+
+// looksLikeDictLiteral is `dict {` with empty body or `key: value` entries.
+func (p *parser) looksLikeDictLiteral() bool {
+	if !p.check(TokenLeftBrace) {
+		return false
+	}
+	index := p.current + 1
+	for index < len(p.tokens) && p.tokens[index].Kind == TokenNewline {
+		index++
+	}
+	if index >= len(p.tokens) {
+		return false
+	}
+	kind := p.tokens[index].Kind
+	if kind == TokenRightBrace {
+		return true
+	}
+	if !p.isDictKeyToken(kind) {
+		return false
+	}
+	index++
+	for index < len(p.tokens) && p.tokens[index].Kind == TokenNewline {
+		index++
+	}
+	return index < len(p.tokens) && p.tokens[index].Kind == TokenColon
+}
+
+func (p *parser) dictLiteral(keyword Token) (Expression, *Diagnostic) {
+	if !p.match(TokenLeftBrace) {
+		return nil, p.error(p.peek(), "E160", "Expected `{` after `dict`.")
+	}
+	literal := &DictLiteral{Keyword: keyword, Open: p.previous()}
+	p.skipNewlines()
+	if p.check(TokenRightBrace) {
+		p.advance()
+		return literal, nil
+	}
+	for {
+		if !p.isDictKeyToken(p.peek().Kind) {
+			return nil, p.error(p.peek(), "E161", "Expected a dict key (identifier or string).")
+		}
+		key := p.advance()
+		p.skipNewlines()
+		if !p.match(TokenColon) {
+			return nil, p.error(p.peek(), "E162", "Expected `:` after dict key.")
+		}
+		p.skipNewlines()
+		value, d := p.expression()
+		if d != nil {
+			return nil, d
+		}
+		literal.Entries = append(literal.Entries, DictEntry{Key: key, Value: value})
+		p.skipNewlines()
+		if p.match(TokenComma) {
+			p.skipNewlines()
+			if p.check(TokenRightBrace) {
+				break
+			}
+			continue
+		}
+		break
+	}
+	if !p.match(TokenRightBrace) {
+		return nil, p.error(p.peek(), "E163", "Expected `}` to close dict literal.")
+	}
+	return literal, nil
 }
 
 func (p *parser) match(kinds ...TokenKind) bool {

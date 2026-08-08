@@ -1,5 +1,5 @@
 import "examples/features/modules/user"
 
-u := User { name: "Grace", age: 40 }
-print greet(u)
+u := user.User { name: "Grace", age: 40 }
+print user.greet(u)
 print u.age

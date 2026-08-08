@@ -15,8 +15,8 @@ task,tier,vol,python,go,rust,zig,vol/python,vol/go,vol/rust,vol/zig
 14-pipeline-stats,compression,67,81,152,153,225,0.827,0.441,0.438,0.298
 15-band-counts,compression,73,110,145,159,244,0.664,0.503,0.459,0.299
 16-map-filter,compression,58,68,118,119,169,0.853,0.492,0.487,0.343
-17-strings-ops,stdlib,44,47,66,58,239,0.936,0.667,0.759,0.184
-18-path-parts,stdlib,52,73,80,99,157,0.712,0.650,0.525,0.331
-19-env-default,stdlib,47,48,105,87,147,0.979,0.448,0.540,0.320
-20-json-fields,stdlib,40,42,108,216,206,0.952,0.370,0.185,0.194
-21-process-echo,stdlib,30,33,93,66,165,0.909,0.323,0.455,0.182
+17-strings-ops,stdlib,49,47,66,58,239,1.043,0.742,0.845,0.205
+18-path-parts,stdlib,56,73,80,99,157,0.767,0.700,0.566,0.357
+19-env-default,stdlib,50,48,105,87,147,1.042,0.476,0.575,0.340
+20-json-fields,stdlib,42,42,108,216,206,1.000,0.389,0.194,0.204
+21-process-echo,stdlib,32,33,93,66,165,0.970,0.344,0.485,0.194

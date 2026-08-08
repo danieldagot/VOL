@@ -33,15 +33,18 @@ VOL aims to combine concise, intent-oriented source code with memory safety,
 predictable execution, and native performance.
 
 **Current reality:** VOL is a tree-walking interpreter prototype with a small
-provisional syntax. **Surface Freeze SF-3** pins SF-2 syntax plus reserved `@std`
-and dict runtime ([`SPEC.md`](SPEC.md) §0 / §5.12). The harness card
-`bench/llm/cards/vol_v3.md` is the default task card. SF-2 / `vol_v2`, SF-1 /
-`vol_v1`, and SF-0 / `vol_v0` remain for historical tables. Do not add Planned
-SF-4+ syntax under SF-3 without a freeze bump. Surface freezes are **syntax /
-library pins**, not proof of LLM workflow superiority. Hand-written
-source-density numbers in `bench/` are not generate/repair evidence. There is no
-native backend, static type system, or ownership checker. Ambient builtins stay
-tiny (`dict()` plus classic core); broader I/O is explicit `@std`. Ownership,
+provisional syntax. **Surface Freeze SF-3.1** is the active foundation freeze:
+SF-3 `@std` + dict, hardened with namespaced imports, `dict {…}` literals,
+multiline chains, and `.len`-only length ([`SPEC.md`](SPEC.md) §0 / §5.12).
+The harness card `bench/llm/cards/vol_v3_1.md` is the default task card.
+SF-3 / `vol_v3`, SF-2 / `vol_v2`, SF-1 / `vol_v1`, and SF-0 / `vol_v0` remain
+for historical tables. Do not add unscheduled Planned sugar under SF-3.1
+without a freeze bump. Assignment / sharing and future ownership intent:
+[`MEMORY_MODEL.md`](MEMORY_MODEL.md). Surface freezes are **syntax / library
+pins**, not proof of LLM workflow superiority. Hand-written source-density
+numbers in `bench/` are not generate/repair evidence. There is no native
+backend, static type system, or ownership checker. Ambient builtins stay tiny
+(`dict()` plus classic core); broader I/O is explicit `@std`. Ownership,
 vectorization, and parallelization are vision/research only until specified and
 tested. Keep vision and implementation status distinct in every document.
 
@@ -51,8 +54,9 @@ Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 - multi-assign `a, b := …` / `a, b = …` is Supported (RHS fully evaluated before assigns)
 - array assignment **shares** references; use `.copy()` (shallow) or `.deep_copy()` (recursive) for isolation
 - integer overflow **traps** (`R028`) with a `fix` suggestion; wrapping modes are Planned
-- `.where` / `.map` / `.count` are Supported; `.count()` (0 args) is length like `.len`;
-  prefer side-effect-free predicates (effects belong in `.each`); purity checks are Planned
+- `.where` / `.map` / `.count(pred)` are Supported; zero-arg `.count()` is rejected
+  (use `.len`); prefer side-effect-free predicates (effects belong in `.each`);
+  purity checks are Planned
 - `print a, b` space-joins display forms; `"label: " + n` coerces the right-hand side
 - missing `return` yields `nothing`; discarding in a call statement is OK;
   assigning or using `nothing` as a value is `R029`
@@ -62,13 +66,14 @@ Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
   bugs still trap; `match` is Rejected (`E153`)
 - anonymous `fn(params) { ... }` and expression-body `fn(params) expr` are Supported (`=>` is not)
 - product `struct` with named and positional literals and `.` field access is Supported
-- `import "path"` + `vol.config.json` discovery/aliases; `export` is live across
-  modules (`examples/features/modules/aliases/` demos `@lib`; reserved `@std`
-  is Supported under SF-3 — [`SPEC.md`](SPEC.md) §5.12; `@compiler` remains
-  vision-only)
-- dict values via ambient `dict()` / `dict("k", v, …)`; index with string keys;
-  `.keys()`; no `{ k: v }` literals yet
-- `.len` is the length property (string: Unicode scalars); `.length` is rejected
+- namespaced `import "path"` / `import "@std/…"` (binds module basename) +
+  `vol.config.json` discovery/aliases; `export` is live across modules
+  (`examples/features/modules/aliases/` demos `@lib`; reserved `@std` under
+  SF-3.1 — [`SPEC.md`](SPEC.md) §5.12; `@compiler` remains vision-only)
+- dict values via `dict { key: value }` and ambient `dict()` / `dict("k", v, …)`;
+  index with string keys; `.keys()`
+- `.len` is the only length form (string: Unicode scalars); `.length` and
+  zero-arg `.count()` are rejected
 - `while` is permanent Supported vocabulary (with `repeat` and `.each` for other intents)
 - `if` is a statement (`elif` / `else`); value choice uses `? :` (not expression-`if`)
 
@@ -146,7 +151,7 @@ specified. Do not imply any of that from the vision section alone.
 ### 6. AI Native
 
 Tooling and diagnostics should be easy for humans and agents to consume. That is
-a design goal; SF-3 surface + early harness runs do not prove workflow superiority.
+a design goal; SF-3.1 surface + early harness runs do not prove workflow superiority.
 
 Goals:
 
@@ -213,10 +218,12 @@ Priority:
 4. Performance
 5. Compile speed
 
-Near-term project priority: **SF-3 is active** — keep the frozen `@std` + dict
-surface precise (tests, diagnostics, docs). `vol fmt` rewriter stays parallel.
-SF-4+ holds enums, dual-return, `|>`, dict literals, Postgres/MySQL, ORM,
-WebSockets, ownership/alloc, build modes, parallel. See `SPEC.md` §0 / §11.
+Near-term project priority: **SF-3.1 foundation is active** — keep namespaced
+`@std`, `dict {…}`, multiline, and `.len`-only precise (tests, diagnostics,
+docs). `vol fmt` rewriter stays parallel. Language sugar (`|>`, enums,
+dual-return, …), Postgres/MySQL, ORM, WebSockets, ownership/alloc, build modes,
+and parallel are **Planned (unscheduled)** — not a next-freeze queue. See
+`SPEC.md` §0 / §11 and [`MEMORY_MODEL.md`](MEMORY_MODEL.md).
 
 ---
 

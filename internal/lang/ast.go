@@ -163,7 +163,9 @@ type StructFieldInit struct {
 }
 
 // StructLiteral constructs a struct value: Type { field: expr, ... } or Type { expr, ... }.
+// Module is set for qualified forms like `cart.Item { ... }` (SF-3.1).
 type StructLiteral struct {
+	Module     Expression // optional module namespace expression
 	Type       Token
 	Open       Token
 	Fields     []StructFieldInit // named form
@@ -172,6 +174,22 @@ type StructLiteral struct {
 
 func (*StructLiteral) expression()          {}
 func (n *StructLiteral) Position() Position { return n.Type.Pos }
+
+// DictEntry is one `key: value` pair in a dict literal.
+type DictEntry struct {
+	Key   Token // identifier or string
+	Value Expression
+}
+
+// DictLiteral is `dict { key: value, ... }` (SF-3.1).
+type DictLiteral struct {
+	Keyword Token
+	Open    Token
+	Entries []DictEntry
+}
+
+func (*DictLiteral) expression()          {}
+func (n *DictLiteral) Position() Position { return n.Keyword.Pos }
 
 type ReturnStatement struct {
 	Keyword Token

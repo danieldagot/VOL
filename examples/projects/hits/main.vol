@@ -1,21 +1,21 @@
-// Tiny hits counter using @std/db + @std/env (SF-3).
+// Tiny hits counter using @std/db + @std/env (SF-3.1).
 
 import "@std/db"
 import "@std/env"
 
 fn bump() {
-    path := get("HITS_DB") ?? ":memory:"
-    conn := open(path)?
-    exec(conn, "create table if not exists hits (n int)")?
-    rows := query(conn, "select n from hits")?
+    path := env.get("HITS_DB") ?? ":memory:"
+    conn := db.open(path)?
+    db.exec(conn, "create table if not exists hits (n int)")?
+    rows := db.query(conn, "select n from hits")?
     n := 0
     if rows.len > 0 {
         n = rows[0]["n"]
     }
     n = n + 1
-    exec(conn, "delete from hits")?
-    exec(conn, "insert into hits(n) values (?)", n)?
-    close(conn)?
+    db.exec(conn, "delete from hits")?
+    db.exec(conn, "insert into hits(n) values (?)", n)?
+    db.close(conn)?
     return ok(n)
 }
 

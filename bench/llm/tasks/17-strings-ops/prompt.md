@@ -5,8 +5,8 @@ Write a complete program in {{LANG}}.
 ## Goal
 
 Using the language's standard string helpers (VOL: `import "@std/strings"` then
-flat names `trim` / `split` / `join` / `has` / `replace` — not `strings.trim`),
-print **four lines**:
+namespaced calls `strings.trim` / `strings.split` / `strings.join` /
+`strings.has` / `strings.replace`), print **four lines**:
 
 1. Trim surrounding spaces from `  vol  ` → `vol`
 2. Split `a,b,c` on `,` and join with `-` → `a-b-c`

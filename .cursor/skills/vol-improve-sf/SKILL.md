@@ -3,19 +3,22 @@ name: vol-improve-sf
 description: >-
   Iterates the active VOL Surface Freeze for token efficiency and honesty:
   density benches, live LLM intent_v1, diagnostic Fix text, card cuts, denser
-  examples/docs — without new SF-4+ glyphs. Use when the user asks to improve
-  SF-3/any SF, maximize token efficiency, tighten vol_vN cards, re-run
-  Gemini intent, densify benches/examples, or finish an SF juice loop.
-  Active freeze is SF-3 (`vol_v3`); SF-3 juice is documented exhausted in
-  TOKEN_EFFICIENCY.md — prefer tooling / second model / SF-4+ ship skill next.
+  examples/docs — without new unscheduled Planned glyphs. Use when the user asks
+  to improve SF-3.1/any SF, maximize token efficiency, tighten vol_vN cards,
+  re-run Gemini intent, densify benches/examples, or finish an SF juice loop.
+  Active freeze is SF-3.1 (`vol_v3_1`); SF-3 juice is exhausted in
+  TOKEN_EFFICIENCY.md — next is SF-3.1 foundation, then tooling / second model;
+  do not default-ship Planned sugar.
 disable-model-invocation: true
 ---
 
 # VOL Improve Any SF
 
-Improve the **active** surface freeze in place. Complements `vol-ship-sf-feature`
-(new freeze / new syntax). Do **not** invent `|>`, `=>`, enums, dual-return, or
-other Planned sugar for juice — ship those only via the ship skill + freeze bump.
+Improve the **active** surface freeze in place (SF-3.1 / `vol_v3_1`). Complements
+`vol-ship-sf-feature` (new freeze / new syntax). Do **not** invent `|>`, `=>`,
+enums, dual-return, or other Planned sugar for juice — ship those only via the
+ship skill + freeze bump. SF-3 juice is exhausted; prefer SF-3.1 foundation
+precision over sugar.
 
 Follow [`AGENTS.md`](AGENTS.md) sync rules. Keep density and LLM workflow tracks
 **distinct**.

@@ -1,9 +1,9 @@
 # VOL Token Efficiency — Working Preset
 
 > Continuation doc for maximizing VOL token efficiency.
-> Last updated: 2026-08-08 (SF-3 `intent_v1` + `@std` tasks; juice loop stopped).
+> Last updated: 2026-08-08 (SF-3.1 foundation; focused gemma `intent` slice 100% FT).
 > Related: [`bench/`](bench/README.md), [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md),
-> [`IDEAS.md`](IDEAS.md), [`SPEC.md`](SPEC.md) §0 / SF-3.
+> [`IDEAS.md`](IDEAS.md), [`SPEC.md`](SPEC.md) §0 / SF-3.1, [`MEMORY_MODEL.md`](MEMORY_MODEL.md).
 
 ## Goal
 
@@ -36,9 +36,9 @@ Suite: **21 tasks** × VOL / Python / Go / Rust / Zig (SF-2 densified VOL + SF-3
 | **parity** | 01–05, 07–08, 10 | control near-Python floor |
 | **stdlib** | 17–21 | SF-3 `@std` vs peer stdlibs (not collection density) |
 
-Current medians (`cl100k_base`, 21 tasks): all VOL/Python **0.829**;
-compression **0.764**; labeled **0.651**; stdlib **0.929** (`dict("k", v, …)`
-closed the json>Python gap; env/strings remain near parity). See
+Current medians (`cl100k_base`, 21 tasks, **SF-3.1**): all VOL/Python **0.829**;
+compression **0.764**; labeled **0.651**; stdlib **0.976** (namespaced `@std`
+raises stdlib vs historical SF-3 **0.929** — accepted foundation tradeoff). See
 [`bench/results/density.md`](bench/results/density.md). Do not mix stdlib
 import surface with compression-tier claims.
 
@@ -87,18 +87,23 @@ Still need ≥1 other model before treating deltas as stable.
 | Dict pairs | json task **1.071** (empty `dict()` + assign) | `dict("k", v, …)` + densify 20-json / examples; lean `vol_v3` **322** | stdlib **0.929**; json **0.929** | FT 100%, cold **685.3**, warm **363.3** (`…061355`, 5-task) | **keep** |
 | Suite gap | `intent_v1` claimed SF-3 but never ran `@std` | Add LLM tasks `17`/`20` + source_checks | — | FT **71%** / success 86% (`…062641`) | diagnose |
 | Footgun | `contains` / `strings.trim` / bare `parse` / `print dump` → `ok(…)` | S002 alias Fixes; R003 Result unwrap Fix; card `print dump(d)?`; wrong_output expected/got in harness | — | FT **100%**, cold **715.7**, warm **365.7** (`…063341`) | **keep** |
+| SF-3.1 foundation | Flat imports / `.count()` length / no dict literals / no multiline | Namespaces; `dict {…}`; multiline `.` chains; `.len` only; agent diags; card `vol_v3_1`; intent tasks **22**/`23` | all **0.829**; stdlib **0.976** | (surface) | **keep** |
+| SF-3.1 footgun | `20-json-fields` 0/3: `'...'` strings + `<thought>` in source | Card: `"..."` only + escape; E003 Fix; strip `<thought>`; task prompt escapes; harness timeout retries | — | Focused 3-task (`20`/`22`/`23`) gemma-4-31b-it: VOL **100%/100%**, cold **758**, warm **355** vs Py FT 66.7% / cold 1647 (`…081431`); card **403** | **keep** |
 
 **Rejected / not pursued for juice:** `.sum(pred)` sugar (would be new surface),
 shrinking `vol_v3` below ~350 while keeping `@std` first-try (quota blocked a
-confirming re-run after a −1-token trim), `|>` / `=>` / enums / dual-return /
-`{k:v}` literals (SF-4+), unfair Python padding, full `@std` API tour in the
-task card (tour belongs in SPEC/examples).
+confirming re-run after a −1-token trim), `|>` / `=>` / enums / dual-return
+(unscheduled Planned), unfair Python padding, full `@std` API tour in the
+task card (tour belongs in SPEC/examples). (`dict {…}` literals moved to
+**SF-3.1 foundation**, not SF-4 sugar.)
 
 ---
 
 ## SF-3 exhausted — rationale
 
-Stop criteria met for this model + expanded `intent_v1` under SF-3:
+Stop criteria met for this model + expanded `intent_v1` under SF-3. **SF-3
+juice is exhausted;** next language work is **SF-3.1 foundation** (namespaces,
+`dict {…}`, multiline, `.len`-only) — not unscheduled Planned sugar.
 
 1. VOL first-try **100%** and success @ K **100%** (7 tasks incl. `@std`).
 2. Cold and warm means **below Python** on the expanded suite (`…063341`); warm
@@ -109,13 +114,13 @@ Stop criteria met for this model + expanded `intent_v1` under SF-3:
    - **Card:** `vol_v3` **350** (+14 vs Python) holds 100% first-try on `@std`
      reminders; further cuts risk FT and hit free-tier quota on re-measure.
    - **Bench densify:** stdlib density tasks already dense; env/strings near floor.
-   - **In-freeze semantics:** `{k:v}` literals / changing Result `print` display
-     are out of SF-3 spirit for table juice.
-4. Further gains need **non-SF-3 language** work:
+   - **In-freeze semantics:** changing Result `print` display was out of SF-3
+     spirit for table juice; `dict {…}` / namespaces / `.len`-only are SF-3.1.
+4. After SF-3 juice: prefer **SF-3.1 foundation** (active freeze), then:
    - **`vol fmt`** rewriter (canonical `_` / bind style → smaller completions)
    - **Prompt caching / warm serving** (infrastructure, not language)
    - **Second model** confirmation
-   - **SF-4+** only if measured necessary (`{k:v}`, `|>`, …) — not glyph theater
+   - Unscheduled sugar (`|>`, enums, …) only if measured necessary — not glyph theater
 
 ---
 
@@ -167,24 +172,25 @@ Needs `GEMINI_API_KEY` (or another provider) in env / `.env`.
 
 ## Strategy: radical dynamics (not radical syntax)
 
-### D1–D3 — SF-2 density dynamics ✓
+### D1–D3 — SF-2 density dynamics ✓ (partially superseded by SF-3.1)
 
 - string `+` coercion (`"n=" + 7`); `1 + "a"` stays `R013`
 - multi-arg `print` (space-join)
-- `.count()` ≡ `.len`; `.count(pred)` for filtered counts; `.sum()` remains 0-arg
-  (filter with `.where` first — taught by card + S003 Fix)
+- SF-2 taught `.count()` ≡ `.len`; **obsolete under SF-3.1** — `.len` only;
+  `.count(pred)` for filtered counts; zero-arg `.count()` rejected; `.sum()`
+  remains 0-arg (filter with `.where` first — taught by card + S003 Fix)
 
 ### D4 — Suite dynamics (honest scoreboard)
 
 Do not fake 50% by padding Python or stripping VOL assert messages.
 
-### D5 — Dict pairs (SF-3) ✓
+### D5 — Dict pairs (SF-3) ✓ / literals (SF-3.1)
 
 - `dict("k", v, …)` alternating string keys/values; `dict()` still empty
 - Odd arity → `R018` with Fix; non-string key → `R045`
-- `{k:v}` literals stay SF-4+
+- **SF-3.1:** `dict { key: value }` literals Supported (no longer “SF-4+”)
 
-### D6 — Canon + tooling (next, outside SF-3 language juice)
+### D6 — Canon + tooling (outside language juice)
 
 - `vol fmt`: prefer `_` over `fn` in collection ops; one bind/loop/value style
 - Move remaining “don’t write X” from card → diagnostic `Fix` when new footguns appear
@@ -194,10 +200,10 @@ Do not fake 50% by padding Python or stripping VOL assert messages.
 
 ## Explicit non-goals for density juice
 
-Do **not** pursue these *for density/workflow juice* as SF-3 language sugar
-(SF-3 is `@std` usability; syntax sugar is SF-4+):
+Do **not** pursue these *for density/workflow juice* as unscheduled Planned sugar
+(SF-3 juice exhausted; active freeze is SF-3.1 foundation):
 
-- `|>` pipelines, `?T` Option sugar, `=>` arrows, dual-return sugar, `{k:v}`
+- `|>` pipelines, `?T` Option sugar, `=>` arrows, dual-return sugar
 - Parallel / ownership inference
 - Renaming keywords for 1-token shaves that grow the card
 - `.sum(pred)` unless a multi-model footgun proves card+Fix insufficient
@@ -209,16 +215,24 @@ Do **not** pursue these *for density/workflow juice* as SF-3 language sugar
 
 ### A. Language dynamics (SF-2 / SF-3) ✓ exhausted for this loop
 
-- [x] String `+` coercion; multi-arg `print`; `.count()` length; densified benches
+- [x] String `+` coercion; multi-arg `print`; densified benches
 - [x] S003 Fix for `.sum(pred)` → `.where(condition).sum()`
 - [x] Lean `vol_v2` / `vol_v3` cards (≤ Python) with explicit `.sum()` 0-arg rule
 - [x] Bind shared pipelines in compression tasks 14/16
 - [x] `dict("k", v, …)` + densified stdlib json / examples; published `vol_v3` `intent_v1`
 
-### B. Workflow / tooling (beyond SF-3 surface)
+### A2. SF-3.1 foundation (active freeze)
+
+- [x] Pin SF-3.1 in SPEC §0 (`vol_v3_1`): namespaces, `dict {…}`, multiline, `.len`-only
+- [x] Benches/examples/card sync; density recount (stdlib **0.976**)
+- [x] Harder intent tasks `22-ns-join` / `23-pipeline-multiline`
+- [ ] Publish Gemini `intent_v1` under `vol_v3_1` (429 free-tier quota 2026-08-08)
+- [x] Do **not** default-ship unscheduled sugar (`|>`, enums, dual-return) for juice
+
+### B. Workflow / tooling (beyond foundation surface)
 
 - [ ] Finish `vol fmt` rewriter with canonical table
-- [ ] Publish ≥1 other model on `intent_v1` + `vol_v3`
+- [ ] Publish ≥1 other model on `intent_v1` (card `vol_v3_1` when ready)
 - [ ] Optional: prompt-cache accounting experiments (warm ≈ production)
 
 ### C. Suite / hygiene
@@ -239,10 +253,10 @@ repeat 8 { … }
 fn square(n) n * n
 scores.count(_ >= 90)
 g := nums.where(_ > 5)
-print g.count()
+print g.len
 print g.sum()
 print "Sum:", total
-print dump(dict("n", 3))?
+print dump(dict { n: 3 })?
 ```
 
 ---

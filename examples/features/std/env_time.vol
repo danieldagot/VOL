@@ -1,8 +1,8 @@
-// @std/env and @std/time (SF-3). Defaults via Option ?? — no get_or.
+// @std/env and @std/time (SF-3.1). Defaults via Option ?? — no get_or.
 
 import "@std/env"
 import "@std/time"
 
-port := get("PORT") ?? "8080"
+port := env.get("PORT") ?? "8080"
 print "port:", port
-print format(0, "2006-01-02")
+print time.format(0, "2006-01-02")

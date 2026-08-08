@@ -5,12 +5,22 @@ import (
 	"strings"
 )
 
+// Repair is a structured agent-oriented fix hint (SF-3.1).
+type Repair struct {
+	Description string `json:"description"`
+	Replacement string `json:"replacement,omitempty"`
+}
+
 type Diagnostic struct {
-	Code    string   `json:"code"`
-	Message string   `json:"message"`
-	File    string   `json:"file"`
-	Pos     Position `json:"position"`
-	Fix     string   `json:"fix,omitempty"`
+	Code      string   `json:"code"`
+	Message   string   `json:"message"`
+	File      string   `json:"file"`
+	Pos       Position `json:"position"`
+	Fix       string   `json:"fix,omitempty"`
+	Expected  string   `json:"expected,omitempty"`
+	Actual    string   `json:"actual,omitempty"`
+	Operation string   `json:"operation,omitempty"`
+	Repairs   []Repair `json:"repairs,omitempty"`
 }
 
 func (d *Diagnostic) Error() string { return d.Message }

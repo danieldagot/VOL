@@ -20,12 +20,17 @@ func newDict() *dictValue {
 // keys and values. Odd arity or non-string keys fail with R018 / R045.
 func builtinDict(values []any, pos Position, file string) (any, *Diagnostic) {
 	if len(values)%2 != 0 {
+		fix := "Use `dict()` / `dict { }` for empty, `dict { k: v, … }` literals, or `dict(\"k\", v, …)` pairs."
 		return nil, &Diagnostic{
-			Code:    "R018",
-			Message: "Function `dict` expects an even number of arguments (key, value pairs), got " + fmt.Sprint(len(values)) + ".",
-			File:    file,
-			Pos:     pos,
-			Fix:     "Use `dict()` for empty, or `dict(\"k\", v, …)` with alternating string keys and values.",
+			Code:      "R018",
+			Message:   "Function `dict` expects an even number of arguments (key, value pairs), got " + fmt.Sprint(len(values)) + ".",
+			File:      file,
+			Pos:       pos,
+			Fix:       fix,
+			Expected:  "even arity (key, value pairs)",
+			Actual:    fmt.Sprintf("%d arguments", len(values)),
+			Operation: "dict",
+			Repairs:   []Repair{{Description: fix}},
 		}
 	}
 	d := newDict()

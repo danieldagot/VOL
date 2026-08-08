@@ -1,10 +1,10 @@
-// @std/math and @std/strings (SF-3).
+// @std/math and @std/strings (SF-3.1).
 
 import "@std/math"
 import "@std/strings"
 
-print abs(-40)?
-print clamp(12, 0, 10)?
-print trim("  vol  ")
-print join(split("a,b,c", ","), "-")
-print has("vocabulary", "cab")
+print math.abs(-40)?
+print math.clamp(12, 0, 10)?
+print strings.trim("  vol  ")
+print strings.join(strings.split("a,b,c", ","), "-")
+print strings.has("vocabulary", "cab")

@@ -25,7 +25,8 @@ anymore—those were merged into `SPEC.md`.
 | `IDEAS.md` | Planned work, open design questions, future features |
 | `AGENTS.md` | Vision, principles, contribution / sync rules, decided prototype bullets |
 | `LLM_BENCHMARK.md` | Falsifiable LLM generate/repair protocol + published-result pointers |
-| `TOKEN_EFFICIENCY.md` | Working preset for density vs workflow iteration (SF-3 juice exhausted) |
+| `TOKEN_EFFICIENCY.md` | Working preset (SF-3 juice exhausted; next SF-3.1 foundation) |
+| `MEMORY_MODEL.md` | Assignment sharing today + future ownership intent |
 | `internal/lang/` | Lexer, parser, AST, resolver, interpreter, diagnostics, tests |
 | `examples/` | Executable examples (`basics/`, `features/`, `projects/`) claimed by README |
 | `cmd/vol/` | CLI (`vol run`, `--json` diagnostics) |
@@ -37,14 +38,15 @@ Do **not** look for or cite `SYNTAX.md` / `VOCABULARY.md` as current sources.
 
 Use this snapshot before roasting—do not pretend the repo is still pre-`SPEC.md`:
 
-- **Implemented (SF-3):** tree-walking interpreter; resolver; structured diagnostics
+- **Implemented (SF-3.1):** tree-walking interpreter; resolver; structured diagnostics
   (human + JSON via `vol --json`); stable error codes with `Fix` on some codes;
   `i64`/`f64`/bool/string/arrays; `const` opt-in immutability; overflow traps
-  (`R028`); `.where` / `.map` / `.count` / `.count()` / `.sum`; `.len` /
+  (`R028`); `.where` / `.map` / `.count(pred)` / `.sum`; `.len` only /
   `.byte_len`; `.copy` / `.deep_copy`; Option / Result; product structs;
   anonymous `fn`; multi-assign; multi-arg `print` + string `+` coercion;
-  `import`/`export`; reserved `@std` (http/process/db/json/…); ambient `dict()`;
-  functions with `nothing` on missing return; CI + fuzz. Default card `vol_v3`.
+  namespaced `import`/`export`; reserved `@std`; `dict {…}` + ambient `dict()`;
+  multiline chains; functions with `nothing` on missing return; CI + fuzz.
+  Default card `vol_v3_1`. See also `MEMORY_MODEL.md`.
 - **Specified in `SPEC.md`:** lexical tokens, line joining, expression precedence,
   evaluation order, array identity, collection / Option / Result / `@std` /
   dict semantics, failure model, conformance examples, **§11 Decided** core rules
@@ -52,12 +54,12 @@ Use this snapshot before roasting—do not pretend the repo is still pre-`SPEC.m
   etc.).
 - **Partially evidenced LLM claim:** `bench/` source density (~17% fewer than
   Python all-suite / ~24% compression / ~7% stdlib) plus Gemini `intent_v1` /
-  `vol_v3` (SF-3, 7 tasks) — not multi-model proof or SF-3 “LLM optimized”
-  evidence. Historical `vol_v2` / SF-2 tables remain labeled.
+  `vol_v3` (SF-3, 7 tasks) — not multi-model proof or SF-3.1 “LLM optimized”
+  evidence. Historical `vol_v3` / SF-3 and `vol_v2` / SF-2 tables remain labeled.
 - **Still missing / vision-only:** static types, ownership/borrow, generics, native
   backend, formatter rewriter, enforced `.where` purity at runtime,
-  parallel/lazy collection fusion; SF-4+ sugar (enums / `|>` / dual-return /
-  dict literals — see IDEAS), not more SF-3 syntax.
+  parallel/lazy collection fusion; unscheduled Planned sugar (enums / `|>` /
+  dual-return — see IDEAS), not more SF-3.1 foundation surface by default.
 
 Identity is **Vocabulary Optimized Language** in README and AGENTS.md. Do not
 roast stale “Vector-Oriented” / “Vibe-Oriented” naming unless it reappears in

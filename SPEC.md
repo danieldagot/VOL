@@ -1,6 +1,7 @@
-# VOL Language Specification (Prototype v0 / SF-3)
+# VOL Language Specification (Prototype v0 / SF-3.1)
 
-> Status: **Surface Freeze SF-3** (usable `@std` + dict; harness card `vol_v3`)
+> Status: **Surface Freeze SF-3.1** (foundation: namespaced `@std`, `dict {…}`,
+> multiline chains, `.len`-only length; harness card `vol_v3_1`)
 > Audience: humans and LLMs
 
 > Source of truth for behavior: this file plus the tests in `internal/lang`
@@ -20,8 +21,10 @@ Related docs:
 | [`README.md`](README.md) | Project status and examples |
 | [`IDEAS.md`](IDEAS.md) | Planned features and open questions |
 | [`AGENTS.md`](AGENTS.md) | Project vision and contribution rules |
-| [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md) | Generate/repair protocol; primary published table is `intent_v1` / `vol_v3` (SF-3) |
-| [`bench/llm/cards/vol_v3.md`](bench/llm/cards/vol_v3.md) | Default harness card (SF-3; `@std` + dict) |
+| [`MEMORY_MODEL.md`](MEMORY_MODEL.md) | Assignment sharing today + future ownership intent |
+| [`LLM_BENCHMARK.md`](LLM_BENCHMARK.md) | Generate/repair protocol; default card `vol_v3_1` (SF-3.1); historical `vol_v3` / SF-3 tables remain |
+| [`bench/llm/cards/vol_v3_1.md`](bench/llm/cards/vol_v3_1.md) | Default harness card (SF-3.1 foundation) |
+| [`bench/llm/cards/vol_v3.md`](bench/llm/cards/vol_v3.md) | Historical SF-3 / `@std` + flat imports card |
 | [`bench/llm/cards/vol_v2.md`](bench/llm/cards/vol_v2.md) | Historical SF-2 / density dynamics card |
 | [`bench/llm/cards/vol_v1.md`](bench/llm/cards/vol_v1.md) | Historical SF-1 / `core_v2` task card |
 | [`bench/llm/cards/vol_v0.md`](bench/llm/cards/vol_v0.md) | Historical `core_v2` card (SF-0) |
@@ -62,14 +65,24 @@ Notation:
 **Supported** means implemented and covered by tests. **Provisional** means
 implemented and tested, but spelling or meaning may change.
 
-### Surface freeze SF-3
+### Surface freeze SF-3.1 (active)
 
-**SF-3** freezes the Supported / Provisional surface in this document and §11.
-It keeps **SF-2 syntax** (no new keywords/operators) and adds a usable
-**reserved `@std`** library plus **dict** runtime values. The default harness
-card is [`bench/llm/cards/vol_v3.md`](bench/llm/cards/vol_v3.md). Historical
-published tables that cite SF-2 / `vol_v2` or SF-1 / `vol_v1` stay tied to those
-cards.
+**SF-3.1** is the active **foundation** freeze: SF-3’s `@std` + dict surface,
+hardened for agents and long-term semantics — **not** language sugar.
+
+Changes vs SF-3:
+
+- Imports bind a **module namespace** (path basename): `import "@std/json"` →
+  `json.parse(...)` (flat short-name install removed)
+- Dict literals: `dict { key: value, ... }` (ambient `dict()` / `dict("k", v)` kept)
+- Multiline expression continuation (postfix `.`, calls, commas, binary ops)
+- `.len` is the only length form; zero-arg `.count()` is rejected
+- Richer agent-oriented diagnostic fields (`expected` / `actual` / `operation` /
+  `repairs`) alongside `fix`
+
+The default harness card is
+[`bench/llm/cards/vol_v3_1.md`](bench/llm/cards/vol_v3_1.md). Historical tables
+that cite SF-3 / `vol_v3` (or earlier) stay tied to those cards.
 
 **Product freezes** (use these in status docs and LLM result tables; do not mix
 freeze IDs in one table):
@@ -78,21 +91,26 @@ freeze IDs in one table):
 | --- | --- | --- |
 | SF-0 | `vol_v0.md` | First pin (historical `core_v2` results) |
 | SF-1 | `vol_v1.md` | Vision-aligned surface before density dynamics |
-| SF-2 | `vol_v2.md` | Density dynamics (multi-arg `print`, string `+` coercion, `.count()`) |
-| SF-3 | `vol_v3.md` | First usable `@std` + dict runtime. **Syntax stays SF-2.** |
-| SF-4+ | (later) | Language sugar (`|>`, enums, dual-return, dict `{k:v}` literals, …); Postgres/MySQL, ORM, WebSockets, … |
+| SF-2 | `vol_v2.md` | Density dynamics (multi-arg `print`, string `+` coercion, `.count()` length) |
+| SF-3 | `vol_v3.md` | First usable `@std` + dict; **flat** imports (historical) |
+| **SF-3.1** | **`vol_v3_1.md`** | **Foundation** (namespaces, `dict {…}`, multiline, `.len`-only, agent diags) |
+
+Language sugar (`|>`, enums, dual-return, `=>`, …), Postgres/MySQL, ORM, and
+WebSockets are **Planned (unscheduled)** in [`IDEAS.md`](IDEAS.md) — not a
+promised next freeze. Assignment / sharing rules and future ownership intent:
+[`MEMORY_MODEL.md`](MEMORY_MODEL.md).
 
 Only keep cards for product freezes that have (or will have) published harness
 runs. Intermediate implementation drafts are not cards.
 
-| Allowed under SF-3 | Requires bumping to SF-4 (or later) |
+| Allowed under SF-3.1 | Requires a new freeze bump |
 | --- | --- |
-| Bug fixes that restore documented SF-3 behavior | New keywords or operators (`|>`, `=>`, enums, dual-return, …) |
-| Clearer diagnostics / `Fix` text for existing codes | Dict `{ k: v }` literals; Postgres/MySQL; ORM; WebSockets |
-| Tests, examples, and doc sync for existing forms | Ownership, parallel, build modes, native backend |
+| Bug fixes that restore documented SF-3.1 behavior | New keywords or operators (`|>`, `=>`, enums, dual-return, …) |
+| Clearer diagnostics / structured `repairs` for existing codes | Postgres/MySQL; ORM; WebSockets |
+| Tests, examples, and doc sync for existing forms | Ownership checker, parallel, build modes, native backend |
 | Card wording edits that do **not** add features | Ambient growth of builtins beyond tiny core + `dict()` |
 
-During SF-3, do **not** implement Planned SF-4+ syntax from [`IDEAS.md`](IDEAS.md)
+Do **not** implement unscheduled Planned sugar from [`IDEAS.md`](IDEAS.md)
 without a freeze bump, SPEC updates, tests, and a new card version.
 
 ### Syntax principles
@@ -151,7 +169,7 @@ do not claim identical implementation.
 | `array.deep_copy()` | Recursive deep clone of an array | deep clone | Supported |
 | `items.where(condition)` | Eager filter; `_` is current item | eager `filter` | Supported |
 | `items.map(transform)` | Eager map; `_` is current item | eager `map` | Supported |
-| `items.count()` / `items.count(condition)` | Length, or eager count of matches | `len` / filter + length | Supported |
+| `items.count(condition)` | Eager count of matches (`_` ok) | filter + length | Supported |
 | `items.sum()` | Left-fold `+` from integer `0` | `sum` / `reduce` | Supported |
 | `input()` / `input(prompt)` | Read one line | stdin / `readLine` | Supported |
 | `assert(cond)` / `assert(cond, msg)` | Fail when false | assertion | Supported |
@@ -269,20 +287,23 @@ Escapes:
 
 Unknown escapes are `E005`. Unclosed strings are `E004`.
 
-### 2.5 Line joining
+### 2.5 Line joining (SF-3.1)
 
-Expressions do **not** continue across newlines.
+Expressions **may** continue across newlines in these cases:
 
-Illegal today:
+- after a binary operator (`1 +\n2`)
+- after `??`
+- before `.` in a postfix chain (`items\n.where(_ > 0)\n.map(_ * 2)`)
+- inside `(…)`, `[…]`, `dict { … }`, and struct `{ … }` (including after `,`)
+
+A newline does **not** continue into a call or index on the next line (that would
+glue the next statement’s `[` / `(` onto the previous expression):
 
 ```vol
-total := 1 +
-2
-```
-
-```vol
-value.foo
-.bar()
+value := 1
+[2].each item {   // OK: new statement, not `1[2]`
+    print item
+}
 ```
 
 Each simple statement must end before the next statement begins, usually with a
@@ -337,7 +358,7 @@ There is no static type checker yet. Type mistakes are usually runtime errors
 - **String `.len` (decided):** counts Unicode scalar values (same idea as Go
   runes), not UTF-8 bytes and not grapheme clusters. The short spelling `.len`
   is canonical; `.length` is rejected with `R007` and a `fix` suggesting `.len`.
-  Zero-arg `.count()` is also Supported as a length call (same result as `.len`).
+  Zero-arg `.count()` is **rejected** (SF-3.1); use `.len` for length.
 - **`.byte_len`** returns the UTF-8 byte count of a string as an integer. For
   ASCII strings this equals `.len`; for multi-byte Unicode it is larger.
   Useful for systems I/O that measures bytes, not characters.
@@ -460,15 +481,19 @@ Rules:
 - No methods; enums / tagged unions / pattern match on user tags are Planned.
 - `export User` makes the type importable.
 
-### 3.7 Dicts (SF-3)
+### 3.7 Dicts (SF-3.1)
 
-Mutable string-key maps. **Supported** under SF-3. Object-literal syntax
-`{ k: v }` is **not** accepted (Planned for SF-4+). Construct with ambient
-`dict()` (empty) or `dict("k", v, …)` (alternating string keys and values);
-mutate via string index assignment.
+Mutable string-key maps. **Supported**. Construct with:
+
+- `dict { key: value, ... }` literals (identifier or string keys; keywords like
+  `ok` are allowed as identifier-style keys)
+- ambient `dict()` (empty) or `dict("k", v, …)` (alternating string keys/values)
+
+Bare `{ k: v }` without `dict` is **not** accepted (a bare `{` begins a block).
+Mutate via string index assignment.
 
 ```vol
-d := dict("name", "VOL")
+d := dict { name: "VOL", n: 3 }
 print d["name"]
 print d.len
 print d.keys()   // sorted string array
@@ -478,10 +503,10 @@ empty["n"] = 3
 
 Rules:
 
-- **Construction:** ambient `dict()` with **0** arguments returns a new empty
-  dict. With an **even** number of arguments, pairs are alternating string keys
-  and values (later pairs overwrite earlier keys). Odd arity → `R018` (Fix
-  points at `dict()` / `dict("k", v, …)`). Non-string key → `R045`.
+- **Construction:** `dict { … }` builds a dict from entries. Ambient `dict()`
+  with **0** arguments returns a new empty dict. With an **even** number of
+  arguments, pairs are alternating string keys and values (later pairs overwrite
+  earlier keys). Odd arity → `R018`. Non-string key in `dict("k", v)` → `R045`.
 - **Identity:** assignment and argument passing **share** the dict reference
   (same rule as arrays). There is no dict `.copy()` / `.deep_copy()`; nested
   dicts inside arrays are cloned when the array is `.deep_copy()`’d.
@@ -635,9 +660,7 @@ Known properties:
 | `array.sum()` | left fold of `+` starting from integer `0` |
 | `array.where(condition)` | eager filter; see below |
 | `array.map(transform)` | eager map; see below |
-| `array.count()` | element count (same as `.len`) |
 | `array.count(condition)` | eager count of matches; see below |
-| `string.count()` | Unicode scalar count (same as `.len`) |
 
 Unknown properties are `R007`. Using `.length` instead of `.len` is `R007` with
 a `fix` pointing at `.len`. Using `.each` as a property or call (for example
@@ -709,30 +732,22 @@ Semantics:
 #### `.count`
 
 ```vol
-items.count()
 items.count(_ > 2)
 ```
 
-Semantics:
+Semantics (SF-3.1 — match count only):
 
-**Zero arguments** (length):
-
-1. Evaluate the receiver; it must be an array or string (`R021`).
-2. Return the same integer as `.len` (array element count or string Unicode
-   scalars).
-
-**One argument** (match count):
-
-1. Evaluate `items`; it must be an array (`R021`).
-2. For each element in order:
+1. Require exactly one argument (`S003` / `R020`). Zero-arg `.count()` is
+   rejected; use `.len` for length (Fix points at `.len`).
+2. Evaluate `items`; it must be an array (`R021`).
+3. For each element in order:
    - bind `_` to that element in a fresh scope
    - evaluate the condition (must be Boolean — `R022`, with the same `_`
      expression `fix` as `.where` when the value is not Boolean)
    - if true, increment a counter
-3. Return the count as an integer.
+4. Return the count as an integer.
 
-Other arities are `S003` / `R020` (`0 or 1` arguments). `.len` remains the
-canonical length **property**; `.count()` is the zero-arg call form.
+`.len` is the only length form.
 
 `.where` / `.map` / `.count` / `.sum()` are not parallel and not lazy in this
 prototype. Future fusion or parallelization of collection pipelines depends on
@@ -1084,25 +1099,27 @@ Rules:
 - Paths must not escape the project root (`S032`); `..` segments are rejected.
 - Import cycles report `S033` with a deterministic path list.
 - Only names listed in `export` are visible to importers (functions, bindings,
-  and struct types). Flat import installs those names into the importer’s module
-  scope; collisions are `S034`.
+  and struct types). Each `import` binds a **module namespace** named by the
+  path basename (`import "@std/json"` → `json`; `import "pkg"` → `pkg` for
+  `pkg/mod.vol`; `import "a/util"` → `util`). Access exports with `.`
+  (`json.parse`, `math.add`, `cart.Item { … }`). Colliding binding names are
+  `S034`.
 - Dependency modules execute (top-level side effects) in topological order before
   the entry module.
 - Ambient tiny core remains small (`args`, `input`, `assert`, `string`, `dict`).
   Broader capability is explicit `import "@std/…"`.
-- **`@std` is reserved (SF-3):** resolved by the native module registry, **not**
-  via project `vol.config.json` `paths`, and **cannot** be remapped by aliases
-  (a `"@std"` paths entry does not hijack reserved imports). Flat import
-  installs short export names; collisions are `S034` (for example
-  `@std/strings` and `@std/path` both export `join`). Full API: §5.12.
+- **`@std` is reserved:** resolved by the native module registry, **not** via
+  project `vol.config.json` `paths`, and **cannot** be remapped by aliases.
+  Full API: §5.12.
 
 Built-in names cannot be redeclared at module scope.
 
-### 5.12 Standard library `@std` (SF-3)
+### 5.12 Standard library `@std` (SF-3.1)
 
-Reserved imports install **flat short names** into the importer’s module scope
-(same collision rules as user modules: `S034`). There is no `http.fetch`
-namespacing after import.
+Reserved imports bind a **module namespace** (basename after `@std/`). Call
+exports as `math.abs`, `strings.join`, `json.parse`, `http.listen`, etc.
+Importing both `@std/strings` and `@std/path` is allowed (`strings.join` /
+`path.join`).
 
 **Resolve rules:**
 
@@ -1178,7 +1195,8 @@ Value returns (not Result). All string arguments required; wrong types → `R047
 | `suffix(s, p)` | bool |
 | `replace(s, old, new)` | string (`ReplaceAll`) |
 
-Note: `@std/path` also exports `join`. Importing both into one scope is `S034`.
+Note: `@std/path` also exports `join`. Import both modules and call
+`strings.join` / `path.join` (no collision under SF-3.1 namespaces).
 
 #### 5.12.3 `@std/fs`
 
@@ -1373,7 +1391,8 @@ VOL diagnostics have:
 - a stable code (`E` lex, `E` parse, `S` resolve, `R` runtime)
 - a message
 - a source location
-- an optional fix suggestion
+- an optional `fix` suggestion (human one-liner)
+- optional agent fields (SF-3.1): `expected`, `actual`, `operation`, `repairs`
 
 Pipeline:
 
@@ -1395,8 +1414,24 @@ vol --json run <file.vol>
 vol run --json <file.vol>
 ```
 
-JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…,"Line":…,"Column":…},"fix":"…"}`.
-`fix` is omitted when absent. I/O failures (file not found) remain plain text.
+JSON shape (optional fields omitted when empty):
+
+```json
+{
+  "code": "R044",
+  "message": "`?` requires a Result on the left, got integer.",
+  "file": "demo.vol",
+  "position": {"Offset": 10, "Line": 1, "Column": 11},
+  "fix": "Use `ok(...)` / `err(...)`, or Option `??` / if-let for Option values.",
+  "expected": "Result",
+  "actual": "integer",
+  "operation": "propagate",
+  "repairs": [{"description": "Use `ok(...)` / `err(...)`, or Option `??` / if-let for Option values."}]
+}
+```
+
+`fix` remains the primary one-liner for humans and simple repair loops. I/O
+failures (file not found) remain plain text.
 
 ### 8.1 Lexical codes
 
@@ -1452,6 +1487,10 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `E157` | expected binding name after `err` |
 | `E158` | multi-declare name/value count mismatch |
 | `E159` | multi-assign name/value count mismatch |
+| `E160` | expected `{` after `dict` |
+| `E161` | expected dict key |
+| `E162` | expected `:` after dict key |
+| `E163` | expected `}` to close dict literal |
 
 ### 8.2.1 Module / resolve codes (loader)
 
@@ -1460,7 +1499,7 @@ JSON shape: `{"code":"…","message":"…","file":"…","position":{"Offset":…
 | `S031` | module not found / unreadable / imports without loader; also bare `@std`, unknown `@std/…` |
 | `S032` | import escapes project root or contains `..` |
 | `S033` | import cycle |
-| `S034` | imported name collides (including colliding `@std` short names) |
+| `S034` | imported module binding name collides |
 | `S035` | invalid / unreadable `vol.config.json` or unknown alias |
 | `S036` | export missing at link time |
 | `S037` | nested `struct` declaration |
@@ -1555,7 +1594,7 @@ print large // [7, 9, 12]
 print large.sum() // 28
 print numbers.map(_ * 2) // [8, 14, 4, 18, 24]
 print numbers.count(_ > 5) // 3
-print numbers.count() // 5
+print numbers.len // 5
 print "Sum:", large.sum() // Sum: 28
 ```
 
@@ -1647,13 +1686,13 @@ print b // 1
 
 ```vol
 import "examples/features/modules/math"
-print add(21, 21) // 42
+print math.add(21, 21) // 42
 ```
 
 ### 9.10 Dicts
 
 ```vol
-d := dict("name", "VOL")
+d := dict { name: "VOL" }
 print d["name"] // VOL
 print d.len // 1
 print d.keys() // [name]
@@ -1666,9 +1705,9 @@ import "@std/math"
 import "@std/strings"
 
 fn demo() {
-    print abs(-7)? // 7
-    print trim("  hi  ") // hi
-    print join(["a", "b"], "-") // a-b
+    print math.abs(-7)? // 7
+    print strings.trim("  hi  ") // hi
+    print strings.join(["a", "b"], "-") // a-b
 }
 demo()
 ```
@@ -1691,10 +1730,10 @@ Do not treat these as specified just because vision docs mention them:
 - generics
 - symbol-selection imports (`import { x } from …`); multi-file folder packages
   beyond `path.vol` / `path/mod.vol`
-- ambient growth of the prelude beyond today’s tiny built-ins (`dict()` is the
-  SF-3 addition; further ambient APIs stay out of scope — use `@std`)
-- dict `{ k: v }` literals (construct with `dict()` / `dict("k", v, …)` under SF-3)
-- Postgres / MySQL drivers, ORM, WebSockets (SF-3 DB is SQLite only)
+- ambient growth of the prelude beyond today’s tiny built-ins (`dict()` /
+  `dict { … }` are Supported; further ambient APIs stay out of scope — use `@std`)
+- bare `{ k: v }` without the `dict` keyword (use `dict { k: v }`)
+- Postgres / MySQL drivers, ORM, WebSockets (DB is SQLite only)
 - `parallel`, async, channels (no parallelization guarantees until specified)
 - wrapping integer arithmetic and overflow/bounds build modes (default is trap;
   see §4.3; modes + wrap ops Planned in [`IDEAS.md`](IDEAS.md))
@@ -1747,22 +1786,28 @@ and Planned work in [`IDEAS.md`](IDEAS.md).
 - **Multi-assign (§5.2):** `a, b := …` / `a, b = …` Supported (RHS evaluated
   before assigns).
 - **Collection map/count (§4.4):** `.map(_)` and `.count(_)` Supported;
-  `.count()` (0 args) is length (same as `.len`) on arrays and strings (SF-2).
+  zero-arg `.count()` rejected (SF-3.1); use `.len` for length.
 - **Multi-arg `print` (§5.7):** `print a, b` space-joins display forms (SF-2).
 - **String `+` coercion (§3.2):** `string + displayable` concatenates via
   display rules; `non-string + string` stays `R013` (SF-2).
 - **Structs (§3.6):** product `struct` with named and positional literals
-  Supported. Tagged unions/enums and methods remain Planned.
+  Supported (including qualified `mod.Type { … }`). Tagged unions/enums and
+  methods remain Planned.
 - **Modules (§5.11):** `import` + `vol.config.json` discovery/aliases Supported;
-  ambient tiny core includes `dict()`; reserved `@std` modules Supported (§5.12).
-- **Dict (§3.7):** mutable string-key maps via `dict()` / `dict("k", v, …)` /
-  `["k"]` / `.len` / `.keys()` Supported; odd arity → `R018`; missing key /
-  non-string key → `R045`; `{ k: v }` literals remain Planned (SF-4+).
-- **`@std` (§5.12):** reserved root (not remappable); flat exports; modules
-  math, strings, fs, path, env, time, url, json, yaml, http, process, db
-  (SQLite). Operational failure → Result; `get` → Option; type mistakes →
-  `R046`/`R047`. Dict `{k:v}` literals, Postgres/MySQL, ORM, WebSockets stay
-  Planned.
+  imports bind **module namespaces** (SF-3.1); ambient tiny core includes
+  `dict()`; reserved `@std` Supported (§5.12).
+- **Dict (§3.7):** `dict { k: v }`, `dict()` / `dict("k", v, …)`, `["k"]`,
+  `.len`, `.keys()` Supported; odd arity → `R018`; missing/non-string key →
+  `R045`. Bare `{ k: v }` without `dict` is not accepted.
+- **`@std` (§5.12):** reserved root (not remappable); **namespaced** exports
+  (`json.parse`); modules math, strings, fs, path, env, time, url, json, yaml,
+  http, process, db (SQLite). Operational failure → Result; `env.get` → Option;
+  type mistakes → `R046`/`R047`. Postgres/MySQL, ORM, WebSockets stay
+  Planned (unscheduled).
+- **Line joining (§2.5):** multiline postfix `.` chains, after operators, and
+  inside brackets/parens/dict/struct literals (SF-3.1).
+- **Agent diagnostics (§8):** optional `expected` / `actual` / `operation` /
+  `repairs` alongside `fix` (SF-3.1).
 - **Ownership / allocation direction (Planned):** local escape analysis first;
   API contracts later; allocation unspecified — do not claim inference.
 - **Parallel direction (Planned):** `parallel` stays Planned; no guarantees

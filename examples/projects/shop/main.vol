@@ -3,15 +3,15 @@
 import "examples/projects/shop/cart"
 
 fn pay(items) {
-    amount := checkout(items)?
+    amount := cart.checkout(items)?
     return ok("charged " + amount)
 }
 
-cart := [Item { name: "mug", price: 12, qty: 2 }, Item { name: "sticker", price: 3, qty: 5 }]
+items := [cart.Item { name: "mug", price: 12, qty: 2 }, cart.Item { name: "sticker", price: 3, qty: 5 }]
 
-print "Subtotal:", cart_total(cart)
+print "Subtotal:", cart.cart_total(items)
 
-if ok msg := pay(cart) {
+if ok msg := pay(items) {
     print "pay:", msg
 } else err e {
     print "pay failed:", e

@@ -2,11 +2,11 @@
 
 import "examples/projects/gradebook/grades"
 
-class := [Student { name: "Ada", score: 92 }, Student { name: "Grace", score: 88 }, Student { name: "Alan", score: 54 }, Student { name: "Katherine", score: 97 }]
+class := [grades.Student { name: "Ada", score: 92 }, grades.Student { name: "Grace", score: 88 }, grades.Student { name: "Alan", score: 54 }, grades.Student { name: "Katherine", score: 97 }]
 
-print "Roster:", names_of(class)
-print "Average:", average(class)
-print "Passing:", passing_count(class)
+print "Roster:", grades.names_of(class)
+print "Average:", grades.average(class)
+print "Passing:", grades.passing_count(class)
 
 high := class.where(_.score >= 90)
-print "Honor roll:", names_of(high)
+print "Honor roll:", grades.names_of(high)

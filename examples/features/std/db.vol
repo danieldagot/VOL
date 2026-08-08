@@ -1,10 +1,10 @@
-// @std/db (SF-3): SQLite open/exec/query/close; rows are dict arrays.
+// @std/db (SF-3.1): SQLite db.open/exec/query/close; rows are dict arrays.
 
 import "@std/db"
 
-conn := open(":memory:")?
-exec(conn, "create table hits (n int)")?
-exec(conn, "insert into hits(n) values (1)")?
-rows := query(conn, "select n from hits")?
+conn := db.open(":memory:")?
+db.exec(conn, "create table hits (n int)")?
+db.exec(conn, "insert into hits(n) values (1)")?
+rows := db.query(conn, "select n from hits")?
 print rows[0]["n"]
-close(conn)?
+db.close(conn)?

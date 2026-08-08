@@ -1,8 +1,8 @@
-// @std/json (SF-3): parse/dump → Result; objects → dict; null → none.
+// @std/json (SF-3.1): json.parse/dump → Result; objects → dict; null → none.
 
 import "@std/json"
 
-print dump(dict("host", "example.com"))?
-v := parse("{\"a\":1,\"b\":null}")?
+print json.dump(dict { host: "example.com" })?
+v := json.parse("{\"a\":1,\"b\":null}")?
 print v["a"]
 print v["b"]

@@ -40,7 +40,7 @@ func TestStdReservedCannotRemap(t *testing.T) {
 	path := writeTempVol(t, dir, "main.vol", `
 import "@std/math"
 fn main() {
-    return abs(-3)?
+    return math.abs(-3)?
 }
 print main()
 `)
@@ -101,13 +101,13 @@ func TestStdMathAndStrings(t *testing.T) {
 import "@std/math"
 import "@std/strings"
 fn show() {
-    print abs(-7)?
-    print trim("  hi  ")
-    print join(["a", "b"], "-")
-    print has("hello", "ell")
-    print prefix("hello", "he")
-    print suffix("hello", "lo")
-    print replace("a-a", "-", "+")
+    print math.abs(-7)?
+    print strings.trim("  hi  ")
+    print strings.join(["a", "b"], "-")
+    print strings.has("hello", "ell")
+    print strings.prefix("hello", "he")
+    print strings.suffix("hello", "lo")
+    print strings.replace("a-a", "-", "+")
 }
 show()
 `)
@@ -123,10 +123,10 @@ show()
 func TestStdPath(t *testing.T) {
 	out, d := runVolSource(t, `
 import "@std/path"
-print join("x", "y", "z")
-print base("/a/b.txt")
-print dir("/a/b.txt")
-print ext("/a/b.txt")
+print path.join("x", "y", "z")
+print path.base("/a/b.txt")
+print path.dir("/a/b.txt")
+print path.ext("/a/b.txt")
 `)
 	if d != nil {
 		t.Fatalf("diagnostic: %+v", d)
@@ -147,13 +147,13 @@ import "@std/env"
 import "@std/time"
 fn demo() {
     path := "`+file+`"
-    write(path, "hello")?
-    print read(path)?
-    print exists(path)
-    print get("VOL_SF3_TEST") ?? "missing"
-    print get("VOL_SF3_MISSING") ?? "fallback"
-    now()
-    print format(0, "2006")
+    fs.write(path, "hello")?
+    print fs.read(path)?
+    print fs.exists(path)
+    print env.get("VOL_SF3_TEST") ?? "missing"
+    print env.get("VOL_SF3_MISSING") ?? "fallback"
+    time.now()
+    print time.format(0, "2006")
 }
 demo()
 `)
@@ -169,7 +169,7 @@ func TestStdURL(t *testing.T) {
 	out, d := runVolSource(t, `
 import "@std/url"
 fn demo() {
-    u := parse("https://example.com:8443/x?q=1")?
+    u := url.parse("https://example.com:8443/x?q=1")?
     print u.scheme
     print u.host
     print u.port
@@ -191,10 +191,10 @@ func TestStdJSON(t *testing.T) {
 import "@std/json"
 import "@std/strings"
 fn demo() {
-    v := parse("{\"a\":1,\"b\":null}")?
+    v := json.parse("{\"a\":1,\"b\":null}")?
     print v["a"]
     print v["b"]
-    print has(dump(v)?, "\"a\":1")
+    print strings.has(json.dump(v)?, "\"a\":1")
 }
 demo()
 `)
@@ -210,7 +210,7 @@ func TestStdYAML(t *testing.T) {
 	out, d := runVolSource(t, `
 import "@std/yaml"
 fn demo() {
-    y := parse("a: 2\nb: null\n")?
+    y := yaml.parse("a: 2\nb: null\n")?
     print y["a"]
     print y["b"]
 }
@@ -232,15 +232,15 @@ import "@std/strings"
 import "@std/process"
 import "@std/db"
 fn demo() {
-    p := run(["echo", "hi"])?
+    p := process.run(["echo", "hi"])?
     print p.status
-    print trim(p.stdout)
-    conn := open("`+dbPath+`")?
-    exec(conn, "create table hits (n int)")?
-    exec(conn, "insert into hits(n) values (3)")?
-    rows := query(conn, "select n from hits")?
+    print strings.trim(p.stdout)
+    conn := db.open("`+dbPath+`")?
+    db.exec(conn, "create table hits (n int)")?
+    db.exec(conn, "insert into hits(n) values (3)")?
+    rows := db.query(conn, "select n from hits")?
     print rows[0]["n"]
-    close(conn)?
+    db.close(conn)?
 }
 demo()
 `)
@@ -269,7 +269,7 @@ func TestStdHTTPFetchAndListen(t *testing.T) {
 	out, d := runVolSource(t, `
 import "@std/http"
 fn demo() {
-    r := fetch("http://`+addr+`/ping")?
+    r := http.fetch("http://`+addr+`/ping")?
     print r.status
     print r.body
 }
@@ -293,9 +293,9 @@ demo()
 	path := writeTempVol(t, dir, "server.vol", `
 import "@std/http"
 fn handle(req) {
-  return reply(200, dict())
+  return http.reply(200, dict())
 }
-listen("`+listenAddr+`", handle)
+http.listen("`+listenAddr+`", handle)
 `)
 	go func() { _ = RunFile(path, io.Discard, ExecuteOptions{}) }()
 	deadline := time.Now().Add(3 * time.Second)
@@ -326,13 +326,39 @@ func TestUnknownStdModule(t *testing.T) {
 	}
 }
 
-func TestStdJoinNameCollision(t *testing.T) {
-	_, d := runVolSource(t, `
+func TestStdJoinNamespacesNoCollision(t *testing.T) {
+	out, d := runVolSource(t, `
 import "@std/strings"
 import "@std/path"
-print 1
+print strings.join(["a", "b"], "-")
+print path.join("a", "b")
 `)
+	if d != nil {
+		t.Fatalf("unexpected diagnostic: %+v", d)
+	}
+	want := "a-b\na/b\n"
+	if out != want {
+		t.Fatalf("got %q want %q", out, want)
+	}
+}
+
+func TestStdModuleNameCollision(t *testing.T) {
+	// User modules with the same basename collide on the binding name.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "vol.config.json"), []byte(`{"root":"."}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.MkdirAll(filepath.Join(dir, "a"), 0o755)
+	_ = os.MkdirAll(filepath.Join(dir, "b"), 0o755)
+	writeTempVol(t, filepath.Join(dir, "a"), "util.vol", "export value\nvalue := 1\n")
+	writeTempVol(t, filepath.Join(dir, "b"), "util.vol", "export value\nvalue := 2\n")
+	path := writeTempVol(t, dir, "main.vol", `
+import "a/util"
+import "b/util"
+print util.value
+`)
+	d := RunFile(path, io.Discard, ExecuteOptions{})
 	if d == nil || d.Code != "S034" {
-		t.Fatalf("want S034 collision, got %+v", d)
+		t.Fatalf("want S034 module binding collision, got %+v", d)
 	}
 }

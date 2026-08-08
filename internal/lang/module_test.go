@@ -20,7 +20,7 @@ func TestRunFileLoadsImportsAndExports(t *testing.T) {
 		t.Fatal(err)
 	}
 	entry := filepath.Join(root, "main.vol")
-	if err := os.WriteFile(entry, []byte("import \"@lib/math\"\nprint add(20, 22)\n"), 0o600); err != nil {
+	if err := os.WriteFile(entry, []byte("import \"@lib/math\"\nprint math.add(20, 22)\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
@@ -41,7 +41,7 @@ func TestRunFileResolvesModVol(t *testing.T) {
 		t.Fatal(err)
 	}
 	entry := filepath.Join(root, "main.vol")
-	if err := os.WriteFile(entry, []byte("import \"pkg\"\nprint value\n"), 0o600); err != nil {
+	if err := os.WriteFile(entry, []byte("import \"pkg\"\nprint pkg.value\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
@@ -93,14 +93,20 @@ func TestExecuteRejectsImportsWithoutLoader(t *testing.T) {
 
 func TestRunFileImportCollisionPointsAtLaterImport(t *testing.T) {
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "a.vol"), []byte("export shared\nshared := 1\n"), 0o600); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "x"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "b.vol"), []byte("export shared\nshared := 2\n"), 0o600); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "y"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "x", "util.vol"), []byte("export shared\nshared := 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "y", "util.vol"), []byte("export shared\nshared := 2\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	entry := filepath.Join(root, "main.vol")
-	source := "import \"a\"\nimport \"b\"\nprint shared\n"
+	source := "import \"x/util\"\nimport \"y/util\"\nprint util.shared\n"
 	if err := os.WriteFile(entry, []byte(source), 0o600); err != nil {
 		t.Fatal(err)
 	}

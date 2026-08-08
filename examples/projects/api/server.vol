@@ -13,10 +13,10 @@ import "@std/http"
 import "@std/env"
 
 fn start() {
-    boot()?
-    addr := get("API_ADDR") ?? "127.0.0.1:8787"
+    handlers.boot()?
+    addr := env.get("API_ADDR") ?? "127.0.0.1:8787"
     print "listening on", addr
-    listen(addr, handle)?
+    http.listen(addr, handlers.handle)?
     return ok(true)
 }
 

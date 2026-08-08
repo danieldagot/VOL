@@ -1,6 +1,6 @@
 nums := [3, 8, 1, 12, 5, 9, 4, 15, 2, 11]
 g := nums.where(_ > 5)
-print g.count()
+print g.len
 print g.sum()
 print g.map(_ * 2).sum()
 print nums.count(_ < 5)

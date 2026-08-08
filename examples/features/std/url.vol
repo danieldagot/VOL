@@ -1,7 +1,7 @@
-// @std/url (SF-3): parse → Result with scheme/host/port/path/query.
+// @std/url (SF-3.1): url.parse → Result with scheme/host/port/path/query.
 
 import "@std/url"
 
-u := parse("https://example.com/api?q=1")?
+u := url.parse("https://example.com/api?q=1")?
 print u.host
 print u.query["q"]

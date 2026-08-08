@@ -494,8 +494,38 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 			return nil, d
 		}
 		return resultValue{ok: false, value: inner}, nil
+	case *DictLiteral:
+		d := newDict()
+		for _, entry := range node.Entries {
+			value, diag := i.evaluate(entry.Value)
+			if diag != nil {
+				return nil, diag
+			}
+			if diag := i.requireValue(value, entry.Value.Position()); diag != nil {
+				return nil, diag
+			}
+			d.set(entry.Key.Lexeme, value)
+		}
+		return d, nil
 	case *StructLiteral:
-		typeValue, found := i.env.get(node.Type.Lexeme)
+		var typeValue any
+		var found bool
+		if node.Module != nil {
+			mod, d := i.evaluate(node.Module)
+			if d != nil {
+				return nil, d
+			}
+			if d := i.requireValue(mod, node.Module.Position()); d != nil {
+				return nil, d
+			}
+			ns, ok := mod.(*moduleNamespace)
+			if !ok {
+				return nil, i.runtime(node.Type.Pos, "R038", "Struct qualifier must be a module.")
+			}
+			typeValue, found = ns.exports[node.Type.Lexeme]
+		} else {
+			typeValue, found = i.env.get(node.Type.Lexeme)
+		}
 		if !found {
 			return nil, i.runtime(node.Type.Pos, "R038", "Unknown struct type `"+node.Type.Lexeme+"`.")
 		}
@@ -607,6 +637,18 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		if d := i.requireValue(object, node.Object.Position()); d != nil {
 			return nil, d
 		}
+		if ns, ok := object.(*moduleNamespace); ok {
+			value, exists := ns.exports[node.Name.Lexeme]
+			if !exists {
+				return nil, i.runtimeWithFix(
+					node.Name.Pos,
+					"R007",
+					"Module `"+ns.name+"` has no export `"+node.Name.Lexeme+"`.",
+					"Use a name exported by `"+ns.name+"` (see SPEC §5.12 for `@std`).",
+				)
+			}
+			return value, nil
+		}
 		if instance, ok := object.(*structValue); ok {
 			value, exists := instance.fields[node.Name.Lexeme]
 			if !exists {
@@ -716,9 +758,13 @@ func (i *interpreter) evaluate(expression Expression) (any, *Diagnostic) {
 		}
 		result, ok := value.(resultValue)
 		if !ok {
-			return nil, i.runtimeWithFix(node.Op.Pos, "R044",
+			d := i.runtimeWithFix(node.Op.Pos, "R044",
 				"`?` requires a Result on the left, got "+typeName(value)+".",
 				"Use `ok(...)` / `err(...)`, or Option `??` / if-let for Option values.")
+			d.Expected = "Result"
+			d.Actual = typeName(value)
+			d.Operation = "propagate"
+			return nil, d
 		}
 		if result.ok {
 			return result.value, nil
@@ -902,17 +948,13 @@ func (i *interpreter) evaluateCount(property *Property, arguments []Expression) 
 	if d := i.requireValue(value, property.Object.Position()); d != nil {
 		return nil, d
 	}
-	if len(arguments) == 0 {
-		if array, ok := value.([]any); ok {
-			return int64(len(array)), nil
-		}
-		if text, ok := value.(string); ok {
-			return int64(len([]rune(text))), nil
-		}
-		return nil, i.runtime(property.Position(), "R021", "`.count` requires an array or string.")
-	}
 	if len(arguments) != 1 {
-		return nil, i.runtime(property.Name.Pos, "R020", "`.count` expects 0 or 1 arguments.")
+		return nil, i.runtimeWithFix(
+			property.Name.Pos,
+			"R020",
+			"`.count` expects 1 argument.",
+			"Use `.len` for length, or `.count(condition)` to count matches (e.g. `.count(_ > 5)`).",
+		)
 	}
 	array, ok := value.([]any)
 	if !ok {
@@ -1278,7 +1320,11 @@ func (i *interpreter) runtime(pos Position, code, message string) *Diagnostic {
 }
 
 func (i *interpreter) runtimeWithFix(pos Position, code, message, fix string) *Diagnostic {
-	return &Diagnostic{Code: code, Message: message, File: i.file, Pos: pos, Fix: fix}
+	d := &Diagnostic{Code: code, Message: message, File: i.file, Pos: pos, Fix: fix}
+	if fix != "" {
+		d.Repairs = []Repair{{Description: fix}}
+	}
+	return d
 }
 
 func (i *interpreter) indexNotIndexable(pos Position, collection any) *Diagnostic {
@@ -1305,11 +1351,15 @@ func (i *interpreter) requireValue(value any, pos Position) *Diagnostic {
 		return nil
 	}
 	return &Diagnostic{
-		Code:    "R029",
-		Message: "Expected a value, got `nothing`.",
-		File:    i.file,
-		Pos:     pos,
-		Fix:     nothingFix,
+		Code:      "R029",
+		Message:   "Expected a value, got `nothing`.",
+		File:      i.file,
+		Pos:       pos,
+		Fix:       nothingFix,
+		Expected:  "value",
+		Actual:    "nothing",
+		Operation: "use",
+		Repairs:   []Repair{{Description: nothingFix}},
 	}
 }
 func display(value any) string {
@@ -1337,6 +1387,9 @@ func display(value any) string {
 	}
 	if dict, ok := value.(*dictValue); ok {
 		return displayDict(dict)
+	}
+	if ns, ok := value.(*moduleNamespace); ok {
+		return "module " + ns.name
 	}
 	if handle, ok := value.(*nativeHandle); ok {
 		return handle.String()
@@ -1374,6 +1427,8 @@ func typeName(value any) string {
 		return "struct type"
 	case *dictValue:
 		return "dict"
+	case *moduleNamespace:
+		return "module"
 	case *nativeHandle:
 		return "handle"
 	case *httpReplyValue:

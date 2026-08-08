@@ -104,7 +104,11 @@ func lex(file, source string) ([]Token, *Diagnostic) {
 			kinds := map[rune]TokenKind{'+': TokenPlus, '-': TokenMinus, '*': TokenStar, '/': TokenSlash, '{': TokenLeftBrace, '}': TokenRightBrace, '[': TokenLeftBracket, ']': TokenRightBracket, '(': TokenLeftParen, ')': TokenRightParen, ',': TokenComma, '.': TokenDot}
 			kind, ok := kinds[r]
 			if !ok {
-				return nil, l.errorAt(pos, "E003", "Unexpected character `"+string(r)+"`.")
+				d := l.errorAt(pos, "E003", "Unexpected character `"+string(r)+"`.")
+				if r == '\'' {
+					d.Fix = "VOL string literals use double quotes (`\"...\"`); escape inner quotes as `\\\"`."
+				}
+				return nil, d
 			}
 			l.advance()
 			tokens = append(tokens, Token{Kind: kind, Lexeme: string(r), Pos: pos})

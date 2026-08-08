@@ -1,7 +1,7 @@
-// @std/yaml (SF-3): parse/dump → Result; null → none.
+// @std/yaml (SF-3.1): yaml.parse/dump → Result; null → none.
 
 import "@std/yaml"
 
-y := parse("name: VOL\nn: null\n")?
+y := yaml.parse("name: VOL\nn: null\n")?
 print y["name"]
 print y["n"]

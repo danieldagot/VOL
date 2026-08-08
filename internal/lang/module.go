@@ -22,10 +22,18 @@ type projectContext struct {
 }
 
 type moduleUnit struct {
-	File       string // absolute path
-	Program    *Program
-	ImportKeys []string            // absolute dependency files, in source order
-	ImportPos  map[string]Position // dependency abs path -> import path token position
+	File        string // absolute path
+	Program     *Program
+	ImportKeys  []string            // absolute dependency files, in source order
+	ImportPos   map[string]Position // dependency abs path -> import path token position
+	ImportNames map[string]string   // dependency abs path -> binding name (module namespace)
+}
+
+// moduleNamespace is the value bound by `import "…"` (SF-3.1). Exports are
+// accessed with `.` (e.g. `json.parse`).
+type moduleNamespace struct {
+	name    string
+	exports map[string]any
 }
 
 // RunFile discovers the project, loads the import graph for entryPath, and executes
@@ -60,19 +68,24 @@ func RunFile(entryPath string, output io.Writer, options ExecuteOptions) *Diagno
 		importedValues := map[string]any{}
 		importedSyms := map[string]symbol{}
 		for _, dep := range unit.ImportKeys {
-			for name, value := range exports[dep] {
-				if _, exists := importedValues[name]; exists {
-					return &Diagnostic{
-						Code:    "S034",
-						Message: "Imported name `" + name + "` collides with another import.",
-						File:    unit.File,
-						Pos:     unit.ImportPos[dep],
-						Fix:     "Rename one of the exports or avoid importing both modules into the same scope.",
-					}
-				}
-				importedValues[name] = value
-				importedSyms[name] = importSymbols[dep][name]
+			binding := unit.ImportNames[dep]
+			if binding == "" {
+				binding = moduleBindingNameFromPath(dep)
 			}
+			if _, exists := importedValues[binding]; exists {
+				return &Diagnostic{
+					Code:      "S034",
+					Message:   "Imported module `" + binding + "` collides with another import.",
+					File:      unit.File,
+					Pos:       unit.ImportPos[dep],
+					Fix:       "Import only one module that binds `" + binding + "`, or rename a project module path.",
+					Expected:  "unique module binding `" + binding + "`",
+					Actual:    "duplicate import binding",
+					Operation: "import",
+				}
+			}
+			importedValues[binding] = &moduleNamespace{name: binding, exports: exports[dep]}
+			importedSyms[binding] = symbol{kind: "module", arity: -1}
 		}
 		if d := resolveModule(unit.Program, importedSyms); d != nil {
 			return d
@@ -182,7 +195,12 @@ func loadModuleGraph(entryAbs string, ctx projectContext) (map[string]*moduleUni
 		if d != nil {
 			return d
 		}
-		unit := &moduleUnit{File: fileAbs, Program: program, ImportPos: map[string]Position{}}
+		unit := &moduleUnit{
+			File:        fileAbs,
+			Program:     program,
+			ImportPos:   map[string]Position{},
+			ImportNames: map[string]string{},
+		}
 		seenDep := map[string]bool{}
 		for _, statement := range program.Statements {
 			imp, ok := statement.(*ImportStatement)
@@ -193,10 +211,12 @@ func loadModuleGraph(entryAbs string, ctx projectContext) (map[string]*moduleUni
 			if d != nil {
 				return d
 			}
+			binding := moduleBindingName(imp.Path.Lexeme, resolved)
 			if !seenDep[resolved] {
 				seenDep[resolved] = true
 				unit.ImportKeys = append(unit.ImportKeys, resolved)
 				unit.ImportPos[resolved] = imp.Path.Pos
+				unit.ImportNames[resolved] = binding
 			}
 			if d := visit(resolved); d != nil {
 				return d
@@ -330,9 +350,40 @@ func symbolFromValue(value any) symbol {
 		return symbol{kind: "struct", arity: -1}
 	case *builtinFunction:
 		return symbol{kind: "builtin", arity: -1}
+	case *moduleNamespace:
+		return symbol{kind: "module", arity: -1}
 	case *dictValue, *nativeHandle, *httpReplyValue:
 		return symbol{kind: "value", arity: -1}
 	default:
 		return symbol{kind: "value", arity: -1}
 	}
+}
+
+// moduleBindingName is the identifier installed by an import (path basename).
+func moduleBindingName(importPath, resolvedAbs string) string {
+	if strings.HasPrefix(importPath, "@std/") {
+		return strings.TrimPrefix(importPath, "@std/")
+	}
+	if filepath.Base(resolvedAbs) == "mod.vol" {
+		return filepath.Base(filepath.Dir(resolvedAbs))
+	}
+	name := importPath
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
+	}
+	if strings.HasPrefix(name, "@") {
+		name = strings.TrimPrefix(name, "@")
+	}
+	return name
+}
+
+func moduleBindingNameFromPath(resolvedAbs string) string {
+	if isStdModulePath(resolvedAbs) {
+		return strings.TrimPrefix(stdImportFromPath(resolvedAbs), "@std/")
+	}
+	if filepath.Base(resolvedAbs) == "mod.vol" {
+		return filepath.Base(filepath.Dir(resolvedAbs))
+	}
+	base := filepath.Base(resolvedAbs)
+	return strings.TrimSuffix(base, ".vol")
 }

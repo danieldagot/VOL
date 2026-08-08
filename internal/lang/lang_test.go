@@ -303,12 +303,48 @@ func TestStringConcatTypeMismatches(t *testing.T) {
 	}
 }
 
-func TestCountZeroArgIsLen(t *testing.T) {
+func TestDictLiteralAndMultilineChain(t *testing.T) {
 	output, diagnostic := run(t, `
+d := dict {
+    name: "VOL",
+    n: 3,
+}
+print d["name"]
+print d["n"]
+nums := [1, 2, 3, 4]
+total := nums
+    .where(_ > 2)
+    .map(_ * 10)
+    .sum()
+print total
+print 1 +
+2
+`)
+	if diagnostic != nil {
+		t.Fatal(diagnostic)
+	}
+	want := "VOL\n3\n70\n3\n"
+	if output != want {
+		t.Fatalf("got %q want %q", output, want)
+	}
+}
+
+func TestCountZeroArgRejected(t *testing.T) {
+	_, diagnostic := run(t, `
 nums := [3, 8, 1]
 print nums.count()
-print nums.where(_ > 5).count()
-print "hi".count()
+`)
+	if diagnostic == nil || diagnostic.Code != "S003" {
+		t.Fatalf("want S003 for zero-arg .count(), got %#v", diagnostic)
+	}
+	if !strings.Contains(diagnostic.Fix, ".len") {
+		t.Fatalf("Fix should mention .len, got %q", diagnostic.Fix)
+	}
+	output, diagnostic := run(t, `
+nums := [3, 8, 1]
+print nums.len
+print nums.where(_ > 5).len
+print "hi".len
 print nums.count(_ > 5)
 `)
 	if diagnostic != nil {

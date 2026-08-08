@@ -1,4 +1,4 @@
-// HTTP route handlers over the notes store (SF-3 @std/http + @std/json + @std/strings).
+// HTTP route handlers over the notes store (SF-3.1 @std/http + @std/json + @std/strings).
 
 export boot, handle
 
@@ -8,35 +8,35 @@ import "@std/json"
 import "@std/strings"
 
 fn boot() {
-    return init_store()
+    return store.init_store()
 }
 
 fn json_error(status, message) {
-    return reply(status, dict("error", message))
+    return http.reply(status, dict { error: message })
 }
 
 fn list_handler() {
-    rows := list_notes()?
-    return reply(200, rows)
+    rows := store.list_notes()?
+    return http.reply(200, rows)
 }
 
 fn create_handler(req) {
-    data := parse(req.body)?
-    note := add_note(data["title"])?
-    return reply(201, note)
+    data := json.parse(req.body)?
+    note := store.add_note(data["title"])?
+    return http.reply(201, note)
 }
 
 fn get_handler(id) {
-    if ok note := get_note(id) {
-        return reply(200, note)
+    if ok note := store.get_note(id) {
+        return http.reply(200, note)
     } else err e {
         return json_error(404, e)
     }
 }
 
 fn delete_handler(id) {
-    if ok _ := remove_note(id) {
-        return reply(200, dict("deleted", true))
+    if ok _ := store.remove_note(id) {
+        return http.reply(200, dict { deleted: true })
     } else err e {
         return json_error(404, e)
     }
@@ -44,7 +44,7 @@ fn delete_handler(id) {
 
 fn handle(req) {
     if req.method == "GET" and req.path == "/health" {
-        return reply(200, dict("ok", true))
+        return http.reply(200, dict { ok: true })
     }
 
     if req.path == "/notes" {
@@ -57,8 +57,8 @@ fn handle(req) {
         return json_error(405, "method not allowed")
     }
 
-    if prefix(req.path, "/notes/") {
-        parts := split(req.path, "/")
+    if strings.prefix(req.path, "/notes/") {
+        parts := strings.split(req.path, "/")
         if parts.len != 3 {
             return json_error(404, "not found")
         }

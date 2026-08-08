@@ -4,8 +4,9 @@ description: >-
   Ships a Planned VOL language feature as a surface-freeze bump: implements
   lexer/parser/AST/resolver/interpreter, tests, examples, SPEC/IDEAS/README/
   AGENTS sync, and a new LLM card. Use when the user asks to implement pipelines,
-  enums, dual-return, or other IDEAS.md Planned syntax; to bump SF-3→SF-4 (or
-  later); or to “ship the next SF feature.”
+  enums, dual-return, or other IDEAS.md Planned syntax; to bump SF-3.1→next
+  freeze (or later); or to “ship the next SF feature.” Do not default-ship
+  unscheduled SF-4 sugar.
 disable-model-invocation: true
 ---
 
@@ -36,9 +37,9 @@ If the feature is still an open question in IDEAS, stop and run Phase 2 of
 
 ## Scope rules
 
-- **One coherent SF slice** per bump (active freeze is SF-3 / card `vol_v3`;
-  next is SF-4+ sugar or later library work). Do not also ship ownership /
-  parallel / SF-4+ syntax in the same pass unless the user asks.
+- **One coherent SF slice** per bump (active freeze is SF-3.1 / card `vol_v3_1`;
+  Planned sugar is unscheduled — do not default-ship `|>` / enums / dual-return).
+  Do not also ship ownership / parallel / sugar in the same pass unless asked.
 - Prefer the IDEAS **density-pinned** spellings. Do not invent a competing form
   without asking.
 - Docs-only directions that cannot run yet (allocation “unspecified”, parallel
@@ -54,14 +55,14 @@ If the feature is still an open question in IDEAS, stop and run Phase 2 of
 State briefly:
 
 - Feature(s) shipping
-- From freeze → to freeze (e.g. SF-3 → SF-4)
-- New card path (`bench/llm/cards/vol_v4.md`, …)
+- From freeze → to freeze (e.g. SF-3.1 → next named freeze)
+- New card path (`bench/llm/cards/vol_vN.md`, …)
 - Out of scope for this bump
 
 If the user said “the rest,” propose a **single** next slice (default ROI:
-`vol fmt` rewriter, or one SF-4+ item the user names). Do **not** default to
-shipping `|>` / enums / dual-return / Postgres/MySQL / ORM / WebSockets without
-an explicit ask.
+finish SF-3.1 foundation docs/tests, or `vol fmt` rewriter). Do **not**
+default to shipping `|>` / enums / dual-return / Postgres/MySQL / ORM /
+WebSockets without an explicit ask.
 
 ### 2. Implement in `internal/lang`
 
@@ -75,7 +76,7 @@ Typical order:
 6. Tests: lexer vocabulary, parser diagnostics, `lang_test.go` / interpreter
    tables, `examples_test.go` row if adding examples
 
-Reuse patterns from the current SF-3 surface (Option / Result / structs / modules / `@std` / dict / density dynamics) when similar.
+Reuse patterns from the current SF-3.1 surface (Option / Result / structs / modules / namespaced `@std` / `dict {…}` / density dynamics) when similar.
 
 ### 3. Examples
 
@@ -117,12 +118,13 @@ Prefer `go test ./...` when time allows; report if skipped.
 
 ## Default next-slice order (if user says “the rest”)
 
-Implement one at a time in this order unless the user overrides (SF-3 active):
+Implement one at a time in this order unless the user overrides (SF-3.1 active):
 
-1. `vol fmt` rewriter (parallel foundation; not freeze-defining)
-2. SF-4+ only when asked: `|>`, enums, dual-return, dict literals; Postgres/MySQL,
-   ORM, WebSockets
-3. Leave ownership / parallel / alloc / build modes as design until a backend or
+1. SF-3.1 foundation precision (namespaces, `dict {…}`, multiline, `.len`-only)
+2. `vol fmt` rewriter (parallel foundation; not freeze-defining)
+3. Unscheduled Planned sugar only when asked: `|>`, enums, dual-return;
+   Postgres/MySQL, ORM, WebSockets
+4. Leave ownership / parallel / alloc / build modes as design until a backend or
    explicit user ask
 
 ## Anti-patterns

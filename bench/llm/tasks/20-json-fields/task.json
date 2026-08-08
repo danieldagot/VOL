@@ -3,9 +3,9 @@
   "source_checks": {
     "vol": [
       "@std/json",
-      "\\bparse\\s*\\(",
-      "\\bdump\\s*\\(",
-      "\\bdict\\s*\\("
+      "json\\.parse\\s*\\(",
+      "json\\.dump\\s*\\(",
+      "dict\\s*\\{"
     ],
     "python": [
       "json\\.loads\\s*\\(",

@@ -1,0 +1,5 @@
+import "@std/path"
+import "@std/strings"
+
+print path.join("a", "b", "c.txt")
+print strings.join(["x", "y", "z"], "-")

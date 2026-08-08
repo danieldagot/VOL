@@ -47,11 +47,11 @@ go run ./cmd/vol run ./examples/basics/arguments.vol -- apple banana
 | `features/struct.vol` | Product structs, named + positional literals |
 | `features/struct_nested.vol` | Nested structs and shared identity |
 | `features/const_struct.vol` | Shallow `const` on struct bindings |
-| `features/print_multi.vol` | Multi-arg `print`, string `+` coercion, `.count()` |
-| `features/modules/main.vol` | `import` + `export` |
+| `features/print_multi.vol` | Multi-arg `print`, string `+` coercion, `.len` |
+| `features/modules/main.vol` | `import` + namespaced exports |
 | `features/modules/import_struct.vol` | Importing a struct type |
 | `features/modules/aliases/main.vol` | `@lib` path alias via local `vol.config.json` |
-| `features/std/dict.vol` | `dict("k", v, …)`, string-key index, `.keys()` |
+| `features/std/dict.vol` | `dict { k: v }`, string-key index, `.keys()` |
 | `features/std/math_strings.vol` | `@std/math` + `@std/strings` |
 | `features/std/fs_path.vol` | `@std/fs` + `@std/path` |
 | `features/std/env_time.vol` | `@std/env` + `@std/time` |
@@ -67,9 +67,9 @@ go run ./cmd/vol run ./examples/features/errors.vol
 go run ./cmd/vol run ./examples/features/std/math_strings.vol
 ```
 
-Note: `@std/strings` and `@std/path` both export `join`; `@std/url` /
-`@std/json` / `@std/yaml` all export `parse`. Import one module per colliding
-name in a given file.
+Note (SF-3.1): imports bind module names — `strings.join` and `path.join` can
+be used in the same file; call `json.parse` / `url.parse` / `yaml.parse`
+explicitly.
 
 ## Projects
 

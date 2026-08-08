@@ -83,6 +83,7 @@ func TestLexerDiagnostics(t *testing.T) {
 	}{
 		{name: "bang without equals", source: "!", code: "E002", line: 1, column: 1},
 		{name: "unexpected character", source: "\n  @", code: "E003", line: 2, column: 3},
+		{name: "single-quoted string", source: "x := 'hi'", code: "E003", line: 1, column: 6},
 		{name: "string ends at newline", source: "\"open\n", code: "E004", line: 1, column: 1},
 		{name: "string ends at eof", source: "\"open", code: "E004", line: 1, column: 1},
 		{name: "dangling escape", source: "\"open\\", code: "E004", line: 1, column: 1},

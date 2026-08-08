@@ -1,0 +1,7 @@
+nums := [3, 8, 1, 12, 5, 9]
+g := nums.where(_ > 5)
+print g.len
+print g.sum()
+print g
+    .map(_ * 2)
+    .sum()
