@@ -616,16 +616,16 @@ Semantics:
 The condition may read enclosing variables. Nested `.where` calls each bind their
 own `_`.
 
-**Purity (decided):** `.where` expresses **pure filtering**. The predicate must
-not rely on observable side effects (mutation of enclosing state, I/O, or other
-effects). Read-only use of `_` and enclosing variables is allowed. Use `.each`
-for imperative per-item work (`print`, mutation, and similar).
+**Purity (Planned):** the intended intent split is that `.where` / `.map` /
+`.count` express filtering, transforms, and counting, while `.each` is for
+imperative per-item work (`print`, mutation, and similar). Prefer side-effect-free
+predicates and transforms.
 
-In this prototype the predicate expression is still evaluated eagerly left to
-right, so impure helpers may appear to “work.” Such programs are
-**non-conforming**: future compilers may assume purity, reorder or fuse
-`.where` pipelines, or reject impure predicates. Do not depend on side effects
-inside `.where`.
+This prototype does **not** reject impure predicates: expressions are evaluated
+eagerly left to right, so helpers with effects may appear to “work.” Do not
+depend on that. Future purity checks (and any fusion or parallelization that
+assumes purity) are Planned in [`IDEAS.md`](IDEAS.md); until they exist, purity
+is guidance, not an enforced language rule.
 
 #### `.sum()`
 
@@ -675,9 +675,9 @@ Semantics:
 4. Return the count as an integer.
 
 `.where` / `.map` / `.count` / `.sum()` are not parallel and not lazy in this
-prototype. Future fusion or parallelization of pure collection pipelines depends
-on the purity rule above (treat `.map` transforms and `.count` predicates like
-`.where` for conformance).
+prototype. Future fusion or parallelization of collection pipelines depends on
+Planned purity checks (treat `.map` transforms and `.count` predicates like
+`.where` for that future rule).
 
 ---
 
@@ -835,9 +835,9 @@ items.each item {
   `items.each item { ... }`). Writing `.each(...)` as a call is not this
   statement; it fails as unknown property `each` (`R007` with the same `fix`).
 
-`.each` and `.where` express different intents. Both are valid: use `.where` for
-pure filters (and `.sum()` for reduction); use `.each` when the body has side
-effects. See §4.4.
+`.each` and `.where` express different intents. Both are valid: prefer `.where`
+for filtering (and `.sum()` for reduction); use `.each` when the body has side
+effects. Purity of `.where` predicates is Planned guidance — see §4.4.
 
 ### 5.7 `print`
 
@@ -988,8 +988,13 @@ Rules:
 
 ```vol
 import "examples/features/modules/math"
-import "@std/demo"
 export add
+```
+
+Aliases are project-local via `vol.config.json` `paths` (illustrative):
+
+```vol
+import "@lib/math"   // expands only if the project defines "@lib" → some dir
 ```
 
 Rules:
@@ -1008,8 +1013,11 @@ Rules:
   scope; collisions are `S034`.
 - Dependency modules execute (top-level side effects) in topological order before
   the entry module.
-- Ambient tiny core is unchanged; there is no automatic stdlib. `@std/...` only
-  works when it resolves to a real `.vol` file under the project.
+- Ambient tiny core is unchanged; there is no automatic stdlib. Alias names such
+  as `@std` are **not reserved or magic** — they work only when a project’s
+  `paths` maps them to a real directory that contains the imported `.vol` file.
+  A richer standard library behind imports remains Planned
+  ([`IDEAS.md`](IDEAS.md)).
 
 Built-in names cannot be redeclared at module scope.
 
@@ -1368,8 +1376,9 @@ and Planned work in [`IDEAS.md`](IDEAS.md).
   recursive clone. Move/ownership are not implied.
 - **Integer overflow (§4.3):** overflow **traps** (`R028` with a `fix`
   suggestion). Wrapping ops / build modes are Planned.
-- **`.where` purity (§4.4):** predicates are **pure filtering**; side effects
-  belong in `.each`. Impure predicates are non-conforming; purity checks Planned.
+- **`.where` / `.map` / `.count` purity (§4.4):** **Planned** — prefer
+  side-effect-free predicates/transforms and use `.each` for effects; the
+  prototype does not enforce purity today (see [`IDEAS.md`](IDEAS.md)).
 - **Missing return (§5.8):** fall-off yields `nothing`; discarding in a call
   statement is OK; assigning or using `nothing` as a value is `R029`.
 - **String / array `.len` (§3.2, §4.4):** canonical short property; string `.len`
@@ -1408,17 +1417,30 @@ Implementers and LLMs must follow the concrete behavior in sections 1–9.
 
 ## 12. Intended formatting (not implemented)
 
-The formatter does not exist yet. Planned presentation rules:
+`vol fmt` exists as a **CLI stub**: it parses the file and reports diagnostics,
+but does **not** rewrite source or enforce format equality. Canonical
+presentation rules (for a future rewriter):
 
 - deterministic, idempotent output
-- four-space indentation unless later changed
-- opening braces on the declaration or control-flow line
-- closing braces on their own line
-- spaces around binary operators
-- stable comment placement
+- four-space indentation
+- opening braces on the declaration or control-flow line (`fn`, `if`, `while`,
+  `repeat`, `.each`, `struct`, …); closing braces on their own line
+- one statement per line; blank line between top-level declarations when helpful
+- spaces around binary operators and around `:=` / `=`
+- no space before `(` in calls; space after `,`
+- prefer `_` over `fn` in `.where` / `.map` / `.count` when equivalent
+- stable comment placement (exact algorithm TBD with the AST rewriter)
 - no mandatory semicolons
 
-Details and commands live in [`IDEAS.md`](IDEAS.md).
+Commands (rewrite / `--check` format-equality still Planned):
+
+```text
+vol fmt file.vol
+vol fmt .
+vol fmt --check file.vol
+```
+
+Details live in [`IDEAS.md`](IDEAS.md).
 
 ---
 

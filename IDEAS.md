@@ -38,7 +38,8 @@ Immediate documentation and design work:
 - [x] Modules — **implemented** (config + `path.vol` / `path/mod.vol`; ambient tiny core).
 - [x] Phase-2 design directions #2–#11 (structs/Result/unwrap/density in SF-1;
       remaining ownership/alloc, parallel, build modes, pipelines).
-- [ ] Foundations before SF-2: formatter design; richer std libraries behind imports.
+- [ ] Foundations before SF-2: finish `vol fmt` rewriter (CLI stub + style rules
+      drafted); richer std libraries behind imports (design only — aliases ≠ stdlib).
 - [x] Write `LLM_BENCHMARK.md` with a falsifiable generate/repair protocol;
       harness + Gemini `core_v2` published — see checklist in that file.
 - [ ] Keep Planned syntax out of `SPEC.md`; only Supported and Provisional forms belong there.
@@ -87,8 +88,9 @@ Immediate documentation and design work:
 - [x] Collection iteration with `.each`.
 - [x] Filtering with `.where` and aggregation with `.sum()`.
 - [x] `.map(_)` and `.count(_)` (SF-1).
-- [x] `.where` predicates are pure by rule; side effects use `.each` (`SPEC.md` §4.4).
-- [ ] Purity diagnostics / checks for `.where` predicates.
+- [ ] `.where` / `.map` / `.count` purity: intent guidance in `SPEC.md` §4.4;
+      diagnostics / enforcement Planned (not decided-as-enforced).
+- [ ] Purity diagnostics / checks for `.where` / `.map` / `.count` predicates.
 - [x] Functions, parameters, calls, and return values.
 - [x] Missing return yields `nothing`; using it as a value is `R029` (`SPEC.md` §5.8).
 - [ ] Typed void vs valued functions (require `return` on all paths when typed).
@@ -123,18 +125,20 @@ When static types exist, Planned refinements:
 - void / procedure functions may omit `return`
 - better diagnostics naming the callee that produced `nothing`
 
-### `.where` purity checks
+### `.where` / `.map` / `.count` purity checks
 
-Decided language rule (already in `SPEC.md` §4.4): `.where` predicates are pure
-filters; use `.each` for side effects. The prototype still evaluates predicate
-expressions eagerly and does not yet reject impurity.
+**Planned (not enforced):** prefer side-effect-free predicates and transforms;
+use `.each` for effects (`SPEC.md` §4.4). The prototype evaluates these
+expressions eagerly and does not reject impurity — do not document purity as a
+settled enforced rule until checks land.
 
 Planned:
 
-- diagnostics when a `.where` predicate clearly has side effects (or cannot be
-  proven pure), with a `fix` suggesting `.each` when appropriate
+- diagnostics when a `.where` / `.map` / `.count` expression clearly has side
+  effects (or cannot be proven pure), with a `fix` suggesting `.each` when
+  appropriate
 - allow clearly pure helper calls such as Boolean predicates over `_`
-- treat purity as a prerequisite for any future fusion or parallel `.where`
+- treat purity as a prerequisite for any future fusion or parallel collection ops
 
 ### Wrapping integer arithmetic / overflow and build modes
 
@@ -324,9 +328,16 @@ entry rule, sorted export-list formatter.
 
 #### Standard-library import policy
 
-**Direction decided (enforced):** ambient tiny core only — `print`, `input`,
-`assert`, `string`, `args`, and collection methods in SPEC. Everything else
-requires an **explicit import** when those libraries exist.
+**Direction decided (enforced for ambient surface):** ambient tiny core only —
+`print`, `input`, `assert`, `string`, `args`, and collection methods in SPEC.
+Everything else requires an **explicit import** when those libraries exist.
+
+**Aliases ≠ stdlib:** `vol.config.json` `paths` (including example spellings like
+`@std` or `@compiler` in this repo’s root config) are **project-local** alias
+demos for the import feature. They are not a reserved standard-library root and
+do not ship a product `std/` tree. A richer std behind imports remains Planned;
+candidate first modules (when implemented): math helpers, strings, filesystem,
+then net/serialization — always via explicit `import`, never ambient growth.
 
 ### Block comments
 
@@ -334,20 +345,30 @@ Block-comment spelling has not been decided.
 
 ## Formatter
 
-- [ ] Build a syntax-aware formatter using the compiler parser.
-- [ ] Define one canonical style.
+- [x] CLI stub: `vol fmt [--check] <path>` parses and reports diagnostics; rewrite
+      and format-equality check still exit with “not implemented” (see `cmd/vol`).
+- [x] Draft canonical style rules (`SPEC.md` §12 + below).
+- [ ] Build a syntax-aware rewriter using the compiler parser / AST.
 - [ ] Make formatting deterministic and idempotent.
 - [ ] Preserve comments reliably.
-- [ ] Support formatting a file or directory.
-- [ ] Support a check-only mode for continuous integration.
+- [ ] Support formatting a directory (`.`).
+- [ ] Support real `--check` format-equality for CI.
 - [ ] Make formatting fast enough to run on save.
 
-Planned commands:
+Canonical style (draft):
+
+- four-space indent; K&R braces on `fn` / `if` / `while` / `repeat` / `.each` /
+  `struct`
+- one statement per line; spaces around binary ops and `:=` / `=`
+- no space before `(` in calls; space after `,`
+- prefer `_` over `fn` in `.where` / `.map` / `.count` when equivalent
+
+Commands:
 
 ```text
 vol fmt file.vol
 vol fmt .
-vol fmt --check .
+vol fmt --check file.vol
 ```
 
 Formatting must only change presentation, never program structure. A separate
@@ -380,7 +401,7 @@ Checklist:
 - [x] Detect import cycles and report their complete path deterministically.
 - [ ] Collect exports written anywhere in a module and format one sorted export list at the top.
 
-Proposed configuration:
+Proposed configuration (illustrative aliases only — not a shipped stdlib layout):
 
 ```json
 {
@@ -570,8 +591,8 @@ not LLM task-success efficiency. Never cite density ratios as workflow proof.
   **Decided and implemented:** `.len` = Unicode scalars; `.byte_len` = UTF-8 bytes.
   See `SPEC.md` §3.2.
 - ~~Which side effects are allowed inside `.where` predicates in a future compiler?~~
-  **Decided:** none relied upon — pure filter; `.each` for effects; checks Planned.
-  See `SPEC.md` §4.4.
+  **Planned:** prefer none — filter/transform intent vs `.each` for effects;
+  not enforced today. See `SPEC.md` §4.4 and “`.where` purity checks” above.
 - ~~Missing return value?~~ **Decided:** `nothing` if unused as a statement
   result; `R029` if assigned or used as a value. See `SPEC.md` §5.8.
 - ~~How are fallible operations and errors represented?~~ **Implemented

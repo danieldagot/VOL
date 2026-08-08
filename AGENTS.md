@@ -50,7 +50,8 @@ Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
 - multi-assign `a, b := …` / `a, b = …` is Supported (RHS fully evaluated before assigns)
 - array assignment **shares** references; use `.copy()` (shallow) or `.deep_copy()` (recursive) for isolation
 - integer overflow **traps** (`R028`) with a `fix` suggestion; wrapping modes are Planned
-- `.where` predicates are **pure**; side effects belong in `.each`; `.map` / `.count` are Supported
+- `.where` / `.map` / `.count` are Supported; prefer side-effect-free predicates
+  (effects belong in `.each`); purity checks are Planned, not enforced today
 - missing `return` yields `nothing`; discarding in a call statement is OK;
   assigning or using `nothing` as a value is `R029`
 - Option uses `some` / `none` with if-let and `??`; Result uses `ok` / `err`
@@ -58,7 +59,9 @@ Settled prototype rules (source of truth: [`SPEC.md`](SPEC.md) §11 Decided):
   bugs still trap; `match` is Rejected (`E153`)
 - anonymous `fn(params) { ... }` and expression-body `fn(params) expr` are Supported (`=>` is not)
 - product `struct` with named and positional literals and `.` field access is Supported
-- `import "path"` + `vol.config.json` discovery/aliases; `export` is live across modules
+- `import "path"` + `vol.config.json` discovery/aliases; `export` is live across
+  modules (root `@std` / `@compiler` entries are illustrative aliases, not a
+  shipped stdlib)
 - `.len` is the length property (string: Unicode scalars); `.length` is rejected
 - `while` is permanent Supported vocabulary (with `repeat` and `.each` for other intents)
 - `if` is a statement (`elif` / `else`); value choice uses `? :` (not expression-`if`)
@@ -141,7 +144,7 @@ a design goal; SF-1 surface + early harness runs do not prove workflow superiori
 
 Goals:
 
-- deterministic formatting (Planned)
+- deterministic formatting (Planned; `vol fmt` CLI stub parses only)
 - deterministic diagnostics (human + JSON — Supported today)
 - structured errors with stable codes (Supported today)
 - machine-readable compiler/interpreter output (`vol --json` — Supported)
@@ -205,9 +208,10 @@ Priority:
 5. Compile speed
 
 Near-term project priority: **SF-1 is active** — keep the frozen surface precise
-(tests, diagnostics, docs) and build foundations (formatter; richer std via
-imports) before an SF-2 feature bump. Remaining directions (enums, dual-return
-sugar, ownership/alloc, build modes, `|>`, parallel) are sketched in
+(tests, diagnostics, docs) and finish foundations (`vol fmt` rewriter after the
+CLI stub; richer std **design** behind imports — aliases ≠ stdlib) before an
+SF-2 feature bump. Remaining directions (enums, dual-return sugar,
+ownership/alloc, build modes, `|>`, parallel) are sketched in
 [`IDEAS.md`](IDEAS.md). See `SPEC.md` §0 / §11.
 
 ---

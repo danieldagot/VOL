@@ -72,11 +72,11 @@ card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
 - indexed array assignment (assignment and arguments share array identity; use `.copy()` for a shallow clone or `.deep_copy()` for a recursive clone)
 - array `.len` and string `.len` (Unicode scalar values) and string `.byte_len` (UTF-8 byte count)
 - array iteration with `.each` (imperative / side effects)
-- collection filtering with `.where(...)`, mapping with `.map(...)`, counting with `.count(...)`, and numeric aggregation with `.sum()`
+- collection filtering with `.where(...)`, mapping with `.map(...)`, counting with `.count(...)`, and numeric aggregation with `.sum()` (prefer side-effect-free predicates; purity checks Planned)
 - Option values with `some(value)` / `none`; unwrap with if-let and `??` (`match` rejected)
 - Result values with `ok(value)` / `err(value)`; unwrap with if-let and postfix `?` in functions (bugs still trap)
 - product `struct` types, named and positional construction, and field get/set
-- `import "path"` / aliases via nearest `vol.config.json`; live `export` across modules
+- `import "path"` / project-local aliases via nearest `vol.config.json`; live `export` across modules (root `@std` / `@compiler` are example aliases, not a shipped stdlib)
 - `print`
 - interactive text input with `input()` or `input(prompt)`
 - runtime checks with `assert(condition)` or `assert(condition, message)`
@@ -94,7 +94,7 @@ card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
 
 - static type checking
 - richer diagnostic suggestions across more error codes
-- canonical VOL formatter
+- canonical VOL formatter rewriter (`vol fmt` CLI stub parses only today)
 - a published compatibility policy and versioned conformance corpus (SF-0 / SF-1 pins)
 - broader LLM workflow results across more models and realistic backend tasks
 - initial language-server support
@@ -123,9 +123,9 @@ card** (SF-1-bound subset — not a full SF-1 product tour). SF-0 /
 - optional `?T` sugar for Option (canonical form is `some`/`none`)
 - C and LLVM backend details
 
-Near-term priority is to keep SF-1 precise and finish foundations (formatter,
-richer std via imports) before an SF-2 feature bump. Remaining directions live
-in [`IDEAS.md`](IDEAS.md).
+Near-term priority is to keep SF-1 precise and finish foundations (`vol fmt`
+rewriter; richer std **behind imports** when designed — not ambient growth)
+before an SF-2 feature bump. Remaining directions live in [`IDEAS.md`](IDEAS.md).
 
 See [`SPEC.md`](SPEC.md) for vocabulary, syntax, and formal behavior of the
 current interpreter, and [`IDEAS.md`](IDEAS.md) for future work and open design

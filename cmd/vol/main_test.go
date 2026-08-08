@@ -40,7 +40,7 @@ func TestLegacyFileCommand(t *testing.T) {
 }
 
 func TestRunUsage(t *testing.T) {
-	for _, args := range [][]string{nil, {}, {"run"}, {"one.vol", "extra"}} {
+	for _, args := range [][]string{nil, {}, {"run"}, {"fmt"}, {"one.vol", "extra"}} {
 		var stdout, stderr bytes.Buffer
 		if code := run(args, &stdout, &stderr); code != 2 {
 			t.Fatalf("args %#v: exit code %d, want 2", args, code)
@@ -48,6 +48,58 @@ func TestRunUsage(t *testing.T) {
 		if stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage:") {
 			t.Fatalf("args %#v: stdout %q, stderr %q", args, stdout.String(), stderr.String())
 		}
+	}
+}
+
+func TestFmtStubParsesThenNotImplemented(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ok.vol")
+	if err := os.WriteFile(path, []byte("print 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"fmt", path},
+		{"fmt", "--check", path},
+		{"--json", "fmt", path},
+	} {
+		var stdout, stderr bytes.Buffer
+		if code := run(args, &stdout, &stderr); code != 2 {
+			t.Fatalf("args %#v: exit %d, want 2; stderr %q", args, code, stderr.String())
+		}
+		if stdout.Len() != 0 || !strings.Contains(stderr.String(), "not implemented") {
+			t.Fatalf("args %#v: stdout %q, stderr %q", args, stdout.String(), stderr.String())
+		}
+	}
+}
+
+func TestFmtReportsParseFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad.vol")
+	if err := os.WriteFile(path, []byte("print }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"fmt", path}, &stdout, &stderr); code != 1 {
+		t.Fatalf("exit %d, want 1", code)
+	}
+	if stdout.Len() != 0 || !strings.Contains(stderr.String(), "error[E101]") {
+		t.Fatalf("stdout %q, stderr %q", stdout.String(), stderr.String())
+	}
+}
+
+func TestFmtJSONParseFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad.vol")
+	if err := os.WriteFile(path, []byte("print }\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"--json", "fmt", path}, &stdout, &stderr); code != 1 {
+		t.Fatalf("exit %d, want 1", code)
+	}
+	var value map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(stderr.String())), &value); err != nil {
+		t.Fatalf("stderr is not valid JSON: %v\nstderr: %q", err, stderr.String())
+	}
+	if value["code"] != "E101" {
+		t.Fatalf("JSON code = %v, want E101", value["code"])
 	}
 }
 
